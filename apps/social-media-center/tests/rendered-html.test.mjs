@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import * as XLSX from "xlsx";
 
 const root = new URL("../", import.meta.url);
 
@@ -11,6 +12,7 @@ for (const [path, heading] of [
   ["app/imports/page.tsx", "新媒体智能数据导入中心"],
   ["app/hot-topics/page.tsx", "新媒体热点监测中心"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
+  ["app/data-templates/page.tsx", "新媒体数据资产采集模板中心"],
 ]) {
   test(`${path} defines the requested page`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
@@ -21,7 +23,7 @@ for (const [path, heading] of [
 }
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, dataTemplates] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -29,6 +31,7 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/imports/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/hot-topics/route.ts", root), "utf8"),
     readFile(new URL("app/api/ai-analysis/route.ts", root), "utf8"),
+    readFile(new URL("app/api/data-templates/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -54,6 +57,11 @@ test("pages use database-backed API routes", async () => {
   assert.match(aiAnalysis, /ruleBasedContentEngine/);
   assert.match(aiAnalysis, /buildReport\("daily"/);
   assert.match(aiAnalysis, /buildReport\("weekly"/);
+  assert.match(dataTemplates, /XLSX\.read/);
+  assert.match(dataTemplates, /日期格式|发布时间/);
+  assert.match(dataTemplates, /非负整数/);
+  assert.match(dataTemplates, /平台名称/);
+  assert.doesNotMatch(dataTemplates, /INSERT INTO|UPDATE social_|DELETE FROM/);
 });
 
 test("content analysis model defines a 100-point weighted score", async () => {
@@ -64,6 +72,24 @@ test("content analysis model defines a 100-point weighted score", async () => {
   assert.match(engine, /propagationAbility: 20/);
   assert.match(engine, /hotMatch: 15/);
   assert.match(engine, /content-rules-v1/);
+});
+
+test("five Excel collection templates expose standard headers and guidance", async () => {
+  const cases = [
+    ["public/templates/douyin-social-posts-template-v1.xlsx", ["平台", "作品标题", "发布时间", "作品链接", "内容类型", "播放量", "点赞量", "评论量", "收藏量", "分享量", "涨粉量", "标签", "备注"]],
+    ["public/templates/kuaishou-social-posts-template-v1.xlsx", ["平台", "作品标题", "发布时间", "作品链接", "内容类型", "播放量", "点赞量", "评论量", "收藏量", "分享量", "涨粉量", "标签", "备注"]],
+    ["public/templates/weibo-social-posts-template-v1.xlsx", ["平台", "作品标题", "发布时间", "作品链接", "内容类型", "播放量", "点赞量", "评论量", "收藏量", "分享量", "涨粉量", "标签", "备注"]],
+    ["public/templates/wechat-channels-social-posts-template-v1.xlsx", ["平台", "作品标题", "发布时间", "作品链接", "内容类型", "播放量", "点赞量", "评论量", "收藏量", "分享量", "涨粉量", "标签", "备注"]],
+    ["public/templates/competitor-accounts-template-v1.xlsx", ["平台", "账号名称", "作品标题", "发布时间", "播放量", "点赞", "评论", "收藏", "爆款原因"]],
+  ];
+
+  for (const [path, expectedHeaders] of cases) {
+    const bytes = await readFile(new URL(path, root));
+    const workbook = XLSX.read(bytes, { type: "buffer" });
+    assert.deepEqual(workbook.SheetNames, ["数据采集", "填写说明", "填写示例"]);
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets["数据采集"], { header: 1, raw: true });
+    assert.deepEqual(rows[0], expectedHeaders);
+  }
 });
 
 test("import schema migration is generated", async () => {

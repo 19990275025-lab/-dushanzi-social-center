@@ -9,6 +9,7 @@ const navItems = [
   { href: "/imports", label: "数据导入中心", code: "04" },
   { href: "/hot-topics", label: "热点监测中心", code: "05" },
   { href: "/ai-analysis", label: "AI内容分析", code: "06" },
+  { href: "/data-templates", label: "数据模板中心", code: "07" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
