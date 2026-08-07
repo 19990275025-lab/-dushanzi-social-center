@@ -43,6 +43,29 @@ export const dataImportLogs = sqliteTable(
   ],
 );
 
+export const collectionLogs = sqliteTable(
+  "collection_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceName: text("source_name").notNull(),
+    sourceUrl: text("source_url"),
+    status: text("status").notNull().default("pending"),
+    totalCount: integer("total_count").notNull().default(0),
+    successCount: integer("success_count").notNull().default(0),
+    errorCount: integer("error_count").notNull().default(0),
+    errorMessage: text("error_message"),
+    collectedAt: text("collected_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_collection_logs_created_at").on(table.createdAt),
+    index("idx_collection_logs_platform_status").on(table.platform, table.status),
+  ],
+);
+
 export const socialPosts = sqliteTable(
   "social_posts",
   {
@@ -72,6 +95,9 @@ export const socialPosts = sqliteTable(
     importLogId: integer("import_log_id").references(() => dataImportLogs.id, {
       onDelete: "set null",
     }),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
+      onDelete: "set null",
+    }),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -80,6 +106,7 @@ export const socialPosts = sqliteTable(
     index("idx_social_posts_account_publish_time").on(table.accountId, table.publishTime),
     index("idx_social_posts_platform_publish_time").on(table.platform, table.publishTime),
     index("idx_social_posts_import_log_id").on(table.importLogId),
+    index("idx_social_posts_collection_log_id").on(table.collectionLogId),
   ],
 );
 

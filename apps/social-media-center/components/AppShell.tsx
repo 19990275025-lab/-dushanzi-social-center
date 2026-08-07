@@ -10,6 +10,7 @@ const navItems = [
   { href: "/hot-topics", label: "热点监测中心", code: "05" },
   { href: "/ai-analysis", label: "AI内容分析", code: "06" },
   { href: "/data-templates", label: "数据模板中心", code: "07" },
+  { href: "/collector", label: "智能采集中心", code: "08" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

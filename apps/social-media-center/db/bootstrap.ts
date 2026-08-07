@@ -34,6 +34,25 @@ const schemaStatements = [
     ON data_import_logs(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_data_import_logs_status
     ON data_import_logs(status)`,
+  `CREATE TABLE IF NOT EXISTS collection_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    source_type TEXT NOT NULL CHECK (source_type IN ('chrome','excel','api')),
+    source_name TEXT NOT NULL,
+    source_url TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    total_count INTEGER NOT NULL DEFAULT 0 CHECK (total_count >= 0),
+    success_count INTEGER NOT NULL DEFAULT 0 CHECK (success_count >= 0),
+    error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
+    error_message TEXT,
+    collected_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_collection_logs_created_at
+    ON collection_logs(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_collection_logs_platform_status
+    ON collection_logs(platform, status)`,
   `CREATE TABLE IF NOT EXISTS social_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -193,9 +212,21 @@ async function initialize() {
       )
       .run();
   }
+  if (!postColumns.results.some((column) => column.name === "collection_log_id")) {
+    await d1
+      .prepare(
+        "ALTER TABLE social_posts ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL",
+      )
+      .run();
+  }
   await d1
     .prepare(
       "CREATE INDEX IF NOT EXISTS idx_social_posts_import_log_id ON social_posts(import_log_id)",
+    )
+    .run();
+  await d1
+    .prepare(
+      "CREATE INDEX IF NOT EXISTS idx_social_posts_collection_log_id ON social_posts(collection_log_id)",
     )
     .run();
 

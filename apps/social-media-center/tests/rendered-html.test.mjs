@@ -13,6 +13,7 @@ for (const [path, heading] of [
   ["app/hot-topics/page.tsx", "新媒体热点监测中心"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
   ["app/data-templates/page.tsx", "新媒体数据资产采集模板中心"],
+  ["app/collector/page.tsx", "新媒体智能采集中心"],
 ]) {
   test(`${path} defines the requested page`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
@@ -23,7 +24,7 @@ for (const [path, heading] of [
 }
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, dataTemplates] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, dataTemplates, collections, collectionConfirm] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -32,6 +33,8 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/hot-topics/route.ts", root), "utf8"),
     readFile(new URL("app/api/ai-analysis/route.ts", root), "utf8"),
     readFile(new URL("app/api/data-templates/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/confirm/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -62,6 +65,11 @@ test("pages use database-backed API routes", async () => {
   assert.match(dataTemplates, /非负整数/);
   assert.match(dataTemplates, /平台名称/);
   assert.doesNotMatch(dataTemplates, /INSERT INTO|UPDATE social_|DELETE FROM/);
+  assert.match(collections, /FROM collection_logs/);
+  assert.match(collections, /DELETE FROM social_posts WHERE collection_log_id/);
+  assert.match(collectionConfirm, /INSERT INTO social_posts/);
+  assert.match(collectionConfirm, /collection_log_id/);
+  assert.match(collectionConfirm, /d1\.batch/);
 });
 
 test("content analysis model defines a 100-point weighted score", async () => {
@@ -108,6 +116,21 @@ test("hot topic schema migrations are generated", async () => {
     assert.match(migration, /status/);
     assert.match(migration, /created_at/);
   }
+});
+
+test("collection schema and Chrome adapter are packaged", async () => {
+  const [migration, manifest, popup] = await Promise.all([
+    readFile(new URL("drizzle/0003_collection_center.sql", root), "utf8"),
+    readFile(new URL("public/chrome-extension/douyin-collector-v1/manifest.json", root), "utf8"),
+    readFile(new URL("public/chrome-extension/douyin-collector-v1/popup.js", root), "utf8"),
+  ]);
+  assert.match(migration, /CREATE TABLE `collection_logs`/);
+  assert.match(migration, /ADD `collection_log_id`/);
+  assert.match(manifest, /creator\.douyin\.com/);
+  assert.match(popup, /collectVisibleDouyinPosts/);
+  assert.match(popup, /chrome\.scripting\.executeScript/);
+  assert.doesNotMatch(popup, /cookie|localStorage|sessionStorage/i);
+  await access(new URL("public/chrome-extension/douyin-collector-v1.zip", root));
 });
 
 test("production build artifacts exist", async () => {
