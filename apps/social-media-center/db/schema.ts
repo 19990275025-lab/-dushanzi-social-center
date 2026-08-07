@@ -25,6 +25,24 @@ export const socialAccounts = sqliteTable(
   ],
 );
 
+export const dataImportLogs = sqliteTable(
+  "data_import_logs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    fileName: text("file_name").notNull(),
+    importType: text("import_type").notNull(),
+    status: text("status").notNull().default("pending"),
+    successCount: integer("success_count").notNull().default(0),
+    errorCount: integer("error_count").notNull().default(0),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_data_import_logs_created_at").on(table.createdAt),
+    index("idx_data_import_logs_status").on(table.status),
+  ],
+);
+
 export const socialPosts = sqliteTable(
   "social_posts",
   {
@@ -51,6 +69,9 @@ export const socialPosts = sqliteTable(
       confidence?: number;
       sample?: boolean;
     } | null>(),
+    importLogId: integer("import_log_id").references(() => dataImportLogs.id, {
+      onDelete: "set null",
+    }),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -58,6 +79,7 @@ export const socialPosts = sqliteTable(
     uniqueIndex("uq_social_posts_account_title").on(table.accountId, table.title),
     index("idx_social_posts_account_publish_time").on(table.accountId, table.publishTime),
     index("idx_social_posts_platform_publish_time").on(table.platform, table.publishTime),
+    index("idx_social_posts_import_log_id").on(table.importLogId),
   ],
 );
 

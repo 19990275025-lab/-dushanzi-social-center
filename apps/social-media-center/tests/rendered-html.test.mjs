@@ -8,6 +8,7 @@ for (const [path, heading] of [
   ["app/page.tsx", "新媒体运营驾驶舱"],
   ["app/content/page.tsx", "内容分析"],
   ["app/tasks/page.tsx", "任务管理"],
+  ["app/imports/page.tsx", "新媒体智能数据导入中心"],
 ]) {
   test(`${path} defines the requested page`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
@@ -18,10 +19,12 @@ for (const [path, heading] of [
 }
 
 test("dashboard data comes from database-backed API routes", async () => {
-  const [dashboard, posts, tasks] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
+    readFile(new URL("app/api/imports/route.ts", root), "utf8"),
+    readFile(new URL("app/api/imports/confirm/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -31,6 +34,16 @@ test("dashboard data comes from database-backed API routes", async () => {
   assert.match(tasks, /FROM content_tasks/);
   assert.match(tasks, /export async function POST/);
   assert.match(tasks, /export async function PATCH/);
+  assert.match(imports, /FROM data_import_logs/);
+  assert.match(imports, /export async function DELETE/);
+  assert.match(confirm, /INSERT INTO social_posts/);
+  assert.match(confirm, /d1\.batch/);
+});
+
+test("import schema migration is generated", async () => {
+  const migration = await readFile(new URL("drizzle/0001_thick_marrow.sql", root), "utf8");
+  assert.match(migration, /CREATE TABLE `data_import_logs`/);
+  assert.match(migration, /ADD `import_log_id`/);
 });
 
 test("production build artifacts exist", async () => {

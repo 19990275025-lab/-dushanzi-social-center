@@ -4,6 +4,7 @@ import * as schema from "./schema";
 
 type RuntimeEnv = {
   DB?: D1Database;
+  UPLOADS?: R2Bucket;
   LOAD_TEST_DATA?: string;
 };
 
@@ -19,6 +20,14 @@ export function getD1() {
 
 export function getDb() {
   return drizzle(getD1(), { schema });
+}
+
+export function getUploads() {
+  const bucket = (env as unknown as RuntimeEnv).UPLOADS;
+  if (!bucket) {
+    throw new Error("上传文件存储连接不可用");
+  }
+  return bucket;
 }
 
 export function shouldLoadTestData() {

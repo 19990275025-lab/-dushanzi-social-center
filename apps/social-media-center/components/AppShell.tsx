@@ -6,6 +6,7 @@ const navItems = [
   { href: "/", label: "运营驾驶舱", code: "01" },
   { href: "/content", label: "内容分析", code: "02" },
   { href: "/tasks", label: "任务管理", code: "03" },
+  { href: "/imports", label: "数据导入中心", code: "04" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

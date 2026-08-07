@@ -10,11 +10,12 @@
 
 ## 1. 交付内容
 
-本版本依据 [`social-media-center-v1-architecture.md`](social-media-center-v1-architecture.md) 创建六张独立业务表，用于抖音、快手、微博和微信视频号的账号、作品、评论、热点、竞品和内容任务管理。
+本版本依据 [`social-media-center-v1-architecture.md`](social-media-center-v1-architecture.md) 创建六张基础业务表，用于抖音、快手、微博和微信视频号的账号、作品、评论、热点、竞品和内容任务管理。第四阶段通过增量迁移新增 `data_import_logs`，不改写已经执行的基础迁移。
 
 | 文件 | 用途 |
 |---|---|
 | `database/migrations/001_create_social_media_v1.sql` | 创建六张表、约束、索引和更新时间触发器 |
+| `database/migrations/002_create_data_import_logs.sql` | 新增导入记录表和作品导入批次关联 |
 | `database/seeds/001_social_media_v1_test_data.sql` | 幂等写入两个模拟账号和三条模拟作品 |
 
 本迁移只创建 `social_*`、`hot_topics`、`competitor_accounts`、`content_tasks` 和专用触发器函数，不查询、不修改、不删除 OTA 销售驾驶舱或 OTA 舆情模块的任何表。
@@ -162,12 +163,30 @@
 
 主要索引：`(task_date, status)`、`responsible_person`。V1.0 不执行自动发布。
 
+### 3.7 `data_import_logs`——导入记录表
+
+用途：持久记录 Excel 和图片导入批次，支持错误追踪、重新导入和按批次回滚。
+
+| 字段 | PostgreSQL 类型 | 必填/默认 | 说明 |
+|---|---|---|---|
+| id | UUID | 主键，自动生成 | 导入批次唯一标识 |
+| platform | VARCHAR(32) | 必填 | 数据所属平台 |
+| file_name | VARCHAR(255) | 必填 | 原始文件名称 |
+| import_type | VARCHAR(16) | 必填 | `excel` 或 `image` |
+| status | VARCHAR(32) | 默认 `pending` | `pending`、`completed`、`failed`、`deleted` |
+| success_count | INTEGER | 默认 0 | 成功写入或确认数量 |
+| error_count | INTEGER | 默认 0 | 校验或写入错误数量 |
+| created_at | TIMESTAMPTZ | 自动生成 | 导入记录创建时间 |
+
+`social_posts.import_log_id` 可空外键关联该表。删除错误批次的数据时按该字段删除作品，但导入日志本身保留并标记为 `deleted`。
+
 ## 4. 表之间关系
 
 ```mermaid
 erDiagram
     social_accounts ||--o{ social_posts : "发布"
     social_posts ||--o{ social_comments : "收到"
+    data_import_logs ||--o{ social_posts : "批次写入"
     competitor_accounts }o..o{ social_accounts : "页面对标（无物理外键）"
     hot_topics }o..o{ content_tasks : "可转为任务（V1.0 无物理外键）"
     content_tasks }o..o{ social_posts : "发布后关联（V1.0 无物理外键）"
@@ -229,6 +248,9 @@ V2.0 自动采集前建议通过新迁移增加以下可空字段，不应提前
 ```bash
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f database/migrations/001_create_social_media_v1.sql
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/migrations/002_create_data_import_logs.sql
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f database/seeds/001_social_media_v1_test_data.sql

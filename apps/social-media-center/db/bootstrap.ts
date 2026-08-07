@@ -20,6 +20,20 @@ const schemaStatements = [
     ON social_accounts(platform, account_id)`,
   `CREATE INDEX IF NOT EXISTS idx_social_accounts_platform_status
     ON social_accounts(platform, status)`,
+  `CREATE TABLE IF NOT EXISTS data_import_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    file_name TEXT NOT NULL,
+    import_type TEXT NOT NULL CHECK (import_type IN ('excel','image')),
+    status TEXT NOT NULL DEFAULT 'pending',
+    success_count INTEGER NOT NULL DEFAULT 0 CHECK (success_count >= 0),
+    error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_data_import_logs_created_at
+    ON data_import_logs(created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_data_import_logs_status
+    ON data_import_logs(status)`,
   `CREATE TABLE IF NOT EXISTS social_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -38,6 +52,7 @@ const schemaStatements = [
     hashtags TEXT NOT NULL DEFAULT '[]',
     duration INTEGER,
     ai_analysis TEXT,
+    import_log_id INTEGER REFERENCES data_import_logs(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -164,6 +179,22 @@ const seedStatements = [
 async function initialize() {
   const d1 = getD1();
   await d1.batch(schemaStatements.map((statement) => d1.prepare(statement)));
+
+  const postColumns = await d1
+    .prepare("PRAGMA table_info(social_posts)")
+    .all<{ name: string }>();
+  if (!postColumns.results.some((column) => column.name === "import_log_id")) {
+    await d1
+      .prepare(
+        "ALTER TABLE social_posts ADD COLUMN import_log_id INTEGER REFERENCES data_import_logs(id) ON DELETE SET NULL",
+      )
+      .run();
+  }
+  await d1
+    .prepare(
+      "CREATE INDEX IF NOT EXISTS idx_social_posts_import_log_id ON social_posts(import_log_id)",
+    )
+    .run();
 
   if (shouldLoadTestData()) {
     await d1.batch(seedStatements.map((statement) => d1.prepare(statement)));
