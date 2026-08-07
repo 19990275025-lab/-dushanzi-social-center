@@ -1,0 +1,144 @@
+import { sql } from "drizzle-orm";
+import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+
+export const socialAccounts = sqliteTable(
+  "social_accounts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    accountName: text("account_name").notNull(),
+    accountId: text("account_id").notNull(),
+    accountUrl: text("account_url"),
+    followersCount: integer("followers_count").notNull().default(0),
+    followingCount: integer("following_count").notNull().default(0),
+    likesCount: integer("likes_count").notNull().default(0),
+    status: text("status").notNull().default("active"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_accounts_platform_account_id").on(
+      table.platform,
+      table.accountId,
+    ),
+    index("idx_social_accounts_platform_status").on(table.platform, table.status),
+  ],
+);
+
+export const socialPosts = sqliteTable(
+  "social_posts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    accountId: integer("account_id")
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: "restrict", onUpdate: "cascade" }),
+    platform: text("platform").notNull(),
+    title: text("title").notNull(),
+    contentType: text("content_type").notNull(),
+    publishTime: text("publish_time").notNull(),
+    videoUrl: text("video_url"),
+    coverUrl: text("cover_url"),
+    views: integer("views").notNull().default(0),
+    likes: integer("likes").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
+    favorites: integer("favorites").notNull().default(0),
+    shares: integer("shares").notNull().default(0),
+    fansGrowth: integer("fans_growth").notNull().default(0),
+    hashtags: text("hashtags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    duration: integer("duration"),
+    aiAnalysis: text("ai_analysis", { mode: "json" }).$type<{
+      summary?: string;
+      confidence?: number;
+      sample?: boolean;
+    } | null>(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_posts_account_title").on(table.accountId, table.title),
+    index("idx_social_posts_account_publish_time").on(table.accountId, table.publishTime),
+    index("idx_social_posts_platform_publish_time").on(table.platform, table.publishTime),
+  ],
+);
+
+export const socialComments = sqliteTable(
+  "social_comments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    postId: integer("post_id")
+      .notNull()
+      .references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    platform: text("platform").notNull(),
+    username: text("username").notNull(),
+    commentText: text("comment_text").notNull(),
+    commentTime: text("comment_time").notNull(),
+    likes: integer("likes").notNull().default(0),
+    sentiment: text("sentiment").notNull().default("unknown"),
+    keyword: text("keyword"),
+    userNeed: text("user_need"),
+    aiReply: text("ai_reply"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_social_comments_post_comment_time").on(table.postId, table.commentTime),
+    index("idx_social_comments_sentiment").on(table.sentiment),
+  ],
+);
+
+export const hotTopics = sqliteTable(
+  "hot_topics",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    topicName: text("topic_name").notNull(),
+    heatValue: real("heat_value").notNull().default(0),
+    trend: text("trend").notNull().default("new"),
+    category: text("category"),
+    relatedDegree: real("related_degree"),
+    aiSuggestion: text("ai_suggestion"),
+    collectTime: text("collect_time").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_hot_topics_platform_name").on(table.platform, table.topicName),
+    index("idx_hot_topics_platform_collect_time").on(table.platform, table.collectTime),
+    index("idx_hot_topics_related_degree").on(table.relatedDegree),
+  ],
+);
+
+export const competitorAccounts = sqliteTable(
+  "competitor_accounts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    accountName: text("account_name").notNull(),
+    accountUrl: text("account_url").notNull(),
+    followers: integer("followers").notNull().default(0),
+    industry: text("industry"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_competitor_accounts_platform_url").on(
+      table.platform,
+      table.accountUrl,
+    ),
+  ],
+);
+
+export const contentTasks = sqliteTable(
+  "content_tasks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    taskDate: text("task_date").notNull(),
+    platform: text("platform").notNull(),
+    taskTitle: text("task_title").notNull(),
+    contentType: text("content_type").notNull(),
+    responsiblePerson: text("responsible_person"),
+    status: text("status").notNull().default("idea"),
+    reviewResult: text("review_result"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_content_tasks_date_status").on(table.taskDate, table.status),
+    index("idx_content_tasks_responsible_person").on(table.responsiblePerson),
+  ],
+);
