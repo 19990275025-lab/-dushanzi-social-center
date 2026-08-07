@@ -10,6 +10,7 @@ for (const [path, heading] of [
   ["app/tasks/page.tsx", "任务管理"],
   ["app/imports/page.tsx", "新媒体智能数据导入中心"],
   ["app/hot-topics/page.tsx", "新媒体热点监测中心"],
+  ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
 ]) {
   test(`${path} defines the requested page`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
@@ -20,13 +21,14 @@ for (const [path, heading] of [
 }
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
     readFile(new URL("app/api/imports/route.ts", root), "utf8"),
     readFile(new URL("app/api/imports/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/hot-topics/route.ts", root), "utf8"),
+    readFile(new URL("app/api/ai-analysis/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -46,6 +48,22 @@ test("pages use database-backed API routes", async () => {
   assert.match(hotTopics, /export async function PATCH/);
   assert.match(hotTopics, /export async function DELETE/);
   assert.match(hotTopics, /ruleBasedTopicEngine/);
+  assert.match(aiAnalysis, /FROM social_posts/);
+  assert.match(aiAnalysis, /FROM hot_topics/);
+  assert.match(aiAnalysis, /FROM social_accounts/);
+  assert.match(aiAnalysis, /ruleBasedContentEngine/);
+  assert.match(aiAnalysis, /buildReport\("daily"/);
+  assert.match(aiAnalysis, /buildReport\("weekly"/);
+});
+
+test("content analysis model defines a 100-point weighted score", async () => {
+  const engine = await readFile(new URL("lib/content-analysis-engine.ts", root), "utf8");
+  assert.match(engine, /visualAttraction: 25/);
+  assert.match(engine, /titleQuality: 20/);
+  assert.match(engine, /interactionAbility: 20/);
+  assert.match(engine, /propagationAbility: 20/);
+  assert.match(engine, /hotMatch: 15/);
+  assert.match(engine, /content-rules-v1/);
 });
 
 test("import schema migration is generated", async () => {

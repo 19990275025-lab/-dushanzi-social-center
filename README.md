@@ -29,6 +29,7 @@
 | [新媒体运营驾驶舱 V1.0](apps/social-media-center/README.md) | 平台总览、内容分析和任务管理的可运行页面 |
 | [新媒体智能数据导入中心 V1.0](apps/social-media-center/README.md#数据导入中心-v10) | Excel 预览确认、图片留档、导入记录与安全回滚 |
 | [新媒体热点监测中心 V1.0](apps/social-media-center/README.md#热点监测中心-v10) | 热点管理、TOP10、景区关联评分与规则型 AI 选题推荐 |
+| [AI 内容分析中心 V1.0](apps/social-media-center/README.md#ai-内容分析中心-v10) | 作品评分、平台洞察、选题升级及 AI 日报/周报 |
 | [内容简报模板](templates/内容简报.md) | 每条内容立项模板 |
 | [发布检查表](templates/发布检查表.md) | 上线前的必检项 |
 | [内容排期表](data/内容排期表.csv) | 可导入表格工具的排期数据 |
@@ -70,5 +71,6 @@
 - `/tasks`：任务列表、新增任务和状态更新。
 - `/imports`：Excel/图片上传、数据预览、确认写入、重新导入和批次回滚。
 - `/hot-topics`：热点新增、编辑、删除、TOP10 排行、关联分析和规则选题推荐。
+- `/ai-analysis`：作品爆款评分、五维内容评分、平台分析、选题升级和运营报告。
 
-页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics` 读取和写入数据库，不在前端硬编码作品、任务或热点数据。热点关联评分和选题推荐当前由可解释规则引擎生成，并预留未来大模型适配路径。当前阶段未实现自动采集或复杂 OCR，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
+页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis` 读取和写入数据库，不在前端硬编码作品、任务、热点或分析结果。热点关联评分、内容评分和选题推荐当前由可解释规则引擎生成，并预留未来大模型适配路径。当前阶段未实现自动采集、画面识别或复杂 OCR，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
