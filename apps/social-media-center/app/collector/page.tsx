@@ -172,17 +172,11 @@ export default function CollectorPage() {
         <article className="panel collector-module">
           <div className="collector-module-head"><span>02</span><b>复用现有能力</b></div>
           <h2>Excel 人工导入</h2>
-          <p>使用标准模板人工整理数据，上传后预览、校验并确认写入正式作品库。</p>
+          <p>按导入字段人工整理数据，上传后预览、校验并确认写入正式作品库。</p>
           <a className="secondary-button collector-link" href="/imports">进入 Excel 导入中心</a>
         </article>
-        <article className="panel collector-module">
-          <div className="collector-module-head"><span>03</span><b>标准资产</b></div>
-          <h2>数据模板管理</h2>
-          <p>下载四个平台作品模板和竞品模板，保持人工与自动数据口径一致。</p>
-          <a className="secondary-button collector-link" href="/data-templates">查看数据模板</a>
-        </article>
         <article className="panel collector-module validation-module">
-          <div className="collector-module-head"><span>04</span><b>统一规则</b></div>
+          <div className="collector-module-head"><span>03</span><b>统一规则</b></div>
           <h2>数据校验</h2>
           <p>校验平台、日期、非负指标、作品链接和重复作品，任何错误均阻止整批入库。</p>
           <div className="collector-capabilities"><span>事务写入</span><span>重复拦截</span><span>整批回滚</span></div>

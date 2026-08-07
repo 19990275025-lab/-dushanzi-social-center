@@ -30,7 +30,6 @@
 | [新媒体智能数据导入中心 V1.0](apps/social-media-center/README.md#数据导入中心-v10) | Excel 预览确认、图片留档、导入记录与安全回滚 |
 | [新媒体热点监测中心 V1.0](apps/social-media-center/README.md#热点监测中心-v10) | 热点管理、TOP10、景区关联评分与规则型 AI 选题推荐 |
 | [AI 内容分析中心 V1.0](apps/social-media-center/README.md#ai-内容分析中心-v10) | 作品评分、平台洞察、选题升级及 AI 日报/周报 |
-| [新媒体数据资产采集模板中心 V1.0](apps/social-media-center/README.md#数据资产采集模板中心-v10) | 四个平台与竞品 Excel 模板、格式校验和真实数据采集流程 |
 | [新媒体智能采集中心 V1.0](apps/social-media-center/README.md#新媒体智能采集中心-v10) | 抖音 Chrome 采集、统一校验、人工确认入库和采集日志 |
 | [内容简报模板](templates/内容简报.md) | 每条内容立项模板 |
 | [发布检查表](templates/发布检查表.md) | 上线前的必检项 |
@@ -74,7 +73,6 @@
 - `/imports`：Excel/图片上传、数据预览、确认写入、重新导入和批次回滚。
 - `/hot-topics`：热点新增、编辑、删除、TOP10 排行、关联分析和规则选题推荐。
 - `/ai-analysis`：作品爆款评分、五维内容评分、平台分析、选题升级和运营报告。
-- `/data-templates`：下载标准 Excel 采集模板，并在进入导入中心前执行格式校验。
 - `/collector`：抖音 Chrome 自动采集、标准 JSON 校验、预览确认、采集日志和批次回滚。
 
-页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/data-templates`、`/api/collections` 提供数据库操作、分析、模板校验和采集日志。模板中心不保存校验文件；抖音 Chrome 采集结果必须经过服务端校验与人工确认后才以事务写入 `social_posts`。快手、微博、视频号自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
+页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/collections` 提供数据库操作、分析、采集校验和日志。抖音 Chrome 采集结果必须经过服务端校验与人工确认后才以事务写入 `social_posts`。快手、微博、视频号自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
