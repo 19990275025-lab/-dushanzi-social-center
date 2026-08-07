@@ -113,17 +113,22 @@ export const hotTopics = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     platform: text("platform").notNull(),
     topicName: text("topic_name").notNull(),
+    keyword: text("keyword").notNull(),
     heatValue: real("heat_value").notNull().default(0),
     trend: text("trend").notNull().default("new"),
     category: text("category"),
     relatedDegree: real("related_degree"),
     aiSuggestion: text("ai_suggestion"),
+    status: text("status").notNull().default("active"),
     collectTime: text("collect_time").notNull().default(sql`CURRENT_TIMESTAMP`),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex("uq_hot_topics_platform_name").on(table.platform, table.topicName),
     index("idx_hot_topics_platform_collect_time").on(table.platform, table.collectTime),
     index("idx_hot_topics_related_degree").on(table.relatedDegree),
+    index("idx_hot_topics_status_heat").on(table.status, table.heatValue),
+    index("idx_hot_topics_keyword").on(table.keyword),
   ],
 );
 

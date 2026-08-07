@@ -84,12 +84,15 @@ const schemaStatements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL,
     topic_name TEXT NOT NULL,
+    keyword TEXT NOT NULL,
     heat_value REAL NOT NULL DEFAULT 0,
     trend TEXT NOT NULL DEFAULT 'new',
     category TEXT,
     related_degree REAL,
     ai_suggestion TEXT,
-    collect_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    status TEXT NOT NULL DEFAULT 'active',
+    collect_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_platform_name
     ON hot_topics(platform, topic_name)`,
@@ -154,14 +157,14 @@ const seedStatements = [
       '{"summary":"第一视角增强临场感，可测试路线说明和到访行动指引。","confidence":0.82,"sample":true}'
     FROM social_accounts WHERE platform = 'weibo' AND account_id = 'test_dsz_weibo'`,
   `INSERT OR IGNORE INTO hot_topics
-    (platform, topic_name, heat_value, trend, category, related_degree, ai_suggestion)
-    VALUES ('douyin', '新疆自驾避暑路线', 9860000, 'rising', '旅游', 0.96, '结合独库公路行程，制作峡谷半日游路线。')`,
+    (platform, topic_name, keyword, heat_value, trend, category, related_degree, ai_suggestion, status)
+    VALUES ('douyin', '新疆自驾避暑路线', '新疆旅游', 9860000, 'rising', '旅游', 0.95, '结合独库公路行程，制作峡谷半日游路线。', 'active')`,
   `INSERT OR IGNORE INTO hot_topics
-    (platform, topic_name, heat_value, trend, category, related_degree, ai_suggestion)
-    VALUES ('weibo', '新疆的夏天有多治愈', 7240000, 'rising', '地域', 0.91, '用游客第一视角展示峡谷光影和风声。')`,
+    (platform, topic_name, keyword, heat_value, trend, category, related_degree, ai_suggestion, status)
+    VALUES ('weibo', '新疆的夏天有多治愈', '新疆夏天', 7240000, 'rising', '地域', 0.91, '用游客第一视角展示峡谷光影和风声。', 'active')`,
   `INSERT OR IGNORE INTO hot_topics
-    (platform, topic_name, heat_value, trend, category, related_degree, ai_suggestion)
-    VALUES ('wechat_channels', '周末短途旅行', 4680000, 'stable', '旅游', 0.78, '强调交通时长、适合人群和安全提示。')`,
+    (platform, topic_name, keyword, heat_value, trend, category, related_degree, ai_suggestion, status)
+    VALUES ('wechat_channels', '周末短途旅行', '周末旅行', 4680000, 'stable', '旅游', 0.78, '强调交通时长、适合人群和安全提示。', 'active')`,
   `INSERT OR IGNORE INTO content_tasks
     (task_date, platform, task_title, content_type, responsible_person, status, review_result)
     VALUES (date('now'), 'douyin', '峡谷晨雾延时拍摄', 'video', '阿依努尔', 'in_production', NULL)`,
@@ -195,6 +198,26 @@ async function initialize() {
       "CREATE INDEX IF NOT EXISTS idx_social_posts_import_log_id ON social_posts(import_log_id)",
     )
     .run();
+
+  const topicColumns = await d1
+    .prepare("PRAGMA table_info(hot_topics)")
+    .all<{ name: string }>();
+  const topicColumnNames = new Set(topicColumns.results.map((column) => column.name));
+  if (!topicColumnNames.has("keyword")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN keyword TEXT").run();
+  }
+  if (!topicColumnNames.has("status")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN status TEXT NOT NULL DEFAULT 'active'").run();
+  }
+  if (!topicColumnNames.has("created_at")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN created_at TEXT").run();
+  }
+  await d1.batch([
+    d1.prepare("UPDATE hot_topics SET keyword = topic_name WHERE keyword IS NULL OR trim(keyword) = ''"),
+    d1.prepare("UPDATE hot_topics SET created_at = COALESCE(collect_time, CURRENT_TIMESTAMP) WHERE created_at IS NULL"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_status_heat ON hot_topics(status, heat_value DESC)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
+  ]);
 
   if (shouldLoadTestData()) {
     await d1.batch(seedStatements.map((statement) => d1.prepare(statement)));

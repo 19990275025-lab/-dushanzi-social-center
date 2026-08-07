@@ -8,6 +8,7 @@
 - `/content`：从 `social_posts` 读取作品，支持平台、日期和指标排序。
 - `/tasks`：从 `content_tasks` 读取任务，支持新增任务和修改状态。
 - `/imports`：上传 Excel 或数据截图，完成预览、确认、重新导入与批次回滚。
+- `/hot-topics`：热点 CRUD、TOP10 排行、景区关联评分与规则型 AI 选题推荐。
 
 ## 数据接口
 
@@ -21,6 +22,10 @@
 - `PATCH /api/imports`：记录文件识别结果。
 - `DELETE /api/imports`：删除指定批次写入的数据，保留导入日志。
 - `POST /api/imports/confirm`：服务端复核并以事务方式写入作品，或人工确认图片。
+- `GET /api/hot-topics`：查询热点、TOP10、关联分析和选题推荐。
+- `POST /api/hot-topics`：新增热点并自动计算景区关联度。
+- `PATCH /api/hot-topics`：编辑热点并重新计算关联度。
+- `DELETE /api/hot-topics?id={id}`：删除指定热点，不触碰历史作品。
 
 前端只依赖这些版本化接口。未来接入平台自动采集时，可在服务端扩展数据写入流程，不需要重写页面。
 
@@ -31,6 +36,12 @@ Excel 支持以下字段名：`标题`、`平台`、`发布时间`、`播放量`
 导入采用“保存文件 → 本地识别 → 数据预览 → 服务端复核 → 事务写入”的流程。任何一行校验失败都会拒绝整批写入；成功作品记录 `import_log_id`，允许按批次安全回滚。原始上传文件存入独立对象存储，数据库通过 `data_import_logs` 保留导入历史。
 
 图片导入当前只保存文件、创建记录并等待人工确认；OCR 接口已经预留，但 V1.0 不调用 OCR 服务。
+
+## 热点监测中心 V1.0
+
+`hot_topics` 在原有字段上增加 `keyword`、`status` 与 `created_at`，保留 `collect_time` 作为最近采集或编辑时间，确保驾驶舱已有查询兼容。关联度由服务端规则引擎根据热点关键词、景区名称和 `social_posts` 历史标题/标签计算；选题推荐返回标题、内容方向、适合平台和拍摄建议。
+
+当前 `recommendationEngine` 为 `rules-v1`。接口响应预留 `/api/v1/social/ai/topic-recommendations` 作为未来大模型适配路径，但 V1.0 不调用外部模型，也不实现自动采集。
 
 ## 本地运行
 

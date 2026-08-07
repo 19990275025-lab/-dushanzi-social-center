@@ -120,14 +120,19 @@
 | id | UUID | 主键，自动生成 | 内部热点观察唯一标识 |
 | platform | VARCHAR(32) | 必填 | 热点来源平台 |
 | topic_name | VARCHAR(500) | 必填 | 热点名称 |
+| keyword | VARCHAR(255) | 必填 | 用于景区关联匹配和选题生成的核心关键词 |
 | heat_value | NUMERIC(20,2) | 默认 0 | 平台原始或标准化热度值，不得为负 |
 | trend | VARCHAR(16) | 默认 `new` | `rising`、`stable`、`falling`、`new` |
 | category | VARCHAR(128) | 可空 | 旅游、地域、活动、天气等分类 |
 | related_degree | NUMERIC(5,4) | 可空 | 与景区的相关度，范围 0–1 |
 | ai_suggestion | TEXT | 可空 | AI 生成的选题建议与风险提示 |
+| status | VARCHAR(16) | 默认 `active` | `active`、`paused`、`archived`，表示运营监测状态 |
 | collect_time | TIMESTAMPTZ | 自动生成 | 观察或导入时间 |
+| created_at | TIMESTAMPTZ | 自动生成 | 热点记录创建时间 |
 
 唯一约束：`(platform, topic_name, collect_time)`，允许同一热点形成时间序列。
+
+热点监测中心 V1.0 通过 `database/migrations/003_enhance_hot_topics.sql` 增量增加上述字段和索引，不删除原字段；`collect_time` 继续表示最近观察/编辑时间，`created_at` 固定表示记录创建时间。
 
 ### 3.5 `competitor_accounts`——竞品账号表
 
@@ -209,6 +214,8 @@ V1.0 不开发或运行自动采集。当前字段中已有以下预留能力：
 | 各表 `platform` | 路由到对应平台 Adapter，并统一平台筛选 |
 | `social_posts.publish_time` | 与平台作品发布时间对齐，辅助增量同步 |
 | `hot_topics.collect_time` | 保存每次热点观察时间，支持未来趋势序列 |
+| `hot_topics.keyword` | 为平台 API 返回的关键词、景区关联评分和后续语义检索提供统一入口 |
+| `hot_topics.status` | 区分正在跟进、暂停和已归档热点，自动采集不会覆盖人工运营状态 |
 | `social_posts.hashtags` | 接收平台返回的多标签数组 |
 | `social_posts.ai_analysis` | 保存结构化分析结果，不保存凭据或浏览器会话 |
 | `social_comments.ai_reply` | 保存待人工审批的回复草案，不表示已自动回复 |
@@ -251,6 +258,9 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f database/migrations/002_create_data_import_logs.sql
+
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/migrations/003_enhance_hot_topics.sql
 
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f database/seeds/001_social_media_v1_test_data.sql
