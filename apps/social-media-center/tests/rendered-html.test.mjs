@@ -53,6 +53,9 @@ test("content and fan insights switch platform themes without changing the app b
     assert.match(source, /theme-\$\{/);
   }
   assert.match(content, /`\$\{currentPlatformLabel\}内容分析`/);
+  assert.match(content, /content-platform-grid/);
+  assert.match(content, /content-platform-card/);
+  assert.match(content, /四平台汇总/);
   assert.match(fans, /`\$\{currentPlatformLabel\}粉丝分析`/);
   assert.match(fans, /platform: "all"/);
   for (const theme of ["theme-douyin", "theme-kuaishou", "theme-weibo", "theme-wechat_channels"]) assert.match(styles, new RegExp(theme));
