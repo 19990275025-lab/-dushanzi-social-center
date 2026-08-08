@@ -55,7 +55,9 @@ test("content and fan insights switch platform themes without changing the app b
   assert.match(fans, /`\$\{currentPlatformLabel\}粉丝分析`/);
   assert.match(fans, /platform: "all"/);
   for (const theme of ["theme-douyin", "theme-kuaishou", "theme-weibo", "theme-wechat_channels"]) assert.match(styles, new RegExp(theme));
-  assert.match(styles, /theme-douyin[^}]+#111418[^}]+#ee315b[^}]+#25cfe2/);
+  const themeStyles = styles.slice(styles.indexOf("/* 内容与用户洞察的平台主题"), styles.indexOf(".loading-panel"));
+  assert.doesNotMatch(themeStyles, /linear-gradient/);
+  assert.match(styles, /theme-douyin[^}]+#ef2b55[^}]+#20cfe1[^}]+#171a1f/);
   assert.match(styles, /theme-kuaishou[^}]+#f26522[^}]+#ffc33d/);
   assert.match(styles, /theme-weibo[^}]+#d9273f/);
   assert.match(styles, /theme-wechat_channels[^}]+#08a957[^}]+#ff8a34/);
