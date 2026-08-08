@@ -5,7 +5,10 @@
 ## 页面
 
 - `/`：平台运营总览、今日内容情况、爆款作品、热点趋势、模拟 AI 建议。
-- `/content`：从 `social_posts` 读取作品，支持平台、日期和指标排序。
+- `/content`：保留原内容数据列表，支持平台、日期和指标排序。
+- `/insights`：内容与用户洞察中心入口，内容分析与粉丝分析相互独立。
+- `/insights/content`：四平台作品、播放、互动、类型、爆款、AI 建议和内容转粉关联分析。
+- `/insights/fans`：四平台粉丝规模、增长趋势及地域、年龄、兴趣、活跃时间画像。
 - `/tasks`：从 `content_tasks` 读取任务，支持新增任务和修改状态。
 - `/imports`：上传 Excel 或数据截图，完成预览、确认、重新导入与批次回滚。
 - `/hot-topics`：热点 CRUD、TOP10 排行、景区关联评分与规则型 AI 选题推荐。
@@ -38,6 +41,8 @@
 - `DELETE /api/collections?id={id}`：回滚指定采集批次的作品，保留采集日志。
 - `GET /api/comment-insights`：查询当前评论洞察结果。
 - `POST /api/comment-insights`：运行规则模型，并将分析结果写回 `social_comments`。
+- `GET /api/insights/content`：读取 `social_posts`，生成四平台内容表现、内容类型、爆款和内容转粉关联。
+- `GET /api/insights/fans`：读取账号、粉丝画像和增长记录；无增长记录时以作品涨粉作为明确标注的回退趋势。
 
 前端只依赖这些版本化接口。未来接入平台自动采集时，可在服务端扩展数据写入流程，不需要重写页面。
 
@@ -95,6 +100,12 @@ V1.0 尚未识别视频画面，因此视觉吸引力使用相对播放、收藏
 
 页面展示评论总量、情绪比例、热门关键词、需求分布和逐条分析结果，并根据主要需求生成建议拍摄主题、标题方向和内容优化建议。预留 `/api/v1/social/ai/comment-insights` 作为未来大模型适配接口；V1.0 不调用外部模型，也不自动回复游客。
 
+## 内容与用户洞察中心 V1.0
+
+一级入口 `/insights` 只负责分流，不把两类数据混在同一页面。`/insights/content` 读取现有 `social_posts` 和 `social_accounts`，展示作品数量、累计播放、赞评藏转互动、内容类型、爆款排行、规则型 AI 优化建议，以及按内容类型计算的涨粉关联。
+
+`/insights/fans` 读取 `social_accounts`、`social_fans` 和 `fan_growth_records`。`social_fans` 保存粉丝画像快照，`fan_growth_records` 保存按日增长序列；两表均预留 `source_type`、`source_record_id`、`raw_payload` 和 `collection_log_id`，供未来 Chrome、Excel 或平台 API 自动采集使用。真实画像尚未采集时页面显示等待状态，不填充永久模拟数据；增长序列缺失时可将 `social_posts.fans_growth` 作为明确标注的内容涨粉趋势。
+
 ## 本地运行
 
 要求 Node.js 22.13+ 和 pnpm。
@@ -127,3 +138,4 @@ pnpm lint
 - AI 运营建议为 V1.0 模拟结果，并在页面明确标注。
 - AI 内容分析采用可解释规则模型，不进行画面识别，也不调用外部大模型。
 - 游客评论洞察采用关键词与情绪词规则，结果用于运营辅助，不替代人工判断或自动回复。
+- 粉丝画像只展示 `social_fans` 中的真实快照；当前不实现粉丝自动采集，也不生成模拟地域、年龄或兴趣数据。

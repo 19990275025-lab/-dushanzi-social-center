@@ -4,6 +4,14 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
+async function readProjectMigration(fileName) {
+  try {
+    return await readFile(new URL(`../../database/migrations/${fileName}`, root), "utf8");
+  } catch {
+    return readFile(new URL(`database/migrations/${fileName}`, root), "utf8");
+  }
+}
+
 for (const [path, heading] of [
   ["app/page.tsx", "新媒体运营驾驶舱"],
   ["app/content/page.tsx", "内容分析"],
@@ -13,6 +21,8 @@ for (const [path, heading] of [
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
   ["app/collector/page.tsx", "新媒体智能采集中心"],
   ["app/comment-insights/page.tsx", "游客评论洞察中心"],
+  ["app/insights/content/page.tsx", "内容分析"],
+  ["app/insights/fans/page.tsx", "粉丝分析"],
 ]) {
   test(`${path} defines the requested page`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
@@ -22,8 +32,15 @@ for (const [path, heading] of [
   });
 }
 
+test("content and user insights landing page keeps both functions separate", async () => {
+  const source = await readFile(new URL("app/insights/page.tsx", root), "utf8");
+  assert.match(source, /内容与用户洞察中心/);
+  assert.match(source, /href="\/insights\/content"/);
+  assert.match(source, /href="\/insights\/fans"/);
+});
+
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, commentInsights] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, commentInsights, contentInsights, fanInsights] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -36,6 +53,8 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/collections/comments/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/comments/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/comment-insights/route.ts", root), "utf8"),
+    readFile(new URL("app/api/insights/content/route.ts", root), "utf8"),
+    readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -74,6 +93,26 @@ test("pages use database-backed API routes", async () => {
   assert.match(commentInsights, /FROM social_comments/);
   assert.match(commentInsights, /UPDATE social_comments/);
   assert.match(commentInsights, /analyzeComment/);
+  assert.match(contentInsights, /FROM social_posts/);
+  assert.match(contentInsights, /contentFanRelations/);
+  assert.match(fanInsights, /FROM social_fans/);
+  assert.match(fanInsights, /FROM fan_growth_records/);
+  assert.match(fanInsights, /FROM social_posts/);
+});
+
+test("content and user insight tables are generated for both databases", async () => {
+  const [d1Migration, postgresMigration, schema, bootstrap] = await Promise.all([
+    readFile(new URL("drizzle/0006_handy_warstar.sql", root), "utf8"),
+    readProjectMigration("004_create_content_user_insights_v1.sql"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+  ]);
+  for (const source of [d1Migration, postgresMigration, schema, bootstrap]) {
+    assert.match(source, /social_fans/);
+    assert.match(source, /fan_growth_records/);
+  }
+  assert.match(schema, /rawPayload/);
+  assert.match(postgresMigration, /raw_payload/);
 });
 
 test("comment insight model covers all requested visitor needs", async () => {
@@ -109,7 +148,7 @@ test("import schema migration is generated", async () => {
 test("hot topic schema migrations are generated", async () => {
   const [d1Migration, postgresMigration] = await Promise.all([
     readFile(new URL("drizzle/0002_legal_vampiro.sql", root), "utf8"),
-    readFile(new URL("../../database/migrations/003_enhance_hot_topics.sql", root), "utf8"),
+    readProjectMigration("003_enhance_hot_topics.sql"),
   ]);
   for (const migration of [d1Migration, postgresMigration]) {
     assert.match(migration, /keyword/);

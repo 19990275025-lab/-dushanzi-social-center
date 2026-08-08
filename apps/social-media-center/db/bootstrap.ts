@@ -55,6 +55,51 @@ const schemaStatements = [
     ON collection_logs(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_collection_logs_platform_status
     ON collection_logs(platform, status)`,
+  `CREATE TABLE IF NOT EXISTS social_fans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    fans_count INTEGER NOT NULL DEFAULT 0 CHECK (fans_count >= 0),
+    gender_distribution TEXT NOT NULL DEFAULT '[]',
+    age_distribution TEXT NOT NULL DEFAULT '[]',
+    region_distribution TEXT NOT NULL DEFAULT '[]',
+    interest_distribution TEXT NOT NULL DEFAULT '[]',
+    active_time_distribution TEXT NOT NULL DEFAULT '[]',
+    source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual')),
+    source_record_id TEXT,
+    raw_payload TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_social_fans_account_collected_at
+    ON social_fans(account_id, collected_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_fans_platform_collected_at
+    ON social_fans(platform, collected_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_fans_source_record
+    ON social_fans(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS fan_growth_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    record_date TEXT NOT NULL,
+    fans_count INTEGER NOT NULL DEFAULT 0 CHECK (fans_count >= 0),
+    net_growth INTEGER NOT NULL DEFAULT 0,
+    new_fans INTEGER NOT NULL DEFAULT 0 CHECK (new_fans >= 0),
+    lost_fans INTEGER NOT NULL DEFAULT 0 CHECK (lost_fans >= 0),
+    source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual')),
+    source_record_id TEXT,
+    raw_payload TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_growth_account_date
+    ON fan_growth_records(account_id, record_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_fan_growth_platform_date
+    ON fan_growth_records(platform, record_date DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_growth_source_record
+    ON fan_growth_records(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS social_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,

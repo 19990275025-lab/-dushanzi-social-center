@@ -68,6 +68,80 @@ export const collectionLogs = sqliteTable(
   ],
 );
 
+export const socialFans = sqliteTable(
+  "social_fans",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    accountId: integer("account_id")
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    platform: text("platform").notNull(),
+    fansCount: integer("fans_count").notNull().default(0),
+    genderDistribution: text("gender_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    ageDistribution: text("age_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    regionDistribution: text("region_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    interestDistribution: text("interest_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    activeTimeDistribution: text("active_time_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    sourceType: text("source_type").notNull().default("api"),
+    sourceRecordId: text("source_record_id"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
+      onDelete: "set null",
+    }),
+    collectedAt: text("collected_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_social_fans_account_collected_at").on(table.accountId, table.collectedAt),
+    index("idx_social_fans_platform_collected_at").on(table.platform, table.collectedAt),
+    uniqueIndex("uq_social_fans_source_record").on(table.platform, table.sourceRecordId),
+  ],
+);
+
+export const fanGrowthRecords = sqliteTable(
+  "fan_growth_records",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    accountId: integer("account_id")
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    platform: text("platform").notNull(),
+    recordDate: text("record_date").notNull(),
+    fansCount: integer("fans_count").notNull().default(0),
+    netGrowth: integer("net_growth").notNull().default(0),
+    newFans: integer("new_fans").notNull().default(0),
+    lostFans: integer("lost_fans").notNull().default(0),
+    sourceType: text("source_type").notNull().default("api"),
+    sourceRecordId: text("source_record_id"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
+      onDelete: "set null",
+    }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_fan_growth_account_date").on(table.accountId, table.recordDate),
+    index("idx_fan_growth_platform_date").on(table.platform, table.recordDate),
+    uniqueIndex("uq_fan_growth_source_record").on(table.platform, table.sourceRecordId),
+  ],
+);
+
 export const socialPosts = sqliteTable(
   "social_posts",
   {

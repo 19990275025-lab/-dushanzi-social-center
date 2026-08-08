@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 
 const navItems = [
   { href: "/", label: "运营驾驶舱", code: "01" },
-  { href: "/content", label: "内容分析", code: "02" },
+  { href: "/insights", label: "内容与用户洞察", code: "02" },
   { href: "/tasks", label: "任务管理", code: "03" },
   { href: "/imports", label: "数据导入中心", code: "04" },
   { href: "/hot-topics", label: "热点监测中心", code: "05" },
@@ -31,7 +31,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="nav-caption">新媒体运营中心</div>
         <nav aria-label="主要导航">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname === item.href || (item.href === "/insights" && pathname.startsWith("/insights/"));
             return (
               <a className={active ? "nav-item active" : "nav-item"} href={item.href} key={item.href}>
                 <span>{item.code}</span>
