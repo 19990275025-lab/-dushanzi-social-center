@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import type { CollectionPayload, CollectionValidationError } from "@/lib/collections";
 import type { CommentCollectionPayload } from "@/lib/comment-collections";
 import { formatCompact, formatDateTime } from "@/lib/format";
+import { DataImportPanel } from "@/app/imports/page";
 
 type CollectionLog = {
   id: number;
@@ -38,6 +39,7 @@ const statusNames: Record<string, string> = {
 };
 
 export default function CollectorPage() {
+  const [activeTab, setActiveTab] = useState<"automatic" | "import">("automatic");
   const [payload, setPayload] = useState<CollectionPayload | null>(null);
   const [commentPayload, setCommentPayload] = useState<CommentCollectionPayload | null>(null);
   const [logId, setLogId] = useState<number | null>(null);
@@ -220,12 +222,19 @@ export default function CollectorPage() {
     <div className="page-stack collector-page">
       <header className="page-heading compact-heading">
         <div>
-          <p className="eyebrow">SMART COLLECTION CENTER · V1.0</p>
-          <h1>新媒体智能采集中心</h1>
-          <p>抖音近 30 天作品与评论采集、统一校验、进度追踪、人工确认入库。</p>
+          <p className="eyebrow">SOCIAL DATA COLLECTION CENTER · V1.0</p>
+          <h1>新媒体数据采集中心</h1>
+          <p>自动采集与人工导入统一入口，保留预览、校验、日志和人工确认机制。</p>
         </div>
         <div className="data-freshness"><span className="status-dot" />安全确认模式</div>
       </header>
+
+      <nav className="collection-center-tabs" aria-label="数据采集中心功能">
+        <button className={activeTab === "automatic" ? "active" : ""} onClick={() => setActiveTab("automatic")} type="button"><span>01</span><div><strong>自动采集</strong><small>Chrome · 抖音作品与评论</small></div></button>
+        <button className={activeTab === "import" ? "active" : ""} onClick={() => setActiveTab("import")} type="button"><span>02</span><div><strong>数据导入</strong><small>Excel · 图片上传</small></div></button>
+      </nav>
+
+      {activeTab === "automatic" ? <>
 
       <section className="collector-summary-strip">
         <article><span>自动采集平台</span><strong>1 / 4</strong><small>抖音已开放</small></article>
@@ -300,7 +309,7 @@ export default function CollectorPage() {
           <div className="collector-module-head"><span>02</span><b>复用现有能力</b></div>
           <h2>Excel 人工导入</h2>
           <p>按导入字段人工整理数据，上传后预览、校验并确认写入正式作品库。</p>
-          <a className="secondary-button collector-link" href="/imports">进入 Excel 导入中心</a>
+          <button className="secondary-button collector-link" onClick={() => setActiveTab("import")} type="button">进入数据导入</button>
         </article>
         <article className="panel collector-module validation-module">
           <div className="collector-module-head"><span>03</span><b>统一规则</b></div>
@@ -383,6 +392,7 @@ export default function CollectorPage() {
       </section>
 
       <p className="collector-compliance">采集器不读取 Cookie、密码或浏览历史，不绕过登录、验证码和平台限制；仅可采集运营方有权管理的账号数据。</p>
+      </> : <DataImportPanel embedded />}
     </div>
   );
 }

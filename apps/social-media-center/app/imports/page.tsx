@@ -88,7 +88,7 @@ function toIsoDate(value: unknown, xlsx: typeof import("xlsx")) {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
-export default function ImportsPage() {
+export function DataImportPanel({ embedded = false }: { embedded?: boolean }) {
   const [platform, setPlatform] = useState("douyin");
   const [importType, setImportType] = useState<ImportType>("excel");
   const [fileName, setFileName] = useState("");
@@ -285,15 +285,15 @@ export default function ImportsPage() {
   const accept = importType === "excel" ? ".xlsx,.xls" : ".png,.jpg,.jpeg,.webp";
 
   return (
-    <div className="page-stack">
-      <header className="page-heading compact-heading">
+    <div className={embedded ? "page-stack embedded-import-panel" : "page-stack"}>
+      {!embedded && <header className="page-heading compact-heading">
         <div>
           <p className="eyebrow">INTELLIGENT DATA INTAKE</p>
           <h1>新媒体智能数据导入中心</h1>
           <p>先识别、再预览、后确认；任何错误都不会污染正式作品数据。</p>
         </div>
         <div className="data-freshness"><span className="status-dot" />安全导入模式</div>
-      </header>
+      </header>}
 
       <section className="import-step-grid">
         <article className="panel import-step-panel">
@@ -413,4 +413,8 @@ export default function ImportsPage() {
       </section>
     </div>
   );
+}
+
+export default function ImportsPage() {
+  return <DataImportPanel />;
 }

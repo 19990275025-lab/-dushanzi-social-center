@@ -6,11 +6,10 @@ const navItems = [
   { href: "/", label: "运营驾驶舱", code: "01" },
   { href: "/insights", label: "内容与用户洞察", code: "02" },
   { href: "/tasks", label: "任务管理", code: "03" },
-  { href: "/imports", label: "数据导入中心", code: "04" },
+  { href: "/collector", label: "数据采集中心", code: "04" },
   { href: "/hot-topics", label: "热点监测中心", code: "05" },
   { href: "/ai-analysis", label: "AI内容分析", code: "06" },
-  { href: "/collector", label: "智能采集中心", code: "07" },
-  { href: "/comment-insights", label: "游客评论洞察", code: "08" },
+  { href: "/comment-insights", label: "游客评论洞察", code: "07" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -31,7 +30,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="nav-caption">新媒体运营中心</div>
         <nav aria-label="主要导航">
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href === "/insights" && pathname.startsWith("/insights/"));
+            const active = pathname === item.href
+              || (item.href === "/insights" && pathname.startsWith("/insights/"))
+              || (item.href === "/collector" && pathname === "/imports");
             return (
               <a className={active ? "nav-item active" : "nav-item"} href={item.href} key={item.href}>
                 <span>{item.code}</span>

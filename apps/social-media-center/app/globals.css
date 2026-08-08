@@ -436,6 +436,12 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
 .analysis-disclaimer { color: #89938f; font-size: 8px; margin: 12px 0 0; text-align: center; }
 
 .collector-summary-strip { background: linear-gradient(125deg, #132b24, #1d4538); border-radius: 18px; color: white; display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 16px; overflow: hidden; }
+.collection-center-tabs { background: white; border: 1px solid var(--line); border-radius: 15px; display: grid; gap: 7px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px; padding: 6px; }
+.collection-center-tabs button { align-items: center; background: transparent; border: 1px solid transparent; border-radius: 11px; color: #74807b; display: grid; gap: 12px; grid-template-columns: 38px 1fr; min-height: 62px; padding: 9px 14px; text-align: left; }
+.collection-center-tabs button > span { align-items: center; background: #eef3f1; border-radius: 9px; color: #65736d; display: flex; font: 700 9px ui-monospace, monospace; height: 36px; justify-content: center; width: 36px; }
+.collection-center-tabs button strong, .collection-center-tabs button small { display: block; }.collection-center-tabs button strong { font-size: 12px; }.collection-center-tabs button small { color: #939d99; font-size: 8px; margin-top: 4px; }
+.collection-center-tabs button.active { background: linear-gradient(135deg, #17372e, #204a3c); border-color: #17372e; color: white; }.collection-center-tabs button.active > span { background: rgba(102,221,175,.13); color: #71dfb4; }.collection-center-tabs button.active small { color: #9fb8af; }
+.embedded-import-panel { gap: 0; }.embedded-import-panel .import-step-grid { margin-top: 0; }
 .collector-summary-strip article { border-right: 1px solid rgba(255,255,255,.09); min-height: 112px; padding: 22px 25px; }.collector-summary-strip article:last-child { border-right: 0; }
 .collector-summary-strip span, .collector-summary-strip small { color: #9db6ae; display: block; font-size: 9px; }.collector-summary-strip strong { display: block; font-size: 29px; margin: 6px 0 4px; }.collector-summary-strip .summary-time { font-size: 16px; margin-top: 13px; }
 .collector-module-grid { display: grid; gap: 13px; grid-template-columns: repeat(3, 1fr); margin-bottom: 16px; }
@@ -541,7 +547,7 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
 @media (max-width: 820px) {
   .sidebar { bottom: 0; height: auto; padding: 8px 10px; right: 0; top: auto; width: auto; }
   .sidebar .brand-block, .nav-caption, .sidebar-spacer, .system-card, .sidebar-footer { display: none; }
-  .sidebar nav { display: grid; grid-template-columns: repeat(8, minmax(72px, 1fr)); overflow-x: auto; scrollbar-width: none; }
+  .sidebar nav { display: grid; grid-template-columns: repeat(7, minmax(72px, 1fr)); overflow-x: auto; scrollbar-width: none; }
   .sidebar nav::-webkit-scrollbar { display: none; }
   .nav-item { flex-direction: column; font-size: 8px; gap: 2px; justify-content: center; padding: 7px 3px; text-align: center; }
   .nav-item:hover { transform: none; }
@@ -613,6 +619,7 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
   .collector-steps { grid-template-columns: 1fr; }.collector-steps li { border-bottom: 1px solid #e9eeec; border-right: 0; padding: 9px 0; }.collector-steps li:last-child { border-bottom: 0; }
   .collector-dropzone { grid-template-columns: 42px 1fr; }.collector-dropzone > b { display: none; }
   .collector-preview-head { align-items: stretch; flex-direction: column; gap: 10px; }.collector-preview-head .primary-button { width: 100%; }
+  .collection-center-tabs { grid-template-columns: 1fr; }.collection-center-tabs button { min-height: 56px; }
   .comment-insights-page .page-heading { align-items: stretch; flex-direction: column; }.insight-heading-action { justify-content: space-between; }.insight-summary-grid { grid-template-columns: repeat(2, 1fr); }.insight-summary-grid article:nth-child(2) { border-right: 0; }.need-bars, .insight-suggestion-grid { grid-template-columns: 1fr; }.sentiment-visual { gap: 18px; }.need-row { grid-template-columns: 82px 1fr 30px; }
   .insight-entry-grid { grid-template-columns: 1fr; }.insight-entry-card { min-height: 325px; padding: 25px; }.insight-entry-card h2 { font-size: 25px; }.insight-boundary-panel { grid-template-columns: 1fr; }
   .content-insights-page .page-heading, .fan-insights-page .page-heading { align-items: stretch; flex-direction: column; }.back-to-insights { text-align: center; }

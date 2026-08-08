@@ -19,7 +19,7 @@ for (const [path, heading] of [
   ["app/imports/page.tsx", "新媒体智能数据导入中心"],
   ["app/hot-topics/page.tsx", "新媒体热点监测中心"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
-  ["app/collector/page.tsx", "新媒体智能采集中心"],
+  ["app/collector/page.tsx", "新媒体数据采集中心"],
   ["app/comment-insights/page.tsx", "游客评论洞察中心"],
   ["app/insights/content/page.tsx", "内容分析"],
   ["app/insights/fans/page.tsx", "粉丝分析"],
@@ -37,6 +37,22 @@ test("content and user insights landing page keeps both functions separate", asy
   assert.match(source, /内容与用户洞察中心/);
   assert.match(source, /href="\/insights\/content"/);
   assert.match(source, /href="\/insights\/fans"/);
+});
+
+test("data collection center combines automatic collection and imports without removing compatibility page", async () => {
+  const [collector, imports, shell] = await Promise.all([
+    readFile(new URL("app/collector/page.tsx", root), "utf8"),
+    readFile(new URL("app/imports/page.tsx", root), "utf8"),
+    readFile(new URL("components/AppShell.tsx", root), "utf8"),
+  ]);
+  assert.match(collector, /自动采集/);
+  assert.match(collector, /数据导入/);
+  assert.match(collector, /DataImportPanel/);
+  assert.match(imports, /export function DataImportPanel/);
+  assert.match(imports, /export default function ImportsPage/);
+  assert.match(shell, /label: "数据采集中心"/);
+  assert.doesNotMatch(shell, /label: "数据导入中心"/);
+  assert.doesNotMatch(shell, /label: "智能采集中心"/);
 });
 
 test("pages use database-backed API routes", async () => {
