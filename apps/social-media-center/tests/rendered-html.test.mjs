@@ -39,6 +39,28 @@ test("content and user insights landing page keeps both functions separate", asy
   assert.match(source, /href="\/insights\/fans"/);
 });
 
+test("content and fan insights switch platform themes without changing the app background", async () => {
+  const [content, fans, styles] = await Promise.all([
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  for (const source of [content, fans]) {
+    assert.match(source, /platform-themed-page/);
+    assert.match(source, /current-platform-badge/);
+    assert.match(source, /当前平台/);
+    assert.match(source, /theme-\$\{/);
+  }
+  assert.match(content, /`\$\{currentPlatformLabel\}内容分析`/);
+  assert.match(fans, /`\$\{currentPlatformLabel\}粉丝分析`/);
+  assert.match(fans, /platform: "all"/);
+  for (const theme of ["theme-douyin", "theme-kuaishou", "theme-weibo", "theme-wechat_channels"]) assert.match(styles, new RegExp(theme));
+  assert.match(styles, /theme-douyin[^}]+#111418[^}]+#ee315b[^}]+#25cfe2/);
+  assert.match(styles, /theme-kuaishou[^}]+#f26522[^}]+#ffc33d/);
+  assert.match(styles, /theme-weibo[^}]+#d9273f/);
+  assert.match(styles, /theme-wechat_channels[^}]+#08a957[^}]+#ff8a34/);
+});
+
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {
   const [collector, imports, shell] = await Promise.all([
     readFile(new URL("app/collector/page.tsx", root), "utf8"),

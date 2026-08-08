@@ -54,23 +54,25 @@ export default function ContentInsightsPage() {
     return () => window.clearTimeout(timer);
   }, [load]);
   const maxTypeViews = useMemo(() => Math.max(...(data?.contentTypes.map((item) => item.views) ?? [0]), 1), [data]);
+  const currentPlatformLabel = platform === "all" ? "全部平台" : platformLabel(platform);
+  const pageTitle = platform === "all" ? "内容分析" : `${currentPlatformLabel}内容分析`;
 
   if (loading && !data) return <div className="loading-panel"><span className="loading-dot" />正在读取内容表现…</div>;
   if (error || !data) return <div className="error-panel">{error || "暂无内容数据"}</div>;
 
   return (
-    <div className="page-stack content-insights-page">
+    <div className={`page-stack content-insights-page platform-themed-page theme-${platform}`}>
       <header className="page-heading compact-heading">
-        <div><p className="eyebrow">CONTENT ANALYSIS</p><h1>内容分析</h1><p>本页只展示作品表现与内容转粉数据，不混入粉丝画像。</p></div>
-        <a className="back-to-insights" href="/insights">← 返回洞察中心</a>
+        <div><p className="eyebrow">CONTENT ANALYSIS</p><h1>{pageTitle}</h1><p>本页只展示作品表现与内容转粉数据，不混入粉丝画像。</p></div>
+        <div className="platform-heading-state"><span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span><a className="back-to-insights" href="/insights">← 返回洞察中心</a></div>
       </header>
 
       <nav className="insight-platform-tabs" aria-label="内容分析平台筛选">
-        {platformOptions.map((item) => <button className={platform === item ? "active" : ""} key={item} onClick={() => setPlatform(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}
+        {platformOptions.map((item) => <button aria-pressed={platform === item} className={`${platform === item ? "active" : ""} platform-tab-${item}`} key={item} onClick={() => setPlatform(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}
       </nav>
 
       <section className="platform-overview-grid">
-        {data.platformOverview.map((item) => <article className={`platform-overview-card platform-${item.platform}`} key={item.platform}><div><span>{platformLabel(item.platform)}</span><small>{item.postCount ? "已有内容数据" : "等待数据"}</small></div><strong>{item.postCount}<em>作品</em></strong><p><span>播放 {formatCompact(item.totalViews)}</span><span>互动 {formatCompact(item.interactions)}</span></p></article>)}
+        {data.platformOverview.map((item) => <article className={`platform-overview-card platform-${item.platform} ${platform === item.platform ? "selected" : ""}`} key={item.platform}><div><span>{platformLabel(item.platform)}</span><small>{platform === item.platform ? "当前平台" : item.postCount ? "已有内容数据" : "等待数据"}</small></div><strong>{item.postCount}<em>作品</em></strong><p><span>播放 {formatCompact(item.totalViews)}</span><span>互动 {formatCompact(item.interactions)}</span></p></article>)}
       </section>
 
       <section className="insight-metric-strip">
