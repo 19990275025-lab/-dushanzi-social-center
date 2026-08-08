@@ -2,13 +2,12 @@
   "schemaVersion": "1.0",
   "source": "chrome-extension",
   "platform": "douyin",
-  "collectedAt": "2026-08-08T13:20:00+08:00",
+  "collectedAt": "2026-08-08T15:45:00+08:00",
   "pageUrl": "https://creator.douyin.com/creator-micro/content/manage?enter_from=dou_web",
   "collectionRange": { "start": "2026-07-10T00:00:00+08:00", "end": "2026-08-08T23:59:59+08:00" },
-  "progress": { "processed": 16, "total": 16, "percent": 100, "stage": "作品列表采集完成（14条可预览，2条链接待补）" },
+  "progress": { "processed": 16, "total": 16, "percent": 100, "stage": "作品列表采集完成（15条可预览，1条链接待补）" },
   "failures": [
-    { "target": "2026-08-08 世界荒芜，我们盛大", "reason": "作品指标已读取，但本轮未稳定解析作品详情链接，暂不进入待入库数据" },
-    { "target": "2026-07-24 独山子大峡谷首届影像大赛（图文）", "reason": "作品指标已读取，但图文详情链接未稳定解析，暂不进入待入库数据" }
+    { "target": "2026-08-08 世界荒芜，我们盛大", "reason": "作品指标已读取，但本轮未稳定解析作品详情链接，暂不进入待入库数据" }
   ],
   "rows": [
     {
@@ -122,6 +121,14 @@
       "videoUrl": "https://www.douyin.com/video/7661553202482974004", "coverUrl": "",
       "views": 441, "likes": 8, "comments": 0, "favorites": 0, "shares": 0, "fansGrowth": 0,
       "hashtags": ["独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 15, "platform": "douyin",
+      "title": "#独山子大峡谷首届影像大赛 #独库公路第一景#独库公路必打卡地#摄影#摄影比赛",
+      "publishTime": "2026-07-24T12:00:00+08:00", "contentType": "image_text",
+      "videoUrl": "https://www.douyin.com/article/7665951213486568699", "coverUrl": "",
+      "views": 172, "likes": 6, "comments": 2, "favorites": 1, "shares": 0, "fansGrowth": 0,
+      "hashtags": ["独山子大峡谷首届影像大赛", "独库公路第一景", "独库公路必打卡地", "摄影", "摄影比赛"], "duration": null
     }
   ]
 }

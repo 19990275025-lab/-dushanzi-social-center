@@ -7,7 +7,7 @@ import {
 
 type CommentLog = { id: number; platform: string; source_type: string; entity_type: string; status: string };
 type PostMatch = { id: number; video_url: string };
-type ExistingComment = { post_id: number; username: string; comment_text: string };
+type ExistingComment = { post_id: number; username: string; comment_text: string; comment_time: string };
 
 async function markFailed(id: number, errorCount: number, message: string) {
   await getD1()
@@ -56,11 +56,11 @@ export async function POST(request: Request) {
 
   const ids = [...postIds.values()];
   const existing = await d1
-    .prepare(`SELECT post_id, username, comment_text FROM social_comments WHERE post_id IN (${ids.map(() => "?").join(",")})`)
+    .prepare(`SELECT post_id, username, comment_text, comment_time FROM social_comments WHERE post_id IN (${ids.map(() => "?").join(",")})`)
     .bind(...ids)
     .all<ExistingComment>();
-  const fingerprints = new Set(existing.results.map((item) => `${item.post_id}\n${item.username}\n${item.comment_text}`));
-  const newRows = payload.rows.filter((row) => !fingerprints.has(`${postIds.get(row.postUrl)}\n${row.username}\n${row.commentText}`));
+  const fingerprints = new Set(existing.results.map((item) => `${item.post_id}\n${item.username}\n${item.comment_text}\n${item.comment_time}`));
+  const newRows = payload.rows.filter((row) => !fingerprints.has(`${postIds.get(row.postUrl)}\n${row.username}\n${row.commentText}\n${new Date(row.commentTime).toISOString()}`));
   const skippedCount = payload.rows.length - newRows.length;
 
   const inserts = newRows.map((row) => d1

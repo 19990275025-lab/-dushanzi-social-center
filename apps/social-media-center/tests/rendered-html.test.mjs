@@ -146,12 +146,12 @@ test("collection schema and Chrome adapter are packaged", async () => {
   assert.match(commentConfirm, /跳过.*重复评论/);
   const posts = JSON.parse(postPreview);
   const comments = JSON.parse(commentPreview);
-  assert.equal(posts.rows.length, 14);
+  assert.equal(posts.rows.length, 15);
   assert.equal(posts.progress.processed, 16);
-  assert.equal(posts.failures.length, 2);
-  assert.equal(comments.rows.length, 14);
+  assert.equal(posts.failures.length, 1);
+  assert.equal(comments.rows.length, 49);
   assert.equal(comments.progress.total, 16);
-  assert.equal(comments.failures.length, 8);
+  assert.equal(comments.failures.length, 0);
   await access(new URL("public/chrome-extension/douyin-collector-v1.zip", root));
 });
 

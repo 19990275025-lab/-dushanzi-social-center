@@ -29,7 +29,7 @@ export type CommentCollectionValidationError = {
 function isDouyinVideoUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname.endsWith("douyin.com") && /\/(video|note)\//.test(url.pathname);
+    return url.protocol === "https:" && url.hostname.endsWith("douyin.com") && /\/(video|note|article)\//.test(url.pathname);
   } catch {
     return false;
   }
@@ -111,7 +111,7 @@ export function validateCommentCollectionPayload(payload: CommentCollectionPaylo
     perPost.set(row.postUrl, count);
     if (count > 50) errors.push({ rowNumber: row.rowNumber, field: "postUrl", message: "单个作品最多采集 50 条评论" });
 
-    const fingerprint = `${row.postUrl}\n${row.username.toLocaleLowerCase("zh-CN")}\n${row.commentText}`;
+    const fingerprint = `${row.postUrl}\n${row.username.toLocaleLowerCase("zh-CN")}\n${row.commentText}\n${row.commentTime}`;
     if (seen.has(fingerprint)) errors.push({ rowNumber: row.rowNumber, field: "commentText", message: "采集文件内评论重复" });
     seen.add(fingerprint);
   }
