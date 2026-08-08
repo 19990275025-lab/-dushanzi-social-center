@@ -8,6 +8,7 @@ type CollectionLog = {
   source_type: string;
   status: string;
 };
+type ExistingPost = { id: number; title: string; video_url: string | null };
 
 async function markFailed(id: number, errorCount: number, message: string) {
   await getD1()
@@ -69,28 +70,38 @@ export async function POST(request: Request) {
   const linkMarks = links.map(() => "?").join(",");
   const existing = await d1
     .prepare(`
-      SELECT title, video_url FROM social_posts
+      SELECT id, title, video_url FROM social_posts
       WHERE account_id = ?
         AND (title IN (${titleMarks}) OR video_url IN (${linkMarks}))
     `)
     .bind(account.id, ...titles, ...links)
-    .all<{ title: string; video_url: string | null }>();
-  if (existing.results.length) {
-    const duplicateErrors = existing.results.map((item) => ({
-      rowNumber:
-        payload.rows.find((row) => row.title === item.title || row.videoUrl === item.video_url)
-          ?.rowNumber ?? 0,
-      field: "title",
-      message: `作品“${item.title}”已存在`,
-    }));
-    await markFailed(logId, duplicateErrors.length, JSON.stringify(duplicateErrors));
-    return Response.json(
-      { error: "发现重复作品，未写入任何数据", errors: duplicateErrors },
-      { status: 409 },
-    );
+    .all<ExistingPost>();
+  const existingByIdentity = new Map<string, ExistingPost>();
+  for (const item of existing.results) {
+    existingByIdentity.set(`title:${item.title}`, item);
+    if (item.video_url) existingByIdentity.set(`url:${item.video_url}`, item);
   }
 
-  const inserts = payload.rows.map((row) =>
+  const updates = payload.rows.flatMap((row) => {
+    const item = existingByIdentity.get(`url:${row.videoUrl}`) ?? existingByIdentity.get(`title:${row.title.trim()}`);
+    if (!item) return [];
+    return [d1.prepare(`
+      UPDATE social_posts
+      SET content_type = ?, publish_time = ?, video_url = ?, cover_url = ?,
+        views = ?, likes = ?, comments = ?, favorites = ?, shares = ?,
+        fans_growth = ?, hashtags = ?, duration = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(
+      row.contentType, new Date(row.publishTime).toISOString(), row.videoUrl,
+      row.coverUrl || null, row.views, row.likes, row.comments, row.favorites,
+      row.shares, row.fansGrowth, JSON.stringify(row.hashtags), row.duration, item.id,
+    )];
+  });
+
+  const newRows = payload.rows.filter((row) =>
+    !existingByIdentity.has(`url:${row.videoUrl}`) && !existingByIdentity.has(`title:${row.title.trim()}`),
+  );
+  const inserts = newRows.map((row) =>
     d1
       .prepare(`
         INSERT INTO social_posts
@@ -119,16 +130,23 @@ export async function POST(request: Request) {
   );
 
   try {
+    const acquisitionFailures = payload.failures ?? [];
     await d1.batch([
+      ...updates,
       ...inserts,
       d1
         .prepare(`
           UPDATE collection_logs
-          SET status = 'completed', success_count = ?, error_count = 0,
-            error_message = NULL, updated_at = CURRENT_TIMESTAMP
+          SET status = 'completed', success_count = ?, error_count = ?,
+            error_message = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `)
-        .bind(payload.rows.length, logId),
+        .bind(
+          payload.rows.length,
+          acquisitionFailures.length,
+          acquisitionFailures.length ? JSON.stringify(acquisitionFailures).slice(0, 4000) : null,
+          logId,
+        ),
     ]);
   } catch {
     await markFailed(logId, payload.rows.length, "数据库写入失败");
@@ -140,6 +158,8 @@ export async function POST(request: Request) {
 
   return Response.json({
     successCount: payload.rows.length,
-    message: `${payload.rows.length} 条抖音作品已写入 social_posts`,
+    insertedCount: newRows.length,
+    updatedCount: updates.length,
+    message: `${payload.rows.length} 条抖音作品已确认（新增 ${newRows.length} 条、更新 ${updates.length} 条）`,
   });
 }

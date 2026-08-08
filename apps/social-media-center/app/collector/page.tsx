@@ -17,6 +17,7 @@ type CollectionLog = {
   success_count: number;
   error_count: number;
   comment_count: number;
+  error_message: string | null;
   collected_at: string | null;
   created_at: string;
 };
@@ -71,6 +72,10 @@ export default function CollectorPage() {
     setErrors([]);
     setMessage(null);
   }
+
+  const activeProgress = commentPayload?.progress ?? payload?.progress;
+  const activeRange = commentPayload?.collectionRange ?? payload?.collectionRange;
+  const activeFailures = commentPayload?.failures ?? payload?.failures ?? [];
 
   async function uploadCollection(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -217,7 +222,7 @@ export default function CollectorPage() {
         <div>
           <p className="eyebrow">SMART COLLECTION CENTER · V1.0</p>
           <h1>新媒体智能采集中心</h1>
-          <p>Chrome 自动提取、统一校验、人工确认入库；第一阶段仅开放抖音。</p>
+          <p>抖音近 30 天作品与评论采集、统一校验、进度追踪、人工确认入库。</p>
         </div>
         <div className="data-freshness"><span className="status-dot" />安全确认模式</div>
       </header>
@@ -229,10 +234,31 @@ export default function CollectorPage() {
         <article><span>最近采集</span><strong className="summary-time">{summary?.latest_collection ? formatDateTime(summary.latest_collection) : "暂无"}</strong><small>Chrome / 人工确认</small></article>
       </section>
 
+      <section className="panel collector-progress-panel">
+        <div className="panel-heading">
+          <div><span>30-DAY TEST PROGRESS</span><h2>30 天采集进度</h2></div>
+          <small>{activeRange ? `${activeRange.start.slice(0, 10)} 至 ${activeRange.end.slice(0, 10)}` : "上传采集文件后显示结果"}</small>
+        </div>
+        <div className="collector-progress-track" aria-label="采集进度">
+          <span style={{ width: `${activeProgress?.percent ?? 0}%` }} />
+        </div>
+        <div className="collector-progress-meta">
+          <strong>{activeProgress?.percent ?? 0}%</strong>
+          <span>{activeProgress ? `${activeProgress.processed} / ${activeProgress.total} · ${activeProgress.stage}` : "等待作品或评论采集预览"}</span>
+          <small>{activeFailures.length ? `${activeFailures.length} 项失败已记录` : "暂无失败记录"}</small>
+        </div>
+        {activeFailures.length > 0 && (
+          <details className="collector-failure-details">
+            <summary>查看失败明细</summary>
+            <ul>{activeFailures.map((failure, index) => <li key={`${failure.target}-${index}`}><strong>{failure.target}</strong>：{failure.reason}</li>)}</ul>
+          </details>
+        )}
+      </section>
+
       <section className="panel collector-workflow">
         <div className="panel-heading">
           <div><span>DOUYIN COMMENTS · V1.0</span><h2>抖音评论详情采集</h2></div>
-          <small>从作品列表评论入口进入详情；每个作品最多 50 条</small>
+          <small>逐条进入评论详情；单作品最多 50 条，单批最多 20 个作品</small>
         </div>
         <label className="collector-dropzone">
           <input accept="application/json,.json" disabled={busy} onChange={uploadCommentCollection} type="file" />
@@ -264,8 +290,8 @@ export default function CollectorPage() {
         <article className="panel collector-module active-module">
           <div className="collector-module-head"><span>01</span><b>V1.0 已开放</b></div>
           <h2>Chrome 自动采集</h2>
-          <p>在已登录的抖音创作者作品管理页提取当前已加载数据，导出标准 JSON。</p>
-          <div className="collector-capabilities"><span>✓ 抖音</span><span>✓ 当前页面</span><span>✓ 最多 100 条</span></div>
+          <p>在已登录的抖音创作者作品管理页按日期提取数据，导出标准 JSON。</p>
+          <div className="collector-capabilities"><span>✓ 仅抖音</span><span>✓ 30 天范围</span><span>✓ 进度与失败记录</span></div>
           <a className="primary-button collector-download" href="/chrome-extension/douyin-collector-v1.zip" download>
             下载 Chrome 采集器
           </a>
@@ -279,8 +305,8 @@ export default function CollectorPage() {
         <article className="panel collector-module validation-module">
           <div className="collector-module-head"><span>03</span><b>统一规则</b></div>
           <h2>数据校验</h2>
-          <p>校验平台、日期、非负指标、作品链接和重复作品，任何错误均阻止整批入库。</p>
-          <div className="collector-capabilities"><span>事务写入</span><span>重复拦截</span><span>整批回滚</span></div>
+          <p>校验平台、日期、非负指标和作品链接；确认后新增作品、更新已有指标并跳过重复评论。</p>
+          <div className="collector-capabilities"><span>人工确认</span><span>安全去重</span><span>批次回滚</span></div>
         </article>
       </section>
 
@@ -292,7 +318,7 @@ export default function CollectorPage() {
         <ol className="collector-steps">
           <li><span>1</span><div><strong>安装扩展</strong><small>解压后通过开发者模式加载</small></div></li>
           <li><span>2</span><div><strong>打开作品管理</strong><small>登录有权管理的抖音账号</small></div></li>
-          <li><span>3</span><div><strong>采集并导出</strong><small>读取当前页面已显示数据</small></div></li>
+          <li><span>3</span><div><strong>采集并导出</strong><small>读取近 30 天作品与评论</small></div></li>
           <li><span>4</span><div><strong>上传并确认</strong><small>校验通过后写入 social_posts</small></div></li>
         </ol>
 
@@ -346,7 +372,7 @@ export default function CollectorPage() {
                   <td><strong>#{log.id}</strong><small>{log.source_name}</small></td>
                   <td>抖音<small>{log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
                   <td><span className={`collection-status status-${log.status}`}>{statusNames[log.status] ?? log.status}</span></td>
-                  <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}{log.entity_type === "comment" && <small>评论 {log.comment_count}</small>}</td><td>{formatDateTime(log.created_at)}</td>
+                  <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}{log.entity_type === "comment" && <small>评论 {log.comment_count}</small>}{log.error_message && <small className="log-error-summary" title={log.error_message}>含失败明细</small>}</td><td>{formatDateTime(log.created_at)}</td>
                   <td>{log.status === "completed" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id, log.entity_type)} type="button">回滚数据</button> : "—"}</td>
                 </tr>
               ))}

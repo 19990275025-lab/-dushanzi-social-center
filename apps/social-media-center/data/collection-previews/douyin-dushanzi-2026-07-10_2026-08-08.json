@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0",
+  "source": "chrome-extension",
+  "platform": "douyin",
+  "collectedAt": "2026-08-08T13:20:00+08:00",
+  "pageUrl": "https://creator.douyin.com/creator-micro/content/manage?enter_from=dou_web",
+  "collectionRange": { "start": "2026-07-10T00:00:00+08:00", "end": "2026-08-08T23:59:59+08:00" },
+  "progress": { "processed": 16, "total": 16, "percent": 100, "stage": "作品列表采集完成（14条可预览，2条链接待补）" },
+  "failures": [
+    { "target": "2026-08-08 世界荒芜，我们盛大", "reason": "作品指标已读取，但本轮未稳定解析作品详情链接，暂不进入待入库数据" },
+    { "target": "2026-07-24 独山子大峡谷首届影像大赛（图文）", "reason": "作品指标已读取，但图文详情链接未稳定解析，暂不进入待入库数据" }
+  ],
+  "rows": [
+    {
+      "rowNumber": 1, "platform": "douyin",
+      "title": "30块能玩一天吗？ 我来挑战一下#挑战 #独库公路第一景 #独库公路必打卡地 #小众打卡拍照地点",
+      "publishTime": "2026-08-06T11:53:35+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7670761823309778202", "coverUrl": "",
+      "views": 738, "likes": 33, "comments": 15, "favorites": 1, "shares": 12, "fansGrowth": 1,
+      "hashtags": ["挑战", "独库公路第一景", "独库公路必打卡地", "小众打卡拍照地点"], "duration": null
+    },
+    {
+      "rowNumber": 2, "platform": "douyin",
+      "title": "想看大家相册里的黄昏～ #黄昏 #独库公路第一景 #独库公路必打卡地 #相册里记录的生活边角料",
+      "publishTime": "2026-08-03T14:43:11+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7669692256378473780", "coverUrl": "",
+      "views": 499, "likes": 16, "comments": 2, "favorites": 0, "shares": 0, "fansGrowth": 0,
+      "hashtags": ["黄昏", "独库公路第一景", "独库公路必打卡地", "相册里记录的生活边角料"], "duration": null
+    },
+    {
+      "rowNumber": 3, "platform": "douyin",
+      "title": "万丈深渊之上，他走成了云端的诗, 风是观众...#穿越机 #达瓦孜 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-08-01T17:44:02+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7668996694981266726", "coverUrl": "",
+      "views": 1318, "likes": 26, "comments": 1, "favorites": 3, "shares": 5, "fansGrowth": 0,
+      "hashtags": ["穿越机", "达瓦孜", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 4, "platform": "douyin",
+      "title": "眼前是亿万年风景，脚下是万丈深渊 每一步都是行走在天边#达瓦孜  #独库公路必打卡地 #世界自然遗产  #独库公路第一景",
+      "publishTime": "2026-07-30T17:21:27+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7668248715139763506", "coverUrl": "",
+      "views": 950, "likes": 35, "comments": 6, "favorites": 3, "shares": 6, "fansGrowth": 0,
+      "hashtags": ["达瓦孜", "独库公路必打卡地", "世界自然遗产", "独库公路第一景"], "duration": null
+    },
+    {
+      "rowNumber": 5, "platform": "douyin",
+      "title": "不要被鸡毛蒜皮的小事困住 这个世界如此辽阔#风和自由 #新疆 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-26T15:41:29+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7666738605368298804", "coverUrl": "",
+      "views": 429, "likes": 6, "comments": 2, "favorites": 1, "shares": 1, "fansGrowth": 0,
+      "hashtags": ["风和自由", "新疆", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 6, "platform": "douyin",
+      "title": "独山子大峡谷首届影像创作大赛 10万奖池等你来战！不限年龄、不限设备，风光、人像、妆造、视频四大赛道任你选。#摄影大赛 #摄影 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-25T12:36:43+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7666319911337168179", "coverUrl": "",
+      "views": 10074, "likes": 325, "comments": 12, "favorites": 3, "shares": 7, "fansGrowth": 4,
+      "hashtags": ["摄影大赛", "摄影", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 7, "platform": "douyin",
+      "title": "大地把最深的裂痕，坦荡成惊世的指纹。 愿你的人生沟壑，也终成独一无二的风景。#这世界咋这么好看 #蓝天白云晴空 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-24T12:06:07+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7665940944688123163", "coverUrl": "",
+      "views": 330, "likes": 6, "comments": 2, "favorites": 0, "shares": 0, "fansGrowth": 0,
+      "hashtags": ["这世界咋这么好看", "蓝天白云晴空", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 8, "platform": "douyin",
+      "title": "独山子大峡谷，比拍到的震撼一百倍！ #独库公路 #独库公路必打卡地 #独库公路第一景 #大自然",
+      "publishTime": "2026-07-22T10:56:10+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7665180748177001779", "coverUrl": "",
+      "views": 322, "likes": 5, "comments": 0, "favorites": 0, "shares": 0, "fansGrowth": 0,
+      "hashtags": ["独库公路", "独库公路必打卡地", "独库公路第一景", "大自然"], "duration": null
+    },
+    {
+      "rowNumber": 9, "platform": "douyin",
+      "title": "用agudo卡点打开达瓦孜##独库公路第一景 #独库公路必打卡地 #新疆",
+      "publishTime": "2026-07-20T11:17:50+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7664444162468580635", "coverUrl": "",
+      "views": 428, "likes": 7, "comments": 0, "favorites": 0, "shares": 0, "fansGrowth": 0,
+      "hashtags": ["独库公路第一景", "独库公路必打卡地", "新疆"], "duration": null
+    },
+    {
+      "rowNumber": 10, "platform": "douyin",
+      "title": "用badboy打开独库公路第一景~ #万妮达版badboy #独库公路第一景 #独库公路必打卡地 #达瓦孜",
+      "publishTime": "2026-07-19T10:47:00+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7664065096615808319", "coverUrl": "",
+      "views": 402, "likes": 15, "comments": 2, "favorites": 0, "shares": 3, "fansGrowth": 0,
+      "hashtags": ["万妮达版badboy", "独库公路第一景", "独库公路必打卡地", "达瓦孜"], "duration": null
+    },
+    {
+      "rowNumber": 11, "platform": "douyin",
+      "title": "用一首枪火打开紧张刺激的达瓦孜表演吧~ #达瓦孜 #枪火 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-18T11:01:07+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7663697672670367019", "coverUrl": "",
+      "views": 311, "likes": 7, "comments": 5, "favorites": 1, "shares": 1, "fansGrowth": 0,
+      "hashtags": ["达瓦孜", "枪火", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 12, "platform": "douyin",
+      "title": "快来大峡谷挑战恐惧吧～ #这也能开播 #去旅行 #看风景 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-17T10:55:00+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7663325003953261864", "coverUrl": "",
+      "views": 442, "likes": 9, "comments": 0, "favorites": 0, "shares": 4, "fansGrowth": 0,
+      "hashtags": ["这也能开播", "去旅行", "看风景", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 13, "platform": "douyin",
+      "title": "独山子大峡谷的高空挑战～ 属于游客的高光时刻～#航拍 #高空挑战 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-14T18:37:05+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7662330826608217371", "coverUrl": "",
+      "views": 944, "likes": 16, "comments": 0, "favorites": 0, "shares": 3, "fansGrowth": 0,
+      "hashtags": ["航拍", "高空挑战", "独库公路第一景", "独库公路必打卡地"], "duration": null
+    },
+    {
+      "rowNumber": 14, "platform": "douyin",
+      "title": "终有一天你也会抵达这里#独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-12T16:19:32+08:00", "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7661553202482974004", "coverUrl": "",
+      "views": 441, "likes": 8, "comments": 0, "favorites": 0, "shares": 0, "fansGrowth": 0,
+      "hashtags": ["独库公路第一景", "独库公路必打卡地"], "duration": null
+    }
+  ]
+}

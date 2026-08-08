@@ -31,6 +31,7 @@
 | [新媒体热点监测中心 V1.0](apps/social-media-center/README.md#热点监测中心-v10) | 热点管理、TOP10、景区关联评分与规则型 AI 选题推荐 |
 | [AI 内容分析中心 V1.0](apps/social-media-center/README.md#ai-内容分析中心-v10) | 作品评分、平台洞察、选题升级及 AI 日报/周报 |
 | [新媒体智能采集中心 V1.0](apps/social-media-center/README.md#新媒体智能采集中心-v10) | 抖音 Chrome 采集、统一校验、人工确认入库和采集日志 |
+| [抖音 30 天真实采集测试 V1.0](docs/douyin-30day-collection-test-v1.md) | 2026-07-10 至 2026-08-08 作品与评论预览、失败明细及游客洞察 |
 | [内容简报模板](templates/内容简报.md) | 每条内容立项模板 |
 | [发布检查表](templates/发布检查表.md) | 上线前的必检项 |
 | [内容排期表](data/内容排期表.csv) | 可导入表格工具的排期数据 |
@@ -74,5 +75,6 @@
 - `/hot-topics`：热点新增、编辑、删除、TOP10 排行、关联分析和规则选题推荐。
 - `/ai-analysis`：作品爆款评分、五维内容评分、平台分析、选题升级和运营报告。
 - `/collector`：抖音 Chrome 自动采集、标准 JSON 校验、预览确认、采集日志和批次回滚。
+- `/comment-insights`：规则型评论情绪、关键词、游客需求排行与内容建议。
 
-页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/collections` 提供数据库操作、分析、采集校验和日志。抖音 Chrome 采集结果必须经过服务端校验与人工确认后才以事务写入 `social_posts`。快手、微博、视频号自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
+页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/collections`、`/api/comment-insights` 提供数据库操作、分析、采集校验和日志。抖音近 30 天作品与评论结果必须经过服务端校验与人工确认后才写入 `social_posts` 和 `social_comments`。快手、微博、视频号自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "独山子新媒体中心 · 抖音采集器",
-  "version": "1.1.0",
-  "description": "从抖音作品管理页提取作品数据，并从作品详情页提取前 50 条评论，导出标准 JSON 后人工确认入库。",
+  "version": "1.2.0",
+  "description": "从抖音作品管理页提取近30天作品，并从作品评论详情提取前50条评论，导出标准 JSON 后人工确认入库。",
   "permissions": ["activeTab", "scripting", "downloads"],
   "host_permissions": ["https://creator.douyin.com/*", "https://www.douyin.com/*"],
   "action": {

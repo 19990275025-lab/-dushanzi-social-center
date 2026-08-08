@@ -19,7 +19,12 @@ export async function POST(request: Request) {
 
   const errors = validateCommentCollectionPayload(payload);
   const status = errors.length ? "failed" : "pending";
-  const errorMessage = errors.length ? JSON.stringify(errors.slice(0, 100)) : null;
+  const acquisitionFailures = payload.failures ?? [];
+  const errorMessage = errors.length
+    ? JSON.stringify(errors.slice(0, 100))
+    : acquisitionFailures.length
+      ? JSON.stringify(acquisitionFailures)
+      : null;
   const sourceName = `douyin-comments-${payload.collectedAt.slice(0, 19).replaceAll(":", "-") || "unknown"}.json`;
   const log = await getD1()
     .prepare(`
@@ -37,7 +42,7 @@ export async function POST(request: Request) {
       payload.pageUrl.slice(0, 2000),
       status,
       payload.rows.length,
-      errors.length,
+      errors.length || acquisitionFailures.length,
       errorMessage,
       payload.collectedAt,
     )

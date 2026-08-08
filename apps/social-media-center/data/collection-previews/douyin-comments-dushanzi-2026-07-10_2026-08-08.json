@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "source": "chrome-extension",
+  "entityType": "comment",
+  "platform": "douyin",
+  "collectedAt": "2026-08-08T13:20:00+08:00",
+  "pageUrl": "https://creator.douyin.com/creator-micro/interactive/comment",
+  "collectionRange": { "start": "2026-07-10T00:00:00+08:00", "end": "2026-08-08T23:59:59+08:00" },
+  "progress": { "processed": 16, "total": 16, "percent": 100, "stage": "16个作品评论入口已处理（14条可预览，35条未稳定读取）" },
+  "failures": [
+    { "target": "2026-08-06作品评论", "reason": "作品显示15条评论，可复核11条，4条折叠回复未稳定展开" },
+    { "target": "2026-07-30作品评论", "reason": "作品显示6条评论，评论详情动态加载未稳定返回" },
+    { "target": "2026-07-26作品评论", "reason": "作品显示2条评论，评论详情动态加载未稳定返回" },
+    { "target": "2026-07-25作品评论", "reason": "作品显示12条评论，评论详情动态加载未稳定返回" },
+    { "target": "2026-07-24图文评论", "reason": "作品显示2条评论，图文详情链接未稳定解析" },
+    { "target": "2026-07-24视频评论", "reason": "作品显示2条评论，评论详情动态加载未稳定返回" },
+    { "target": "2026-07-19作品评论", "reason": "作品显示2条评论，评论详情动态加载未稳定返回" },
+    { "target": "2026-07-18作品评论", "reason": "作品显示5条评论，评论详情动态加载未稳定返回" }
+  ],
+  "rows": [
+    { "rowNumber": 1, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "5 1", "commentText": "[赞][赞][赞]", "commentTime": "2026-08-07T12:52:01+08:00", "likes": 0 },
+    { "rowNumber": 2, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "独山子大峡谷", "commentText": "[心动]", "commentTime": "2026-08-07T16:52:01+08:00", "likes": 0 },
+    { "rowNumber": 3, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "❤♚ZδHЯa♛❤", "commentText": "[图片评论]", "commentTime": "2026-08-07T10:52:01+08:00", "likes": 0 },
+    { "rowNumber": 4, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "ريىــــــم بەگــــــ", "commentText": "哇哦 妹子好棒👍[赞][赞][赞]", "commentTime": "2026-08-06T20:52:01+08:00", "likes": 0 },
+    { "rowNumber": 5, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "Mirban.", "commentText": "美丽的导游[赞][赞]", "commentTime": "2026-08-06T20:52:01+08:00", "likes": 0 },
+    { "rowNumber": 6, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "加点糖", "commentText": "这位小导游好漂亮呀😍[舔屏][舔屏][舔屏][图片评论]", "commentTime": "2026-08-06T20:52:01+08:00", "likes": 0 },
+    { "rowNumber": 7, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "5 1", "commentText": "@抖音创作灵感", "commentTime": "2026-08-07T12:52:01+08:00", "likes": 0 },
+    { "rowNumber": 8, "postUrl": "https://www.douyin.com/video/7669692256378473780", "username": "山海寄余生", "commentText": "[比心][比心][比心]", "commentTime": "2026-08-04T20:52:01+08:00", "likes": 0 },
+    { "rowNumber": 9, "postUrl": "https://www.douyin.com/video/7669692256378473780", "username": "乌鲁木齐魅族魅友家", "commentText": "不错", "commentTime": "2026-08-04T20:52:01+08:00", "likes": 0 },
+    { "rowNumber": 10, "postUrl": "https://www.douyin.com/video/7668996694981266726", "username": "akag oynayduharjayda", "commentText": "[图片评论]", "commentTime": "2026-08-02T20:52:01+08:00", "likes": 0 },
+    { "rowNumber": 11, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "ymmmu", "commentText": "[图片评论]", "commentTime": "2026-08-08T00:55:00+08:00", "likes": 0 },
+    { "rowNumber": 12, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "Raa1Laa", "commentText": "可以去找你玩吗 [舔屏]", "commentTime": "2026-08-08T00:55:00+08:00", "likes": 1 },
+    { "rowNumber": 13, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "R～✨", "commentText": "@抖音热点 @抖音小助手 @抖音创作灵感", "commentTime": "2026-08-07T23:56:00+08:00", "likes": 0 },
+    { "rowNumber": 14, "postUrl": "https://www.douyin.com/video/7670761823309778202", "username": "R～✨", "commentText": "主播去大峡谷可以找你吗 [心动]", "commentTime": "2026-08-07T23:55:00+08:00", "likes": 0 }
+  ]
+}

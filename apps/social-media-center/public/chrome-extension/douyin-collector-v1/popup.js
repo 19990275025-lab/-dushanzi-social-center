@@ -86,8 +86,12 @@ async function collectVisibleDouyinPosts() {
       hashtags,
       duration: durationText ? Number(durationText[1]) * 60 + Number(durationText[2]) : null,
     });
-    if (rows.length >= 100) break;
+    if (rows.length >= 200) break;
   }
+
+  const rangeEnd = new Date();
+  const rangeStart = new Date(rangeEnd);
+  rangeStart.setDate(rangeStart.getDate() - 29);
 
   return {
     schemaVersion: "1.0",
@@ -95,18 +99,25 @@ async function collectVisibleDouyinPosts() {
     platform: "douyin",
     collectedAt: new Date().toISOString(),
     pageUrl: location.href,
+    collectionRange: { start: rangeStart.toISOString(), end: rangeEnd.toISOString() },
+    progress: { processed: rows.length, total: rows.length, percent: rows.length ? 100 : 0, stage: "作品列表采集完成" },
+    failures: [],
     rows,
   };
 }
 
 async function collectVisibleDouyinComments() {
-  if (!location.hostname.endsWith("douyin.com") || !/\/(video|note)\//.test(location.pathname)) {
+  const publicDetail = /\/(video|note)\//.test(location.pathname);
+  const creatorItemId = new URL(location.href).searchParams.get("item_id");
+  if (!location.hostname.endsWith("douyin.com") || (!publicDetail && !creatorItemId)) {
     throw new Error("请先从作品列表的评论入口进入作品详情页");
   }
 
   const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
   for (let round = 0; round < 8; round += 1) {
-    window.scrollBy({ top: Math.max(window.innerHeight * 0.9, 600), behavior: "smooth" });
+    const scrollables = Array.from(document.querySelectorAll("div")).filter((node) => node.scrollHeight > node.clientHeight + 200);
+    const commentScroller = scrollables.sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+    (commentScroller || window).scrollBy({ top: Math.max(window.innerHeight * 0.9, 600), behavior: "smooth" });
     await wait(450);
   }
   for (let round = 0; round < 3; round += 1) {
@@ -132,6 +143,13 @@ async function collectVisibleDouyinComments() {
       const unit = relative[2];
       const milliseconds = unit === "分钟" ? 60000 : unit === "小时" ? 3600000 : unit === "天" ? 86400000 : unit === "周" ? 604800000 : unit === "年" ? 31536000000 : 2592000000;
       return new Date(now.getTime() - amount * milliseconds).toISOString();
+    }
+    const yesterday = text.match(/^昨天\s*(\d{1,2}):(\d{2})$/);
+    if (yesterday) {
+      const result = new Date(now);
+      result.setDate(result.getDate() - 1);
+      result.setHours(Number(yesterday[1]), Number(yesterday[2]), 0, 0);
+      return result.toISOString();
     }
     if (text === "刚刚") return now.toISOString();
     const full = text.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})日?(?:\s+(\d{1,2}):(\d{2}))?/);
@@ -164,7 +182,7 @@ async function collectVisibleDouyinComments() {
     if (!rawText.includes("回复") || rawText.length > 2500) continue;
 
     const username = String(anchor.innerText || anchor.textContent || "").replace(/\s+/g, " ").trim().slice(0, 200);
-    const timeMatch = rawText.match(/(刚刚|\d+\s*(?:分钟|小时|天|周|个月|月|年)前|20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s+\d{1,2}:\d{2})?|\d{1,2}[-/.月]\d{1,2}日?)(?:·[^\n]*)?/);
+    const timeMatch = rawText.match(/(刚刚|昨天\s*\d{1,2}:\d{2}|\d+\s*(?:分钟|小时|天|周|个月|月|年)前|20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?(?:\s+\d{1,2}:\d{2})?|\d{1,2}[-/.月]\d{1,2}日?)(?:·[^\n]*)?/);
     const commentTime = parseCommentTime(timeMatch?.[0] || "");
     const paragraphNumbers = Array.from(card.querySelectorAll("p")).map((node) => (node.textContent || "").trim()).filter((value) => /^[0-9.,]+\s*[万亿]?$/.test(value));
     const likes = parseMetric(paragraphNumbers[0] || "0");
@@ -172,13 +190,13 @@ async function collectVisibleDouyinComments() {
     for (const image of clone.querySelectorAll("img")) image.replaceWith(document.createTextNode(image.getAttribute("alt") || ""));
     const lines = String(clone.innerText || "").split("\n").map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
     const ignored = new Set([username, "...", "分享", "回复", "作者", ...paragraphNumbers]);
-    const commentText = lines.filter((line) => !ignored.has(line) && !/^展开\d+条回复$/.test(line) && !/(刚刚|\d+\s*(?:分钟|小时|天|周|个月|月|年)前|20\d{2}[-/.年]|\d{1,2}[-/.月]\d{1,2})/.test(line)).join(" ").trim().slice(0, 2000);
+    const commentText = lines.filter((line) => !ignored.has(line) && !/^展开\d+条回复$/.test(line) && !/(刚刚|昨天\s*\d{1,2}:\d{2}|\d+\s*(?:分钟|小时|天|周|个月|月|年)前|20\d{2}[-/.年]|\d{1,2}[-/.月]\d{1,2})/.test(line)).join(" ").trim().slice(0, 2000);
     if (!username || !commentText || !commentTime) continue;
 
     seenCards.add(card);
     rows.push({
       rowNumber: rows.length + 1,
-      postUrl: `${location.origin}${location.pathname}`,
+      postUrl: creatorItemId ? `https://www.douyin.com/video/${creatorItemId}` : `${location.origin}${location.pathname}`,
       username,
       commentText,
       commentTime,
@@ -194,6 +212,8 @@ async function collectVisibleDouyinComments() {
     platform: "douyin",
     collectedAt: new Date().toISOString(),
     pageUrl: location.href,
+    progress: { processed: 1, total: 1, percent: 100, stage: "当前作品评论采集完成" },
+    failures: [],
     rows,
   };
 }
@@ -201,7 +221,7 @@ async function collectVisibleDouyinComments() {
 document.getElementById("collect").addEventListener("click", async () => {
   const button = document.getElementById("collect");
   button.disabled = true;
-  showStatus("正在滚动并读取当前页面已显示的作品……");
+  showStatus("进度 1/3：正在滚动并读取近 30 天作品……");
   document.getElementById("result").hidden = true;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -214,7 +234,7 @@ document.getElementById("collect").addEventListener("click", async () => {
     if (!latestPayload?.rows?.length) {
       throw new Error("未识别到作品，请打开作品管理列表并确保作品卡片已加载");
     }
-    showStatus(`采集完成：${latestPayload.rows.length} 条。请导出后上传校验。`);
+    showStatus(`进度 3/3：采集完成 ${latestPayload.rows.length} 条。请导出后上传校验。`);
     document.getElementById("count").textContent = `${latestPayload.rows.length} 条作品`;
     document.getElementById("result").hidden = false;
   } catch (error) {
@@ -228,7 +248,7 @@ document.getElementById("collect").addEventListener("click", async () => {
 document.getElementById("collect-comments").addEventListener("click", async () => {
   const button = document.getElementById("collect-comments");
   button.disabled = true;
-  showStatus("正在加载并读取当前作品前 50 条评论……");
+  showStatus("进度 1/3：正在加载并展开当前作品评论……");
   document.getElementById("result").hidden = true;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -236,7 +256,7 @@ document.getElementById("collect-comments").addEventListener("click", async () =
     const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: collectVisibleDouyinComments });
     latestPayload = results[0]?.result ?? null;
     if (!latestPayload?.rows?.length) throw new Error("未识别到评论，请确认已从评论入口进入详情并加载评论区域");
-    showStatus(`采集完成：${latestPayload.rows.length} 条评论。请导出后上传预览。`);
+    showStatus(`进度 3/3：采集完成 ${latestPayload.rows.length} 条评论。请导出后上传预览。`);
     document.getElementById("count").textContent = `${latestPayload.rows.length} 条评论`;
     document.getElementById("result").hidden = false;
   } catch (error) {

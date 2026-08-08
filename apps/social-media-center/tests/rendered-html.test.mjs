@@ -119,10 +119,15 @@ test("hot topic schema migrations are generated", async () => {
 });
 
 test("collection schema and Chrome adapter are packaged", async () => {
-  const [migration, manifest, popup] = await Promise.all([
+  const [migration, manifest, popup, collectorPage, postConfirm, commentConfirm, postPreview, commentPreview] = await Promise.all([
     readFile(new URL("drizzle/0003_collection_center.sql", root), "utf8"),
     readFile(new URL("public/chrome-extension/douyin-collector-v1/manifest.json", root), "utf8"),
     readFile(new URL("public/chrome-extension/douyin-collector-v1/popup.js", root), "utf8"),
+    readFile(new URL("app/collector/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/collections/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/comments/confirm/route.ts", root), "utf8"),
+    readFile(new URL("data/collection-previews/douyin-dushanzi-2026-07-10_2026-08-08.json", root), "utf8"),
+    readFile(new URL("data/collection-previews/douyin-comments-dushanzi-2026-07-10_2026-08-08.json", root), "utf8"),
   ]);
   assert.match(migration, /CREATE TABLE `collection_logs`/);
   assert.match(migration, /ADD `collection_log_id`/);
@@ -131,8 +136,22 @@ test("collection schema and Chrome adapter are packaged", async () => {
   assert.match(popup, /collectVisibleDouyinComments/);
   assert.match(popup, /rows\.length >= 50/);
   assert.match(popup, /展开\\s\*\\d\+\\s\*条回复/);
+  assert.match(popup, /creatorItemId/);
+  assert.match(popup, /昨天/);
   assert.match(popup, /chrome\.scripting\.executeScript/);
   assert.doesNotMatch(popup, /cookie|localStorage|sessionStorage/i);
+  assert.match(collectorPage, /30 天采集进度/);
+  assert.match(collectorPage, /失败明细/);
+  assert.match(postConfirm, /UPDATE social_posts/);
+  assert.match(commentConfirm, /跳过.*重复评论/);
+  const posts = JSON.parse(postPreview);
+  const comments = JSON.parse(commentPreview);
+  assert.equal(posts.rows.length, 14);
+  assert.equal(posts.progress.processed, 16);
+  assert.equal(posts.failures.length, 2);
+  assert.equal(comments.rows.length, 14);
+  assert.equal(comments.progress.total, 16);
+  assert.equal(comments.failures.length, 8);
   await access(new URL("public/chrome-extension/douyin-collector-v1.zip", root));
 });
 

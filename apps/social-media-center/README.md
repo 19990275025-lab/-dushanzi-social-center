@@ -10,7 +10,7 @@
 - `/imports`：上传 Excel 或数据截图，完成预览、确认、重新导入与批次回滚。
 - `/hot-topics`：热点 CRUD、TOP10 排行、景区关联评分与规则型 AI 选题推荐。
 - `/ai-analysis`：作品爆款评分、五维内容评分、平台分析、选题推荐与 AI 日报/周报。
-- `/collector`：统一管理 Chrome 自动采集、Excel 人工导入、数据校验和采集日志；V1.0 仅开放抖音自动采集。
+- `/collector`：统一管理 Chrome 自动采集、Excel 人工导入、数据校验和采集日志；支持抖音近 30 天作品与评论测试。
 - `/comment-insights`：分析真实评论的情绪、关键词和游客需求，输出内容运营建议。
 
 ## 数据接口
@@ -32,9 +32,9 @@
 - `GET /api/ai-analysis`：读取作品、热点和账号数据，生成规则评分、平台洞察、选题及运营报告。
 - `GET /api/collections`：查询采集日志及成功、失败汇总。
 - `POST /api/collections`：校验抖音 Chrome 采集文件并创建待确认日志，不写作品表。
-- `POST /api/collections/confirm`：再次校验、拦截重复作品并以事务方式写入 `social_posts`。
+- `POST /api/collections/confirm`：再次校验，新增作品并安全更新已有作品的最新指标。
 - `POST /api/collections/comments`：校验抖音评论采集文件并创建待确认日志，不写评论表。
-- `POST /api/collections/comments/confirm`：再次校验、关联已有作品并以事务方式写入 `social_comments`。
+- `POST /api/collections/comments/confirm`：再次校验、关联已有作品、跳过重复评论并写入 `social_comments`。
 - `DELETE /api/collections?id={id}`：回滚指定采集批次的作品，保留采集日志。
 - `GET /api/comment-insights`：查询当前评论洞察结果。
 - `POST /api/comment-insights`：运行规则模型，并将分析结果写回 `social_comments`。
@@ -81,6 +81,12 @@ V1.0 尚未识别视频画面，因此视觉吸引力使用相对播放、收藏
 
 评论数据继续执行“标准 JSON → 数据校验 → 页面预览 → 人工确认 → 事务写入”的审批流程。确认前不会写入 `social_comments`；确认时按作品链接关联已有 `social_posts`，作品不存在、字段错误或单作品超过 50 条都会拒绝整批写入。成功批次通过 `collection_log_id` 关联采集日志，`collection_logs.entity_type` 标识作品或评论批次，`comment_count` 记录实际评论入库数。删除评论采集批次时只回滚该批评论，保留日志，不影响对应作品。
 
+### 抖音 30 天真实采集测试 V1.0
+
+30 天测试范围支持最多20个作品、每个作品最多50条评论。采集 JSON 可携带日期范围、处理进度和失败明细；采集中心在预览区显示百分比和失败原因，失败详情同时持久化到 `collection_logs.error_message`。作品确认时新增缺失记录并更新已有作品的最新指标；评论确认时按“作品、用户名、评论内容”去重，不因相对时间变化重复入库。
+
+本次 2026-07-10 至 2026-08-08 的测试报告位于 `docs/douyin-30day-collection-test-v1.md`。预览阶段不写数据库，必须先确认作品，再确认评论；快手、微博、视频号以及定时任务均未实现。
+
 生产数据库会初始化一个零指标的“独山子大峡谷景区抖音”运营账号作为作品归属，不加载演示作品、虚构粉丝量或其他平台测试数据。
 
 ## 游客评论洞察中心 V1.0
@@ -114,7 +120,7 @@ pnpm lint
 
 ## 当前边界
 
-- Chrome 自动采集 V1.0 仅支持抖音当前作品管理页面；快手、微博、视频号和平台 API 自动采集尚未实现。
+- Chrome 自动采集仅支持抖音作品管理和评论详情页；快手、微博、视频号和平台 API 自动采集尚未实现。
 - 图片上传未接入复杂 OCR，仅保存记录和人工确认。
 - 未实现自动发布、自动回复或无审批 AI 执行。
 - 不访问、不修改 OTA 模块的页面、接口或数据库表。

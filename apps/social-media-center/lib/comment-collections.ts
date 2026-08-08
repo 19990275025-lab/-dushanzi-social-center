@@ -14,6 +14,9 @@ export type CommentCollectionPayload = {
   platform: "douyin";
   collectedAt: string;
   pageUrl: string;
+  collectionRange?: { start: string; end: string };
+  progress?: { processed: number; total: number; percent: number; stage: string };
+  failures?: { target: string; reason: string }[];
   rows: CollectedCommentRow[];
 };
 
@@ -44,7 +47,21 @@ export function normalizeCommentCollectionPayload(value: unknown): CommentCollec
     platform: String(raw.platform ?? "") as "douyin",
     collectedAt: String(raw.collectedAt ?? ""),
     pageUrl: String(raw.pageUrl ?? ""),
-    rows: raw.rows.slice(0, 150).map((item, index) => {
+    collectionRange: raw.collectionRange && typeof raw.collectionRange === "object" ? {
+      start: String((raw.collectionRange as Record<string, unknown>).start ?? ""),
+      end: String((raw.collectionRange as Record<string, unknown>).end ?? ""),
+    } : undefined,
+    progress: raw.progress && typeof raw.progress === "object" ? {
+      processed: Number((raw.progress as Record<string, unknown>).processed),
+      total: Number((raw.progress as Record<string, unknown>).total),
+      percent: Number((raw.progress as Record<string, unknown>).percent),
+      stage: String((raw.progress as Record<string, unknown>).stage ?? ""),
+    } : undefined,
+    failures: Array.isArray(raw.failures) ? raw.failures.slice(0, 1000).map((item) => {
+      const failure = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+      return { target: String(failure.target ?? "").slice(0, 500), reason: String(failure.reason ?? "").slice(0, 1000) };
+    }).filter((item) => item.target && item.reason) : [],
+    rows: raw.rows.slice(0, 1000).map((item, index) => {
       const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
       return {
         rowNumber: Number.isInteger(Number(row.rowNumber)) ? Number(row.rowNumber) : index + 1,
@@ -66,7 +83,20 @@ export function validateCommentCollectionPayload(payload: CommentCollectionPaylo
   if (payload.platform !== "douyin") errors.push({ rowNumber: 0, field: "platform", message: "V1.0 仅支持抖音评论" });
   if (!payload.collectedAt || Number.isNaN(Date.parse(payload.collectedAt))) errors.push({ rowNumber: 0, field: "collectedAt", message: "采集时间格式无效" });
   if (!payload.rows.length) errors.push({ rowNumber: 0, field: "rows", message: "采集文件中没有评论" });
-  if (payload.rows.length > 150) errors.push({ rowNumber: 0, field: "rows", message: "单批最多采集 3 个作品、每个作品 50 条评论" });
+  if (payload.rows.length > 1000) errors.push({ rowNumber: 0, field: "rows", message: "单批最多采集 20 个作品、每个作品 50 条评论" });
+  if (payload.collectionRange && (
+    Number.isNaN(Date.parse(payload.collectionRange.start))
+    || Number.isNaN(Date.parse(payload.collectionRange.end))
+    || Date.parse(payload.collectionRange.start) > Date.parse(payload.collectionRange.end)
+  )) errors.push({ rowNumber: 0, field: "collectionRange", message: "采集日期范围无效" });
+  if (payload.progress && (
+    !Number.isInteger(payload.progress.processed)
+    || !Number.isInteger(payload.progress.total)
+    || payload.progress.processed < 0
+    || payload.progress.total < payload.progress.processed
+    || payload.progress.percent < 0
+    || payload.progress.percent > 100
+  )) errors.push({ rowNumber: 0, field: "progress", message: "采集进度无效" });
 
   const perPost = new Map<string, number>();
   const seen = new Set<string>();
@@ -81,7 +111,7 @@ export function validateCommentCollectionPayload(payload: CommentCollectionPaylo
     perPost.set(row.postUrl, count);
     if (count > 50) errors.push({ rowNumber: row.rowNumber, field: "postUrl", message: "单个作品最多采集 50 条评论" });
 
-    const fingerprint = `${row.postUrl}\n${row.username.toLocaleLowerCase("zh-CN")}\n${row.commentText}\n${row.commentTime}`;
+    const fingerprint = `${row.postUrl}\n${row.username.toLocaleLowerCase("zh-CN")}\n${row.commentText}`;
     if (seen.has(fingerprint)) errors.push({ rowNumber: row.rowNumber, field: "commentText", message: "采集文件内评论重复" });
     seen.add(fingerprint);
   }

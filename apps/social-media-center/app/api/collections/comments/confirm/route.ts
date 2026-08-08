@@ -7,7 +7,7 @@ import {
 
 type CommentLog = { id: number; platform: string; source_type: string; entity_type: string; status: string };
 type PostMatch = { id: number; video_url: string };
-type ExistingComment = { post_id: number; username: string; comment_text: string; comment_time: string };
+type ExistingComment = { post_id: number; username: string; comment_text: string };
 
 async function markFailed(id: number, errorCount: number, message: string) {
   await getD1()
@@ -56,17 +56,14 @@ export async function POST(request: Request) {
 
   const ids = [...postIds.values()];
   const existing = await d1
-    .prepare(`SELECT post_id, username, comment_text, comment_time FROM social_comments WHERE post_id IN (${ids.map(() => "?").join(",")})`)
+    .prepare(`SELECT post_id, username, comment_text FROM social_comments WHERE post_id IN (${ids.map(() => "?").join(",")})`)
     .bind(...ids)
     .all<ExistingComment>();
-  const fingerprints = new Set(existing.results.map((item) => `${item.post_id}\n${item.username}\n${item.comment_text}\n${item.comment_time}`));
-  const duplicates = payload.rows.filter((row) => fingerprints.has(`${postIds.get(row.postUrl)}\n${row.username}\n${row.commentText}\n${new Date(row.commentTime).toISOString()}`));
-  if (duplicates.length) {
-    await markFailed(logId, duplicates.length, `发现 ${duplicates.length} 条重复评论`);
-    return Response.json({ error: "发现重复评论，未写入任何数据", errors: duplicates.map((row) => ({ rowNumber: row.rowNumber, field: "commentText", message: "评论已存在" })) }, { status: 409 });
-  }
+  const fingerprints = new Set(existing.results.map((item) => `${item.post_id}\n${item.username}\n${item.comment_text}`));
+  const newRows = payload.rows.filter((row) => !fingerprints.has(`${postIds.get(row.postUrl)}\n${row.username}\n${row.commentText}`));
+  const skippedCount = payload.rows.length - newRows.length;
 
-  const inserts = payload.rows.map((row) => d1
+  const inserts = newRows.map((row) => d1
     .prepare(`
       INSERT INTO social_comments
         (post_id, platform, username, comment_text, comment_time, likes,
@@ -76,19 +73,29 @@ export async function POST(request: Request) {
     .bind(postIds.get(row.postUrl), row.username, row.commentText, new Date(row.commentTime).toISOString(), row.likes, logId));
 
   try {
+    const acquisitionFailures = payload.failures ?? [];
+    const failureCount = acquisitionFailures.length + skippedCount;
+    const failureDetails = [
+      ...acquisitionFailures,
+      ...(skippedCount ? [{ target: "duplicate-comments", reason: `跳过 ${skippedCount} 条已存在评论` }] : []),
+    ];
     await d1.batch([
       ...inserts,
       d1.prepare(`
         UPDATE collection_logs
         SET status = 'completed', success_count = ?, comment_count = ?,
-          error_count = 0, error_message = NULL, updated_at = CURRENT_TIMESTAMP
+          error_count = ?, error_message = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).bind(payload.rows.length, payload.rows.length, logId),
+      `).bind(newRows.length, newRows.length, failureCount, failureDetails.length ? JSON.stringify(failureDetails).slice(0, 4000) : null, logId),
     ]);
   } catch {
     await markFailed(logId, payload.rows.length, "评论数据库写入失败");
     return Response.json({ error: "评论数据库写入失败，事务已回滚" }, { status: 500 });
   }
 
-  return Response.json({ successCount: payload.rows.length, message: `${payload.rows.length} 条抖音评论已写入 social_comments` });
+  return Response.json({
+    successCount: newRows.length,
+    skippedCount,
+    message: `${newRows.length} 条抖音评论已写入 social_comments${skippedCount ? `，跳过 ${skippedCount} 条重复评论` : ""}`,
+  });
 }

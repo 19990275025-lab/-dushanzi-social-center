@@ -105,8 +105,6 @@ const schemaStatements = [
     ON social_comments(sentiment)`,
   `CREATE INDEX IF NOT EXISTS idx_social_comments_user_need
     ON social_comments(user_need)`,
-  `CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id
-    ON social_comments(collection_log_id)`,
   `CREATE TABLE IF NOT EXISTS hot_topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL,
