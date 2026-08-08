@@ -94,6 +94,7 @@ const schemaStatements = [
     sentiment TEXT NOT NULL DEFAULT 'unknown',
     keyword TEXT,
     user_need TEXT,
+    ai_analysis TEXT,
     ai_reply TEXT,
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -102,6 +103,8 @@ const schemaStatements = [
     ON social_comments(post_id, comment_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_social_comments_sentiment
     ON social_comments(sentiment)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_comments_user_need
+    ON social_comments(user_need)`,
   `CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id
     ON social_comments(collection_log_id)`,
   `CREATE TABLE IF NOT EXISTS hot_topics (
@@ -255,8 +258,14 @@ async function initialize() {
       .prepare("ALTER TABLE social_comments ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL")
       .run();
   }
+  if (!commentColumns.results.some((column) => column.name === "ai_analysis")) {
+    await d1.prepare("ALTER TABLE social_comments ADD COLUMN ai_analysis TEXT").run();
+  }
   await d1
     .prepare("CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id ON social_comments(collection_log_id)")
+    .run();
+  await d1
+    .prepare("CREATE INDEX IF NOT EXISTS idx_social_comments_user_need ON social_comments(user_need)")
     .run();
   await d1
     .prepare(

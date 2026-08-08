@@ -127,6 +127,13 @@ export const socialComments = sqliteTable(
     sentiment: text("sentiment").notNull().default("unknown"),
     keyword: text("keyword"),
     userNeed: text("user_need"),
+    aiAnalysis: text("ai_analysis", { mode: "json" }).$type<{
+      engine: string;
+      confidence: number;
+      sentimentScore: number;
+      matchedRules: string[];
+      analyzedAt: string;
+    } | null>(),
     aiReply: text("ai_reply"),
     collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
       onDelete: "set null",
@@ -136,6 +143,7 @@ export const socialComments = sqliteTable(
   (table) => [
     index("idx_social_comments_post_comment_time").on(table.postId, table.commentTime),
     index("idx_social_comments_sentiment").on(table.sentiment),
+    index("idx_social_comments_user_need").on(table.userNeed),
     index("idx_social_comments_collection_log_id").on(table.collectionLogId),
   ],
 );

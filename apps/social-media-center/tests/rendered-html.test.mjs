@@ -12,6 +12,7 @@ for (const [path, heading] of [
   ["app/hot-topics/page.tsx", "新媒体热点监测中心"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
   ["app/collector/page.tsx", "新媒体智能采集中心"],
+  ["app/comment-insights/page.tsx", "游客评论洞察中心"],
 ]) {
   test(`${path} defines the requested page`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
@@ -22,7 +23,7 @@ for (const [path, heading] of [
 }
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, commentInsights] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -34,6 +35,7 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/collections/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/comments/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/comments/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/comment-insights/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -69,6 +71,23 @@ test("pages use database-backed API routes", async () => {
   assert.match(commentConfirm, /INSERT INTO social_comments/);
   assert.match(commentConfirm, /collection_log_id/);
   assert.match(commentConfirm, /d1\.batch/);
+  assert.match(commentInsights, /FROM social_comments/);
+  assert.match(commentInsights, /UPDATE social_comments/);
+  assert.match(commentInsights, /analyzeComment/);
+});
+
+test("comment insight model covers all requested visitor needs", async () => {
+  const [engine, migration] = await Promise.all([
+    readFile(new URL("lib/comment-insight-engine.ts", root), "utf8"),
+    readFile(new URL("drizzle/0005_boring_argent.sql", root), "utf8"),
+  ]);
+  for (const category of ["旅游攻略", "交通路线", "价格咨询", "项目体验", "亲子需求", "老人需求", "服务评价", "其他"]) {
+    assert.match(engine, new RegExp(category));
+  }
+  assert.match(engine, /comment-rules-v1/);
+  assert.match(engine, /\/api\/v1\/social\/ai\/comment-insights/);
+  assert.match(migration, /ADD `ai_analysis`/);
+  assert.match(migration, /idx_social_comments_user_need/);
 });
 
 test("content analysis model defines a 100-point weighted score", async () => {
