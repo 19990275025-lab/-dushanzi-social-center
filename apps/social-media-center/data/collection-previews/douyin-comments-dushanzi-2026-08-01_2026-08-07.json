@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0",
+  "source": "chrome-extension",
+  "entityType": "comment",
+  "platform": "douyin",
+  "collectedAt": "2026-08-07T20:52:01+08:00",
+  "pageUrl": "https://www.douyin.com/user/self?from_tab_name=main&showSubTab=video&showTab=post",
+  "rows": [
+    {
+      "rowNumber": 1,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "5 1",
+      "commentText": "[赞][赞][赞]",
+      "commentTime": "2026-08-07T12:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 2,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "独山子大峡谷",
+      "commentText": "[心动]",
+      "commentTime": "2026-08-07T16:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 3,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "❤♚ZδHЯa♛❤",
+      "commentText": "[图片评论]",
+      "commentTime": "2026-08-07T10:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 4,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "ريىــــــم بەگــــــ",
+      "commentText": "哇哦 妹子好棒👍[赞][赞][赞]",
+      "commentTime": "2026-08-06T20:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 5,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "Mirban.",
+      "commentText": "美丽的导游[赞][赞]",
+      "commentTime": "2026-08-06T20:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 6,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "加点糖",
+      "commentText": "这位小导游好漂亮呀😍[舔屏][舔屏][舔屏][图片评论]",
+      "commentTime": "2026-08-06T20:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 7,
+      "postUrl": "https://www.douyin.com/video/7670761823309778202",
+      "username": "5 1",
+      "commentText": "@抖音创作灵感",
+      "commentTime": "2026-08-07T12:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 8,
+      "postUrl": "https://www.douyin.com/video/7669692256378473780",
+      "username": "山海寄余生",
+      "commentText": "[比心][比心][比心]",
+      "commentTime": "2026-08-04T20:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 9,
+      "postUrl": "https://www.douyin.com/video/7669692256378473780",
+      "username": "乌鲁木齐魅族魅友家",
+      "commentText": "不错",
+      "commentTime": "2026-08-04T20:52:01+08:00",
+      "likes": 0
+    },
+    {
+      "rowNumber": 10,
+      "postUrl": "https://www.douyin.com/video/7668996694981266726",
+      "username": "akag oynayduharjayda",
+      "commentText": "[图片评论]",
+      "commentTime": "2026-08-02T20:52:01+08:00",
+      "likes": 0
+    }
+  ]
+}

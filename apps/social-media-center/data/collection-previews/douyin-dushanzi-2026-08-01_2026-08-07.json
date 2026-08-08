@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0",
+  "source": "chrome-extension",
+  "platform": "douyin",
+  "collectedAt": "2026-08-07T20:29:17+08:00",
+  "pageUrl": "https://creator.douyin.com/creator-micro/content/manage",
+  "rows": [
+    {
+      "rowNumber": 1,
+      "platform": "douyin",
+      "title": "30块能玩一天吗？ 我来挑战一下#挑战 #独库公路第一景 #独库公路必打卡地 #小众打卡拍照地点",
+      "publishTime": "2026-08-06T11:53:00+08:00",
+      "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7670761823309778202",
+      "coverUrl": "",
+      "views": 680,
+      "likes": 31,
+      "comments": 11,
+      "favorites": 1,
+      "shares": 11,
+      "fansGrowth": 1,
+      "hashtags": [
+        "挑战",
+        "独库公路第一景",
+        "独库公路必打卡地",
+        "小众打卡拍照地点"
+      ],
+      "duration": 21
+    },
+    {
+      "rowNumber": 2,
+      "platform": "douyin",
+      "title": "想看大家相册里的黄昏～ #黄昏 #独库公路第一景 #独库公路必打卡地 #相册里记录的生活边角料",
+      "publishTime": "2026-08-03T14:43:00+08:00",
+      "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7669692256378473780",
+      "coverUrl": "",
+      "views": 489,
+      "likes": 16,
+      "comments": 2,
+      "favorites": 0,
+      "shares": 0,
+      "fansGrowth": 0,
+      "hashtags": [
+        "黄昏",
+        "独库公路第一景",
+        "独库公路必打卡地",
+        "相册里记录的生活边角料"
+      ],
+      "duration": 14
+    },
+    {
+      "rowNumber": 3,
+      "platform": "douyin",
+      "title": "万丈深渊之上，他走成了云端的诗, 风是观众...#穿越机 #达瓦孜 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-08-01T17:44:00+08:00",
+      "contentType": "video",
+      "videoUrl": "https://www.douyin.com/video/7668996694981266726",
+      "coverUrl": "",
+      "views": 1311,
+      "likes": 26,
+      "comments": 1,
+      "favorites": 3,
+      "shares": 5,
+      "fansGrowth": 0,
+      "hashtags": [
+        "穿越机",
+        "达瓦孜",
+        "独库公路第一景",
+        "独库公路必打卡地"
+      ],
+      "duration": 33
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import type { CollectionPayload, CollectionValidationError } from "@/lib/collections";
+import type { CommentCollectionPayload } from "@/lib/comment-collections";
 import { formatCompact, formatDateTime } from "@/lib/format";
 
 type CollectionLog = {
@@ -10,10 +11,12 @@ type CollectionLog = {
   source_type: string;
   source_name: string;
   source_url: string | null;
+  entity_type: "post" | "comment";
   status: string;
   total_count: number;
   success_count: number;
   error_count: number;
+  comment_count: number;
   collected_at: string | null;
   created_at: string;
 };
@@ -21,6 +24,7 @@ type CollectionLog = {
 type Summary = {
   total_logs: number;
   imported_posts: number;
+  imported_comments: number;
   validation_errors: number;
   latest_collection: string | null;
 };
@@ -34,7 +38,9 @@ const statusNames: Record<string, string> = {
 
 export default function CollectorPage() {
   const [payload, setPayload] = useState<CollectionPayload | null>(null);
+  const [commentPayload, setCommentPayload] = useState<CommentCollectionPayload | null>(null);
   const [logId, setLogId] = useState<number | null>(null);
+  const [commentLogId, setCommentLogId] = useState<number | null>(null);
   const [logs, setLogs] = useState<CollectionLog[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [errors, setErrors] = useState<CollectionValidationError[]>([]);
@@ -55,6 +61,13 @@ export default function CollectorPage() {
   function resetPreview() {
     setPayload(null);
     setLogId(null);
+    setErrors([]);
+    setMessage(null);
+  }
+
+  function resetCommentPreview() {
+    setCommentPayload(null);
+    setCommentLogId(null);
     setErrors([]);
     setMessage(null);
   }
@@ -129,8 +142,65 @@ export default function CollectorPage() {
     loadLogs();
   }
 
-  async function rollbackCollection(id: number) {
-    if (!window.confirm("确认回滚该采集批次写入的作品？采集日志仍会保留。")) return;
+  async function uploadCommentCollection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    resetCommentPreview();
+    if (!file.name.toLowerCase().endsWith(".json") || file.size > 2 * 1024 * 1024) {
+      setMessage({ type: "error", text: "仅支持 2MB 以内的抖音评论 JSON 文件。" });
+      event.target.value = "";
+      return;
+    }
+    setBusy(true);
+    try {
+      const content = JSON.parse(await file.text()) as unknown;
+      const response = await fetch("/api/collections/comments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(content),
+      });
+      const result = (await response.json()) as { error?: string; errors?: CollectionValidationError[]; payload?: CommentCollectionPayload; log?: CollectionLog };
+      setErrors(result.errors ?? []);
+      if (!response.ok || !result.payload || !result.log) {
+        setMessage({ type: "error", text: result.error ?? "评论采集数据校验失败" });
+      } else {
+        setCommentPayload(result.payload);
+        setCommentLogId(result.log.id);
+        setMessage({ type: "success", text: `已识别 ${result.payload.rows.length} 条抖音评论，确认后写入 social_comments。` });
+      }
+      loadLogs();
+    } catch {
+      setMessage({ type: "error", text: "评论 JSON 文件无法解析，请重新采集。" });
+    } finally {
+      setBusy(false);
+      event.target.value = "";
+    }
+  }
+
+  async function confirmCommentCollection() {
+    if (!commentPayload || !commentLogId) return;
+    setBusy(true);
+    const response = await fetch("/api/collections/comments/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ logId: commentLogId, payload: commentPayload }),
+    });
+    const result = (await response.json()) as { message?: string; error?: string; errors?: CollectionValidationError[] };
+    setBusy(false);
+    setErrors(result.errors ?? []);
+    if (!response.ok) {
+      setMessage({ type: "error", text: result.error ?? "评论采集数据入库失败" });
+      loadLogs();
+      return;
+    }
+    setMessage({ type: "success", text: result.message ?? "评论采集数据已入库" });
+    setCommentPayload(null);
+    setCommentLogId(null);
+    loadLogs();
+  }
+
+  async function rollbackCollection(id: number, entityType: "post" | "comment") {
+    if (!window.confirm(`确认回滚该采集批次写入的${entityType === "comment" ? "评论" : "作品"}？采集日志仍会保留。`)) return;
     const response = await fetch(`/api/collections?id=${id}`, { method: "DELETE" });
     const result = (await response.json()) as { error?: string };
     setMessage(
@@ -155,8 +225,39 @@ export default function CollectorPage() {
       <section className="collector-summary-strip">
         <article><span>自动采集平台</span><strong>1 / 4</strong><small>抖音已开放</small></article>
         <article><span>采集批次</span><strong>{formatCompact(summary?.total_logs ?? 0)}</strong><small>含失败与回滚记录</small></article>
-        <article><span>已入库作品</span><strong>{formatCompact(summary?.imported_posts ?? 0)}</strong><small>统一进入 social_posts</small></article>
+        <article><span>已入库作品</span><strong>{formatCompact(summary?.imported_posts ?? 0)}</strong><small>评论 {formatCompact(summary?.imported_comments ?? 0)} 条</small></article>
         <article><span>最近采集</span><strong className="summary-time">{summary?.latest_collection ? formatDateTime(summary.latest_collection) : "暂无"}</strong><small>Chrome / 人工确认</small></article>
+      </section>
+
+      <section className="panel collector-workflow">
+        <div className="panel-heading">
+          <div><span>DOUYIN COMMENTS · V1.0</span><h2>抖音评论详情采集</h2></div>
+          <small>从作品列表评论入口进入详情；每个作品最多 50 条</small>
+        </div>
+        <label className="collector-dropzone">
+          <input accept="application/json,.json" disabled={busy} onChange={uploadCommentCollection} type="file" />
+          <span>评论</span>
+          <div><strong>{busy ? "正在校验评论文件……" : "上传抖音评论采集结果"}</strong><small>预览确认后才写入 social_comments</small></div>
+          <b>选择文件</b>
+        </label>
+        {commentPayload && (
+          <div className="collector-preview">
+            <div className="collector-preview-head">
+              <div><strong>待入库评论 · {commentPayload.rows.length} 条</strong><small>{new Set(commentPayload.rows.map((row) => row.postUrl)).size} 个作品</small></div>
+              <button className="primary-button" disabled={busy} onClick={confirmCommentCollection} type="button">确认写入 social_comments</button>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>用户名</th><th>评论内容</th><th>评论时间</th><th>点赞</th><th>作品</th></tr></thead>
+                <tbody>{commentPayload.rows.map((row) => (
+                  <tr key={`${row.rowNumber}-${row.postUrl}-${row.username}`}>
+                    <td>{row.username}</td><td>{row.commentText}</td><td>{formatDateTime(row.commentTime)}</td><td>{row.likes}</td><td><a href={row.postUrl} rel="noreferrer" target="_blank">查看作品</a></td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="collector-module-grid">
@@ -243,10 +344,10 @@ export default function CollectorPage() {
               {logs.map((log) => (
                 <tr key={log.id}>
                   <td><strong>#{log.id}</strong><small>{log.source_name}</small></td>
-                  <td>抖音<small>Chrome 自动采集</small></td>
+                  <td>抖音<small>{log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
                   <td><span className={`collection-status status-${log.status}`}>{statusNames[log.status] ?? log.status}</span></td>
-                  <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}</td><td>{formatDateTime(log.created_at)}</td>
-                  <td>{log.status === "completed" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id)} type="button">回滚数据</button> : "—"}</td>
+                  <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}{log.entity_type === "comment" && <small>评论 {log.comment_count}</small>}</td><td>{formatDateTime(log.created_at)}</td>
+                  <td>{log.status === "completed" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id, log.entity_type)} type="button">回滚数据</button> : "—"}</td>
                 </tr>
               ))}
               {!logs.length && <tr><td className="empty-cell" colSpan={7}>暂无采集记录</td></tr>}

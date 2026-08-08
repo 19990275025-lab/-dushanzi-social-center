@@ -29,6 +29,13 @@
       "when": 1786103516886,
       "tag": "0003_collection_center",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786106762880,
+      "tag": "0004_complete_corsair",
+      "breakpoints": true
     }
   ]
 }

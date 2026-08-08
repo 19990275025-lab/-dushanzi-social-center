@@ -51,10 +51,12 @@ export const collectionLogs = sqliteTable(
     sourceType: text("source_type").notNull(),
     sourceName: text("source_name").notNull(),
     sourceUrl: text("source_url"),
+    entityType: text("entity_type").notNull().default("post"),
     status: text("status").notNull().default("pending"),
     totalCount: integer("total_count").notNull().default(0),
     successCount: integer("success_count").notNull().default(0),
     errorCount: integer("error_count").notNull().default(0),
+    commentCount: integer("comment_count").notNull().default(0),
     errorMessage: text("error_message"),
     collectedAt: text("collected_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -126,11 +128,15 @@ export const socialComments = sqliteTable(
     keyword: text("keyword"),
     userNeed: text("user_need"),
     aiReply: text("ai_reply"),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
+      onDelete: "set null",
+    }),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index("idx_social_comments_post_comment_time").on(table.postId, table.commentTime),
     index("idx_social_comments_sentiment").on(table.sentiment),
+    index("idx_social_comments_collection_log_id").on(table.collectionLogId),
   ],
 );
 

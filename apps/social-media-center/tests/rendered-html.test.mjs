@@ -22,7 +22,7 @@ for (const [path, heading] of [
 }
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -32,6 +32,8 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/ai-analysis/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/comments/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/comments/confirm/route.ts", root), "utf8"),
   ]);
 
   assert.match(dashboard, /FROM social_accounts/);
@@ -62,6 +64,11 @@ test("pages use database-backed API routes", async () => {
   assert.match(collectionConfirm, /INSERT INTO social_posts/);
   assert.match(collectionConfirm, /collection_log_id/);
   assert.match(collectionConfirm, /d1\.batch/);
+  assert.match(commentCollections, /entity_type/);
+  assert.match(commentCollections, /comment_count/);
+  assert.match(commentConfirm, /INSERT INTO social_comments/);
+  assert.match(commentConfirm, /collection_log_id/);
+  assert.match(commentConfirm, /d1\.batch/);
 });
 
 test("content analysis model defines a 100-point weighted score", async () => {
@@ -102,6 +109,9 @@ test("collection schema and Chrome adapter are packaged", async () => {
   assert.match(migration, /ADD `collection_log_id`/);
   assert.match(manifest, /creator\.douyin\.com/);
   assert.match(popup, /collectVisibleDouyinPosts/);
+  assert.match(popup, /collectVisibleDouyinComments/);
+  assert.match(popup, /rows\.length >= 50/);
+  assert.match(popup, /展开\\s\*\\d\+\\s\*条回复/);
   assert.match(popup, /chrome\.scripting\.executeScript/);
   assert.doesNotMatch(popup, /cookie|localStorage|sessionStorage/i);
   await access(new URL("public/chrome-extension/douyin-collector-v1.zip", root));

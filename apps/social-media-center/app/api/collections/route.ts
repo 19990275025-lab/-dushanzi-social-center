@@ -8,8 +8,8 @@ export async function GET() {
   const [logs, summary] = await Promise.all([
     d1
       .prepare(`
-        SELECT id, platform, source_type, source_name, source_url, status,
-          total_count, success_count, error_count, error_message,
+        SELECT id, platform, source_type, source_name, source_url, entity_type, status,
+          total_count, success_count, error_count, comment_count, error_message,
           collected_at, created_at, updated_at
         FROM collection_logs
         ORDER BY created_at DESC, id DESC
@@ -20,7 +20,8 @@ export async function GET() {
       .prepare(`
         SELECT
           COUNT(*) AS total_logs,
-          COALESCE(SUM(success_count), 0) AS imported_posts,
+          COALESCE(SUM(CASE WHEN entity_type = 'post' THEN success_count ELSE 0 END), 0) AS imported_posts,
+          COALESCE(SUM(comment_count), 0) AS imported_comments,
           COALESCE(SUM(error_count), 0) AS validation_errors,
           MAX(created_at) AS latest_collection
         FROM collection_logs
@@ -90,20 +91,23 @@ export async function DELETE(request: Request) {
 
   const d1 = getD1();
   const log = await d1
-    .prepare("SELECT id, status FROM collection_logs WHERE id = ?")
+    .prepare("SELECT id, status, entity_type FROM collection_logs WHERE id = ?")
     .bind(id)
-    .first<{ id: number; status: string }>();
+    .first<{ id: number; status: string; entity_type: string }>();
   if (!log) return Response.json({ error: "采集日志不存在" }, { status: 404 });
   if (log.status === "deleted") {
     return Response.json({ error: "该采集批次已经回滚" }, { status: 409 });
   }
 
+  const deleteRows = log.entity_type === "comment"
+    ? d1.prepare("DELETE FROM social_comments WHERE collection_log_id = ?").bind(id)
+    : d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id);
   await d1.batch([
-    d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id),
+    deleteRows,
     d1
       .prepare(`
         UPDATE collection_logs
-        SET status = 'deleted', success_count = 0, updated_at = CURRENT_TIMESTAMP
+        SET status = 'deleted', success_count = 0, comment_count = 0, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `)
       .bind(id),

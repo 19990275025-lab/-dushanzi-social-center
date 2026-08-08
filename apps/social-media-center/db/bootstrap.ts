@@ -40,10 +40,12 @@ const schemaStatements = [
     source_type TEXT NOT NULL CHECK (source_type IN ('chrome','excel','api')),
     source_name TEXT NOT NULL,
     source_url TEXT,
+    entity_type TEXT NOT NULL DEFAULT 'post',
     status TEXT NOT NULL DEFAULT 'pending',
     total_count INTEGER NOT NULL DEFAULT 0 CHECK (total_count >= 0),
     success_count INTEGER NOT NULL DEFAULT 0 CHECK (success_count >= 0),
     error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
+    comment_count INTEGER NOT NULL DEFAULT 0 CHECK (comment_count >= 0),
     error_message TEXT,
     collected_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -93,12 +95,15 @@ const schemaStatements = [
     keyword TEXT,
     user_need TEXT,
     ai_reply TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_social_comments_post_comment_time
     ON social_comments(post_id, comment_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_social_comments_sentiment
     ON social_comments(sentiment)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id
+    ON social_comments(collection_log_id)`,
   `CREATE TABLE IF NOT EXISTS hot_topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL,
@@ -198,6 +203,12 @@ const seedStatements = [
     VALUES (date('now'), 'douyin', '日落观景点发布', 'video', '张晨', 'published', '审核通过')`,
 ];
 
+const operationalAccountStatements = [
+  `INSERT OR IGNORE INTO social_accounts
+    (platform, account_name, account_id, followers_count, following_count, likes_count, status)
+    VALUES ('douyin', '独山子大峡谷景区抖音', 'dushanzi_daxigu_douyin', 0, 0, 0, 'active')`,
+];
+
 async function initialize() {
   const d1 = getD1();
   await d1.batch(schemaStatements.map((statement) => d1.prepare(statement)));
@@ -224,6 +235,29 @@ async function initialize() {
       "CREATE INDEX IF NOT EXISTS idx_social_posts_import_log_id ON social_posts(import_log_id)",
     )
     .run();
+
+  const collectionColumns = await d1
+    .prepare("PRAGMA table_info(collection_logs)")
+    .all<{ name: string }>();
+  const collectionColumnNames = new Set(collectionColumns.results.map((column) => column.name));
+  if (!collectionColumnNames.has("entity_type")) {
+    await d1.prepare("ALTER TABLE collection_logs ADD COLUMN entity_type TEXT NOT NULL DEFAULT 'post'").run();
+  }
+  if (!collectionColumnNames.has("comment_count")) {
+    await d1.prepare("ALTER TABLE collection_logs ADD COLUMN comment_count INTEGER NOT NULL DEFAULT 0").run();
+  }
+
+  const commentColumns = await d1
+    .prepare("PRAGMA table_info(social_comments)")
+    .all<{ name: string }>();
+  if (!commentColumns.results.some((column) => column.name === "collection_log_id")) {
+    await d1
+      .prepare("ALTER TABLE social_comments ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL")
+      .run();
+  }
+  await d1
+    .prepare("CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id ON social_comments(collection_log_id)")
+    .run();
   await d1
     .prepare(
       "CREATE INDEX IF NOT EXISTS idx_social_posts_collection_log_id ON social_posts(collection_log_id)",
@@ -249,6 +283,8 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_status_heat ON hot_topics(status, heat_value DESC)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
   ]);
+
+  await d1.batch(operationalAccountStatements.map((statement) => d1.prepare(statement)));
 
   if (shouldLoadTestData()) {
     await d1.batch(seedStatements.map((statement) => d1.prepare(statement)));
