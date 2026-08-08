@@ -22,6 +22,7 @@ for (const [path, heading] of [
   ["app/collector/page.tsx", "新媒体数据采集中心"],
   ["app/comment-insights/page.tsx", "游客评论洞察中心"],
   ["app/insights/content/page.tsx", "内容分析"],
+  ["app/insights/content/detail/page.tsx", "作品数据分析"],
   ["app/insights/fans/page.tsx", "粉丝分析"],
 ]) {
   test(`${path} defines the requested page`, async () => {
@@ -122,7 +123,7 @@ test("global date filter is wired to every requested dashboard and API", async (
 });
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, commentInsights, contentInsights, fanInsights] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, commentInsights, contentInsights, contentDetail, fanInsights] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -136,6 +137,7 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/collections/comments/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/comment-insights/route.ts", root), "utf8"),
     readFile(new URL("app/api/insights/content/route.ts", root), "utf8"),
+    readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
     readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
   ]);
 
@@ -177,9 +179,26 @@ test("pages use database-backed API routes", async () => {
   assert.match(commentInsights, /analyzeComment/);
   assert.match(contentInsights, /FROM social_posts/);
   assert.match(contentInsights, /contentFanRelations/);
+  assert.match(contentDetail, /FROM social_posts/);
+  assert.match(contentDetail, /FROM social_comments/);
+  assert.match(contentDetail, /trafficSources: \[\]/);
   assert.match(fanInsights, /FROM social_fans/);
   assert.match(fanInsights, /FROM fan_growth_records/);
   assert.match(fanInsights, /FROM social_posts/);
+});
+
+test("top content opens a real-data work analysis with separate tabs", async () => {
+  const [content, detail, api] = await Promise.all([
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/insights/content/detail/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
+  ]);
+  assert.match(content, /\/insights\/content\/detail\?id=/);
+  assert.match(content, /数据分析/);
+  for (const tab of ["流量分析", "观众分析", "评论热词", "评论管理"]) assert.match(detail, new RegExp(tab));
+  assert.match(detail, /未采集指标不会生成模拟数据/);
+  assert.match(api, /interactionRate: percent/);
+  assert.doesNotMatch(api, /个人主页|推荐页|关注页/);
 });
 
 test("content and user insight tables are generated for both databases", async () => {
