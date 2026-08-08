@@ -1,6 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { GlobalDateFilter } from "@/components/GlobalDateFilter";
 
 const navItems = [
   { href: "/", label: "运营驾驶舱", code: "01" },
@@ -18,6 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     () => window.location.pathname,
     () => "",
   );
+  const dateFilterPages = ["/", "/insights/content", "/insights/fans", "/comment-insights", "/ai-analysis"];
 
   return (
     <div className="app-shell">
@@ -55,6 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="brand-mark"><span>独</span></div>
           <div><strong>新媒体运营中心</strong><small>AI 营销中台</small></div>
         </div>
+        {dateFilterPages.includes(pathname) && <GlobalDateFilter />}
         {children}
       </main>
     </div>

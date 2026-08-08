@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { resolveDateRange } from "@/lib/date-range";
 
 const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
 const contentTypeNames: Record<string, string> = {
@@ -32,7 +33,9 @@ function interactions(post: PostRow) {
 
 export async function GET(request: Request) {
   await ensureDatabase();
-  const requested = new URL(request.url).searchParams.get("platform") ?? "all";
+  const searchParams = new URL(request.url).searchParams;
+  const range = resolveDateRange(searchParams);
+  const requested = searchParams.get("platform") ?? "all";
   const platform = platforms.includes(requested as (typeof platforms)[number]) ? requested : "all";
   const d1 = getD1();
 
@@ -41,9 +44,10 @@ export async function GET(request: Request) {
       SELECT id, platform, title, content_type, publish_time, views, likes,
         comments, favorites, shares, fans_growth
       FROM social_posts
+      WHERE date(publish_time) BETWEEN date(?) AND date(?)
       ORDER BY publish_time DESC, id DESC
       LIMIT 500
-    `).all<PostRow>(),
+    `).bind(range.from, range.to).all<PostRow>(),
     d1.prepare(`
       SELECT platform, followers_count
       FROM social_accounts
@@ -112,6 +116,7 @@ export async function GET(request: Request) {
 
   return Response.json({
     platform,
+    range,
     totals,
     platformOverview,
     contentTypes,

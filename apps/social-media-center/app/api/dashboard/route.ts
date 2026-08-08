@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { resolveDateRange } from "@/lib/date-range";
 
 const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
 
@@ -11,9 +12,10 @@ type PlatformRow = {
   interactions: number;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   await ensureDatabase();
   const d1 = getD1();
+  const range = resolveDateRange(new URL(request.url).searchParams);
 
   const [accountResult, postResult, progressResult, topPostsResult, topicsResult, pendingResult] =
     await Promise.all([
@@ -25,26 +27,28 @@ export async function GET() {
       `).all<{ platform: string; followers: number }>(),
       d1.prepare(`
         SELECT platform,
-          SUM(CASE WHEN date(publish_time) = date('now') THEN 1 ELSE 0 END) AS today_posts,
+          COUNT(*) AS today_posts,
           COALESCE(SUM(views), 0) AS views,
           COALESCE(SUM(likes + comments + favorites + shares), 0) AS interactions
         FROM social_posts
+        WHERE date(publish_time) BETWEEN date(?) AND date(?)
         GROUP BY platform
-      `).all<Omit<PlatformRow, "followers">>(),
+      `).bind(range.from, range.to).all<Omit<PlatformRow, "followers">>(),
       d1.prepare(`
         SELECT platform,
           COUNT(*) AS total,
           SUM(CASE WHEN status IN ('published', 'done') THEN 1 ELSE 0 END) AS completed
         FROM content_tasks
-        WHERE task_date = date('now')
+        WHERE date(task_date) BETWEEN date(?) AND date(?)
         GROUP BY platform
-      `).all<{ platform: string; total: number; completed: number }>(),
+      `).bind(range.from, range.to).all<{ platform: string; total: number; completed: number }>(),
       d1.prepare(`
         SELECT id, platform, title, views, likes, comments, ai_analysis
         FROM social_posts
+        WHERE date(publish_time) BETWEEN date(?) AND date(?)
         ORDER BY views DESC, likes DESC, comments DESC
         LIMIT 5
-      `).all<{
+      `).bind(range.from, range.to).all<{
         id: number;
         platform: string;
         title: string;
@@ -70,7 +74,8 @@ export async function GET() {
         SELECT COUNT(*) AS count
         FROM content_tasks
         WHERE status NOT IN ('published', 'done', 'cancelled')
-      `).first<{ count: number }>(),
+          AND date(task_date) BETWEEN date(?) AND date(?)
+      `).bind(range.from, range.to).first<{ count: number }>(),
     ]);
 
   const accountMap = new Map(accountResult.results.map((row) => [row.platform, row]));
@@ -109,6 +114,7 @@ export async function GET() {
 
   return Response.json({
     updatedAt: new Date().toISOString(),
+    range,
     overview,
     today: {
       published: overview.reduce((sum, item) => sum + item.todayPosts, 0),

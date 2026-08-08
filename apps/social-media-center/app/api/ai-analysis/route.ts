@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { resolveDateRange } from "@/lib/date-range";
 import {
   ruleBasedContentEngine,
   scoreWeights,
@@ -60,10 +61,8 @@ function platformAdvice(platform: string, posts: AnalyzedPost[], account?: Accou
   };
 }
 
-function buildReport(kind: "daily" | "weekly", posts: AnalyzedPost[], platformRows: ReturnType<typeof platformAdvice>[], topicAction?: string) {
-  const hours = kind === "daily" ? 24 : 24 * 7;
-  const cutoff = Date.now() - hours * 60 * 60 * 1000;
-  const periodPosts = posts.filter((post) => new Date(post.publish_time).getTime() >= cutoff);
+function buildReport(kind: "daily" | "weekly", posts: AnalyzedPost[], platformRows: ReturnType<typeof platformAdvice>[], periodLabel: string, topicAction?: string) {
+  const periodPosts = posts;
   const excellentPosts = periodPosts.slice(0, 3).map((post) => ({ id: post.id, title: post.title, platform: post.platform, score: post.overallScore, views: post.views }));
   const keys = ["visualAttraction", "titleQuality", "interactionAbility", "propagationAbility", "hotMatch"] as const;
   const averages = keys.map((key) => ({ key, score: average(periodPosts.map((post) => post.dimensions[key])) })).sort((a, b) => a.score - b.score);
@@ -78,7 +77,7 @@ function buildReport(kind: "daily" | "weekly", posts: AnalyzedPost[], platformRo
   return {
     kind,
     title: kind === "daily" ? "AI 日报" : "AI 周报",
-    periodLabel: kind === "daily" ? "过去 24 小时" : "过去 7 天",
+    periodLabel,
     postCount: periodPosts.length,
     accountPerformance: platformRows.map((row) => ({ platform: row.platform, followers: row.followers, postCount: periodPosts.filter((post) => post.platform === row.platform).length, views: periodPosts.filter((post) => post.platform === row.platform).reduce((sum, post) => sum + post.views, 0) })),
     excellentPosts,
@@ -87,17 +86,19 @@ function buildReport(kind: "daily" | "weekly", posts: AnalyzedPost[], platformRo
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await ensureDatabase();
   const d1 = getD1();
+  const range = resolveDateRange(new URL(request.url).searchParams);
   const [postResult, topicResult, accountResult] = await Promise.all([
     d1.prepare(`
       SELECT id, account_id, platform, title, content_type, publish_time,
         views, likes, comments, favorites, shares, fans_growth, hashtags, duration
       FROM social_posts
+      WHERE date(publish_time) BETWEEN date(?) AND date(?)
       ORDER BY publish_time DESC, id DESC
       LIMIT 300
-    `).all<Omit<AnalysisPost, "hashtags"> & { hashtags: string | null }>(),
+    `).bind(range.from, range.to).all<Omit<AnalysisPost, "hashtags"> & { hashtags: string | null }>(),
     d1.prepare(`
       SELECT platform, topic_name, keyword, heat_value, trend, related_degree, ai_suggestion
       FROM hot_topics
@@ -137,12 +138,13 @@ export async function GET() {
     platformAnalysis,
     topicRecommendations: ideas,
     reports: {
-      daily: buildReport("daily", analyzedPosts, platformAnalysis, ideas[0] ? `围绕“${ideas[0].sourceTopic}”制作下一条内容。` : undefined),
-      weekly: buildReport("weekly", analyzedPosts, platformAnalysis, ideas[0] ? `围绕“${ideas[0].sourceTopic}”规划系列内容。` : undefined),
+      daily: buildReport("daily", analyzedPosts, platformAnalysis, range.label, ideas[0] ? `围绕“${ideas[0].sourceTopic}”制作下一条内容。` : undefined),
+      weekly: buildReport("weekly", analyzedPosts, platformAnalysis, range.label, ideas[0] ? `围绕“${ideas[0].sourceTopic}”规划系列内容。` : undefined),
     },
     engine: ruleBasedContentEngine.name,
     futureAiEndpoint: "/api/v1/social/ai/content-analysis",
     sources: ["social_posts", "hot_topics", "social_accounts"],
+    range,
     updatedAt: new Date().toISOString(),
   });
 }

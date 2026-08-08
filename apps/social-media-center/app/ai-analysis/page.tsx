@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
+import { dateRangeQuery } from "@/lib/date-range";
+import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
 type Dimensions = {
   visualAttraction: number;
@@ -88,6 +90,7 @@ function scoreClass(score: number) {
 }
 
 export default function AiAnalysisPage() {
+  const range = useGlobalDateRange();
   const [data, setData] = useState<AnalysisData | null>(null);
   const [platform, setPlatform] = useState("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -97,7 +100,7 @@ export default function AiAnalysisPage() {
 
   const loadAnalysis = useCallback(async () => {
     try {
-      const response = await fetch("/api/ai-analysis");
+      const response = await fetch(`/api/ai-analysis?${dateRangeQuery(range)}`);
       if (!response.ok) throw new Error("AI 内容分析数据读取失败");
       const result = await response.json() as AnalysisData;
       setData(result);
@@ -108,7 +111,7 @@ export default function AiAnalysisPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadAnalysis(), 0);
@@ -132,7 +135,7 @@ export default function AiAnalysisPage() {
 
       <section className="analysis-hero">
         <article><span>已分析作品</span><strong>{data.summary.postCount}</strong><small>来源 social_posts</small></article>
-        <article><span>累计播放</span><strong>{formatCompact(data.summary.totalViews)}</strong><small>当前全部作品</small></article>
+        <article><span>周期播放</span><strong>{formatCompact(data.summary.totalViews)}</strong><small>当前日期范围</small></article>
         <article><span>平均综合评分</span><strong>{data.summary.averageScore}<em>/100</em></strong><small>五维加权结果</small></article>
         <article><span>爆款作品</span><strong>{data.summary.breakoutCount}</strong><small>爆款评分 ≥ 80</small></article>
         <article className="best-post-card"><span>当前最佳作品</span><strong>{data.summary.bestPost?.title ?? "暂无作品"}</strong><small>{data.summary.bestPost ? `综合评分 ${data.summary.bestPost.score}` : "等待数据"}</small></article>

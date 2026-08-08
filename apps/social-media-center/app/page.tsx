@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDateTime, platformLabel } from "@/lib/format";
+import { dateRangeQuery } from "@/lib/date-range";
+import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
 type OverviewItem = {
   platform: string;
@@ -13,6 +15,7 @@ type OverviewItem = {
 
 type DashboardData = {
   updatedAt: string;
+  range: { from: string; to: string; label: string };
   overview: OverviewItem[];
   today: {
     published: number;
@@ -49,18 +52,19 @@ function LoadingPanel() {
 }
 
 export default function DashboardPage() {
+  const range = useGlobalDateRange();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/dashboard")
+    fetch(`/api/dashboard?${dateRangeQuery(range)}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("数据读取失败");
         return response.json() as Promise<DashboardData>;
       })
       .then(setData)
       .catch((reason: Error) => setError(reason.message));
-  }, []);
+  }, [range]);
 
   const totals = useMemo(
     () =>
@@ -84,7 +88,7 @@ export default function DashboardPage() {
         <div>
           <p className="eyebrow">SOCIAL MEDIA COMMAND CENTER</p>
           <h1>新媒体运营驾驶舱</h1>
-          <p>从平台表现到内容行动，一屏掌握今日运营节奏。</p>
+          <p>从平台表现到内容行动，一屏掌握所选周期运营节奏。</p>
         </div>
         <div className="data-freshness">
           <span className="status-dot" />
@@ -101,15 +105,15 @@ export default function DashboardPage() {
         <div>
           <span>累计播放量</span>
           <strong>{formatCompact(totals.views)}</strong>
-          <small>已入库作品合计</small>
+          <small>{data.range.label}作品合计</small>
         </div>
         <div>
           <span>累计互动量</span>
           <strong>{formatCompact(totals.interactions)}</strong>
-          <small>赞评藏转合计</small>
+          <small>{data.range.label}赞评藏转</small>
         </div>
         <div className="hero-action">
-          <span>今日已发布</span>
+          <span>周期内已发布</span>
           <strong>{data.today.published}<em> 条</em></strong>
           <small>{data.today.pending} 项任务待推进</small>
         </div>
@@ -139,8 +143,8 @@ export default function DashboardPage() {
                 <strong>{formatCompact(item.followers)}</strong>
               </div>
               <div className="platform-metrics">
-                <div><span>今日发布</span><strong>{item.todayPosts}</strong></div>
-                <div><span>累计播放</span><strong>{formatCompact(item.views)}</strong></div>
+                <div><span>周期发布</span><strong>{item.todayPosts}</strong></div>
+                <div><span>周期播放</span><strong>{formatCompact(item.views)}</strong></div>
                 <div><span>互动量</span><strong>{formatCompact(item.interactions)}</strong></div>
               </div>
             </article>
@@ -151,11 +155,11 @@ export default function DashboardPage() {
       <div className="dashboard-grid dashboard-grid-top">
         <section className="panel today-panel">
           <div className="panel-heading">
-            <div><span className="section-kicker">TODAY</span><h2>今日内容情况</h2></div>
+            <div><span className="section-kicker">SELECTED PERIOD</span><h2>{data.range.label}内容情况</h2></div>
             <span className="count-badge">{data.today.pending} 待发布</span>
           </div>
           <div className="today-summary">
-            <div><strong>{data.today.published}</strong><span>今日发布作品</span></div>
+            <div><strong>{data.today.published}</strong><span>周期发布作品</span></div>
             <div><strong>{data.today.pending}</strong><span>待推进任务</span></div>
           </div>
           <div className="progress-list">
@@ -170,7 +174,7 @@ export default function DashboardPage() {
 
         <section className="panel ai-panel">
           <div className="panel-heading light-heading">
-            <div><span className="section-kicker">AI INSIGHT</span><h2>今日运营建议</h2></div>
+            <div><span className="section-kicker">AI INSIGHT</span><h2>周期运营建议</h2></div>
             <span className="ai-badge">AI</span>
           </div>
           <p className="ai-intro">基于当前作品表现与热点趋势生成，执行前请由运营负责人确认。</p>

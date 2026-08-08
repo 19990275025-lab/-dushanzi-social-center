@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
+import { dateRangeQuery } from "@/lib/date-range";
+import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
 const platformOptions = ["all", "douyin", "kuaishou", "weibo", "wechat_channels"];
 const contentTypeLabels: Record<string, string> = {
@@ -27,6 +29,7 @@ type ContentData = {
 };
 
 export default function ContentInsightsPage() {
+  const range = useGlobalDateRange();
   const [platform, setPlatform] = useState("all");
   const [data, setData] = useState<ContentData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,7 +38,7 @@ export default function ContentInsightsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/insights/content?platform=${platform}`);
+      const response = await fetch(`/api/insights/content?platform=${platform}&${dateRangeQuery(range)}`);
       if (!response.ok) throw new Error("内容洞察数据读取失败");
       setData(await response.json() as ContentData);
       setError("");
@@ -44,7 +47,7 @@ export default function ContentInsightsPage() {
     } finally {
       setLoading(false);
     }
-  }, [platform]);
+  }, [platform, range]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);

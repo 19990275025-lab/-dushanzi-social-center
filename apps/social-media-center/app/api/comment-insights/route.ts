@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { resolveDateRange, type DateRange } from "@/lib/date-range";
 import {
   analyzeComment,
   buildOperatingSuggestions,
@@ -26,19 +27,20 @@ type CommentRow = {
   post_title: string;
 };
 
-async function readComments() {
+async function readComments(range: DateRange) {
   return getD1().prepare(`
     SELECT c.id, c.post_id, c.platform, c.username, c.comment_text,
       c.comment_time, c.likes, c.sentiment, c.keyword, c.user_need,
       c.ai_analysis, p.title AS post_title
     FROM social_comments c
     INNER JOIN social_posts p ON p.id = c.post_id
+    WHERE date(c.comment_time) BETWEEN date(?) AND date(?)
     ORDER BY c.likes DESC, c.comment_time DESC, c.id DESC
     LIMIT 2000
-  `).all<CommentRow>();
+  `).bind(range.from, range.to).all<CommentRow>();
 }
 
-function buildResponse(rows: CommentRow[]) {
+function buildResponse(rows: CommentRow[], range: DateRange) {
   const analyzed = rows.map((row) => ({ row, result: analyzeComment(row) }));
   const sentiments: Record<Sentiment, number> = { positive: 0, negative: 0, neutral: 0 };
   const keywordCounts = new Map<string, number>();
@@ -87,20 +89,23 @@ function buildResponse(rows: CommentRow[]) {
     engine: commentInsightEngine.name,
     futureAiEndpoint: commentInsightEngine.futureEndpoint,
     sources: ["social_comments", "social_posts"],
+    range,
     updatedAt: new Date().toISOString(),
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await ensureDatabase();
-  const rows = await readComments();
-  return Response.json(buildResponse(rows.results), { headers: { "Cache-Control": "no-store" } });
+  const range = resolveDateRange(new URL(request.url).searchParams);
+  const rows = await readComments(range);
+  return Response.json(buildResponse(rows.results, range), { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   await ensureDatabase();
   const d1 = getD1();
-  const rows = await readComments();
+  const range = resolveDateRange(new URL(request.url).searchParams);
+  const rows = await readComments(range);
   const analyzedAt = new Date().toISOString();
   const statements = rows.results.map((row) => {
     const result = analyzeComment(row);
@@ -131,6 +136,6 @@ export async function POST() {
     return Response.json({ error: "评论分析写入失败，请稍后重试" }, { status: 500 });
   }
 
-  const refreshed = await readComments();
-  return Response.json(buildResponse(refreshed.results));
+  const refreshed = await readComments(range);
+  return Response.json(buildResponse(refreshed.results, range));
 }

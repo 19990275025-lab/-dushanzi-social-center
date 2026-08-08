@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { resolveDateRange } from "@/lib/date-range";
 
 const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
 
@@ -44,9 +45,10 @@ function distribution(value: string): DistributionItem[] {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await ensureDatabase();
   const d1 = getD1();
+  const range = resolveDateRange(new URL(request.url).searchParams);
   const [accounts, profiles, growth, derivedGrowth] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, followers_count
@@ -59,24 +61,27 @@ export async function GET() {
         age_distribution, region_distribution, interest_distribution,
         active_time_distribution, source_type, collected_at
       FROM social_fans
+      WHERE date(collected_at) BETWEEN date(?) AND date(?)
       ORDER BY collected_at DESC, id DESC
       LIMIT 200
-    `).all<ProfileRow>(),
+    `).bind(range.from, range.to).all<ProfileRow>(),
     d1.prepare(`
       SELECT platform, record_date, fans_count, net_growth, new_fans,
         lost_fans, source_type
       FROM fan_growth_records
+      WHERE date(record_date) BETWEEN date(?) AND date(?)
       ORDER BY record_date ASC, id ASC
       LIMIT 1000
-    `).all<GrowthRow>(),
+    `).bind(range.from, range.to).all<GrowthRow>(),
     d1.prepare(`
       SELECT platform, date(publish_time) AS record_date,
         COALESCE(SUM(fans_growth), 0) AS net_growth
       FROM social_posts
+      WHERE date(publish_time) BETWEEN date(?) AND date(?)
       GROUP BY platform, date(publish_time)
       ORDER BY record_date ASC
       LIMIT 1000
-    `).all<DerivedGrowthRow>(),
+    `).bind(range.from, range.to).all<DerivedGrowthRow>(),
   ]);
 
   const latestProfile = new Map<string, ProfileRow>();
@@ -123,6 +128,7 @@ export async function GET() {
 
   return Response.json({
     platforms: result,
+    range,
     sources: ["social_accounts", "social_fans", "fan_growth_records", "social_posts"],
     collectionApi: "/api/v1/social/fans/collect",
     updatedAt: new Date().toISOString(),

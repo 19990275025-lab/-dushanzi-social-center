@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
+import { dateRangeQuery } from "@/lib/date-range";
+import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
 const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"];
 type Distribution = { label: string; value: number };
@@ -15,16 +17,17 @@ function ProfileBlock({ title, items }: { title: string; items: Distribution[] }
 }
 
 export default function FanInsightsPage() {
+  const range = useGlobalDateRange();
   const [data, setData] = useState<FanData | null>(null);
   const [selected, setSelected] = useState("douyin");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/insights/fans").then(async (response) => {
+    fetch(`/api/insights/fans?${dateRangeQuery(range)}`).then(async (response) => {
       if (!response.ok) throw new Error("粉丝洞察数据读取失败");
       return response.json() as Promise<FanData>;
     }).then(setData).catch((reason: Error) => setError(reason.message));
-  }, []);
+  }, [range]);
 
   const current = data?.platforms.find((item) => item.platform === selected) ?? null;
   const maxGrowth = useMemo(() => Math.max(...(current?.trend.map((item) => Math.abs(item.net_growth)) ?? [0]), 1), [current]);

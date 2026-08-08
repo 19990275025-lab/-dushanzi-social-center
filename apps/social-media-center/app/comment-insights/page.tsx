@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatDate, platformLabel } from "@/lib/format";
+import { dateRangeQuery } from "@/lib/date-range";
+import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
 type InsightData = {
   summary: {
@@ -38,6 +40,7 @@ type InsightData = {
 const sentimentLabel = { positive: "正向", negative: "负向", neutral: "中性" };
 
 export default function CommentInsightsPage() {
+  const range = useGlobalDateRange();
   const [data, setData] = useState<InsightData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -45,7 +48,7 @@ export default function CommentInsightsPage() {
   const analyze = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/comment-insights", { method: "POST" });
+      const response = await fetch(`/api/comment-insights?${dateRangeQuery(range)}`, { method: "POST" });
       const result = await response.json() as InsightData & { error?: string };
       if (!response.ok) throw new Error(result.error || "游客评论分析失败");
       setData(result);
@@ -55,7 +58,7 @@ export default function CommentInsightsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void analyze(), 0);
