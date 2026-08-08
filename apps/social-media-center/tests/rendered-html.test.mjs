@@ -78,11 +78,13 @@ test("data collection center combines automatic collection and imports without r
 });
 
 test("global date filter resolves yesterday, week, month and custom ranges", async () => {
-  const { rangeForPreset, resolveDateRange } = await import(new URL("../lib/date-range.ts", import.meta.url));
+  const { rangeForMonth, rangeForPreset, resolveDateRange } = await import(new URL("../lib/date-range.ts", import.meta.url));
   const now = new Date("2026-08-08T04:00:00.000Z");
   assert.deepEqual(rangeForPreset("yesterday", now), { preset: "yesterday", from: "2026-08-07", to: "2026-08-07", label: "昨日" });
   assert.deepEqual(rangeForPreset("week", now), { preset: "week", from: "2026-08-02", to: "2026-08-08", label: "近一周" });
-  assert.deepEqual(rangeForPreset("month", now), { preset: "month", from: "2026-08-01", to: "2026-08-08", label: "自然月" });
+  assert.deepEqual(rangeForPreset("month", now), { preset: "month", from: "2026-08-01", to: "2026-08-08", label: "2026年8月" });
+  assert.deepEqual(rangeForMonth(2026, 7, now), { preset: "month", from: "2026-07-01", to: "2026-07-31", label: "2026年7月" });
+  assert.deepEqual(resolveDateRange(new URLSearchParams("preset=month&from=2026-07-01&to=2026-07-31"), now), { preset: "month", from: "2026-07-01", to: "2026-07-31", label: "2026年7月" });
   assert.deepEqual(resolveDateRange(new URLSearchParams("preset=custom&from=2026-07-10&to=2026-08-08"), now), { preset: "custom", from: "2026-07-10", to: "2026-08-08", label: "2026-07-10 至 2026-08-08" });
 });
 
@@ -104,6 +106,11 @@ test("global date filter is wired to every requested dashboard and API", async (
   ]);
   assert.match(shell, /GlobalDateFilter/);
   assert.match(filter, /datePresetLabels/);
+  assert.match(filter, /MonthPicker/);
+  assert.match(filter, /month-picker-grid/);
+  assert.match(filter, /dual-calendar/);
+  assert.match(filter, /CalendarMonth/);
+  assert.doesNotMatch(filter, /type="date"/);
   for (const label of ["昨日", "近一周", "自然月", "自定义"]) assert.match(dateRange, new RegExp(label));
   for (const page of [dashboardPage, contentPage, fanPage, commentPage, aiPage]) assert.match(page, /dateRangeQuery\(range\)/);
   for (const api of [dashboardApi, contentApi, fanApi, commentApi, aiApi]) {
