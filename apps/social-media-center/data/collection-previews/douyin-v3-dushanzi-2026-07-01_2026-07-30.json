@@ -1,0 +1,280 @@
+{
+  "schemaVersion": "3.0",
+  "source": "douyin-app-to-chrome-creator-center",
+  "platform": "douyin",
+  "accountName": "独山子大峡谷",
+  "collectedAt": "2026-08-09T17:40:00+08:00",
+  "previewOnly": true,
+  "confirmed": false,
+  "collectionRange": {
+    "start": "2026-07-01T00:00:00+08:00",
+    "end": "2026-07-30T23:59:59+08:00"
+  },
+  "fans": {
+    "currentTotal": 161405,
+    "periodEndTotal": 161100,
+    "gender": [
+      { "label": "男性", "value": 64 },
+      { "label": "女性", "value": 36 }
+    ],
+    "age": [
+      { "label": "<23", "value": 7 },
+      { "label": "24-30", "value": 11 },
+      { "label": "31-40", "value": 34 },
+      { "label": "41-50", "value": 22 },
+      { "label": ">50", "value": 26 }
+    ],
+    "region": [
+      { "label": "新疆", "value": 22 },
+      { "label": "江苏", "value": 8 },
+      { "label": "浙江", "value": 7 },
+      { "label": "广东", "value": 6 },
+      { "label": "安徽", "value": 5 },
+      { "label": "河南", "value": 4 },
+      { "label": "山东", "value": 4 },
+      { "label": "上海", "value": 4 },
+      { "label": "湖南", "value": 3 },
+      { "label": "四川", "value": 3 },
+      { "label": "陕西", "value": 3 },
+      { "label": "河北", "value": 3 },
+      { "label": "湖北", "value": 3 },
+      { "label": "江西", "value": 3 },
+      { "label": "山西", "value": 3 },
+      { "label": "福建", "value": 2 },
+      { "label": "黑龙江", "value": 2 },
+      { "label": "辽宁", "value": 2 },
+      { "label": "北京", "value": 2 },
+      { "label": "甘肃", "value": 2 },
+      { "label": "内蒙古", "value": 2 },
+      { "label": "贵州", "value": 1 },
+      { "label": "吉林", "value": 1 },
+      { "label": "广西", "value": 1 },
+      { "label": "云南", "value": 1 },
+      { "label": "重庆", "value": 1 },
+      { "label": "天津", "value": 1 },
+      { "label": "海南", "value": 1 }
+    ],
+    "interests": [
+      { "label": "随拍", "value": 37 },
+      { "label": "亲子", "value": 15 },
+      { "label": "美食", "value": 10 },
+      { "label": "社会时政", "value": 9 },
+      { "label": "剧情", "value": 7 },
+      { "label": "体育", "value": 5 },
+      { "label": "三农", "value": 5 },
+      { "label": "旅行", "value": 4 },
+      { "label": "汽车", "value": 4 },
+      { "label": "颜值", "value": 4 }
+    ],
+    "growth": [
+      {
+        "recordDate": "2026-07-30",
+        "fansCount": 161100,
+        "netGrowth": 613,
+        "newFans": 1646,
+        "lostFans": 1033,
+        "returningFans": 196,
+        "granularity": "period_summary"
+      }
+    ]
+  },
+  "posts": [
+    {
+      "title": "眼前是亿万年风景，脚下是万丈深渊 每一步都是行走在天边#达瓦孜 #独库公路必打卡地 #世界自然遗产 #独库公路第一景",
+      "publishTime": "2026-07-30T17:21:00+08:00",
+      "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7668248715139763506",
+      "contentType": "video",
+      "views": 971,
+      "likes": 35,
+      "commentsCount": 3,
+      "displayedCommentsCount": 6,
+      "favorites": 3,
+      "shares": 7,
+      "completionRate": 4.31,
+      "skipRate": 42.11,
+      "averagePlayDuration": 7.59,
+      "trafficSources": [
+        { "label": "推荐页", "value": 55.2 },
+        { "label": "关注页", "value": 21.5 },
+        { "label": "个人主页", "value": 14.8 },
+        { "label": "朋友页", "value": 5.2 },
+        { "label": "消息页", "value": 1.9 },
+        { "label": "精选App", "value": 0.8 }
+      ],
+      "audience": {
+        "gender": [{ "label": "男性", "value": 56 }, { "label": "女性", "value": 44 }],
+        "age": [
+          { "label": "<18", "value": 1 }, { "label": "18-23", "value": 9 },
+          { "label": "24-30", "value": 16 }, { "label": "31-40", "value": 44 },
+          { "label": "41-50", "value": 19 }, { "label": ">50", "value": 10 }
+        ],
+        "region": [
+          { "label": "新疆", "value": 57.69 }, { "label": "广东", "value": 4.62 },
+          { "label": "河南", "value": 3.65 }, { "label": "湖北", "value": 2.88 },
+          { "label": "北京", "value": 2.5 }, { "label": "安徽", "value": 2.31 },
+          { "label": "河北", "value": 2.31 }, { "label": "上海", "value": 2.31 },
+          { "label": "浙江", "value": 2.31 }, { "label": "陕西", "value": 2.12 }
+        ]
+      },
+      "comments": [
+        { "username": "胡老", "commentText": "[鼓掌][鼓掌][赞]", "commentTime": "2026-08-01T12:25:00+08:00", "likes": 0 },
+        { "username": "quxnix", "commentText": "[赞][赞][赞][赞][赞][赞][玫瑰][玫瑰][玫瑰][玫瑰][玫瑰][玫瑰][比心][比心][比心][比心][比心][比心][比心]", "commentTime": "2026-07-31T23:37:00+08:00", "likes": 0 },
+        { "username": "天山雄鹰艾尼", "commentText": "新疆特色绝技 非遗表演在独山子大峡谷闪耀着", "commentTime": "2026-07-31T15:34:00+08:00", "likes": 0 }
+      ],
+      "commentKeywords": [{ "label": "赞", "value": 2 }, { "label": "比心", "value": 1 }, { "label": "非遗", "value": 1 }]
+    },
+    {
+      "title": "不要被鸡毛蒜皮的小事困住 这个世界如此辽阔#风和自由 #新疆 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-26T15:41:00+08:00",
+      "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7666738605368298804",
+      "contentType": "video",
+      "views": 449, "likes": 6, "commentsCount": 1, "displayedCommentsCount": 2, "favorites": 1, "shares": 1,
+      "completionRate": 6.25, "skipRate": 57.04, "averagePlayDuration": null,
+      "trafficSources": [
+        { "label": "关注页", "value": 41.6 }, { "label": "个人主页", "value": 33.5 },
+        { "label": "推荐页", "value": 16.6 }, { "label": "朋友页", "value": 4.3 }, { "label": "其他", "value": 2.4 }
+      ],
+      "audience": {
+        "gender": [{ "label": "男性", "value": 55 }, { "label": "女性", "value": 45 }],
+        "age": [
+          { "label": "<18", "value": 1 }, { "label": "18-23", "value": 13 },
+          { "label": "24-30", "value": 20 }, { "label": "31-40", "value": 41 },
+          { "label": "41-50", "value": 15 }, { "label": ">50", "value": 10 }
+        ],
+        "region": [
+          { "label": "新疆", "value": 50.34 }, { "label": "广东", "value": 5.7 },
+          { "label": "河南", "value": 4.03 }, { "label": "安徽", "value": 3.36 },
+          { "label": "江苏", "value": 3.02 }, { "label": "陕西", "value": 2.68 },
+          { "label": "北京", "value": 2.35 }, { "label": "浙江", "value": 2.35 },
+          { "label": "河北", "value": 2.35 }, { "label": "湖北", "value": 2.35 }
+        ]
+      },
+      "comments": [{ "username": "💫Gin", "commentText": "我真服了这么好看，没人看？[宕机][宕机][宕机]", "commentTime": "2026-07-26T19:24:00+08:00", "likes": 0 }],
+      "commentKeywords": [{ "label": "好看", "value": 1 }]
+    },
+    {
+      "title": "独山子大峡谷首届影像创作大赛 10万奖池等你来战！不限年龄、不限设备，风光、人像、妆造、视频四大赛道任你选。#摄影大赛 #摄影 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-25T12:36:00+08:00",
+      "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7666319911337168179",
+      "contentType": "video", "views": 10000, "likes": 325, "commentsCount": 0, "displayedCommentsCount": 12,
+      "favorites": 3, "shares": 7, "completionRate": 4.15, "skipRate": 6.21, "averagePlayDuration": null,
+      "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "#独山子大峡谷首届影像大赛 #独库公路第一景#独库公路必打卡地#摄影#摄影比赛",
+      "publishTime": "2026-07-24T12:45:00+08:00",
+      "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7665951213486568699",
+      "contentType": "image_text", "views": 179, "likes": 6, "commentsCount": 1, "displayedCommentsCount": 2,
+      "favorites": 0, "shares": 1, "completionRate": 10.22, "skipRate": null, "averagePlayDuration": null,
+      "trafficSources": [],
+      "audience": { "gender": [], "age": [], "region": [{ "label": "新疆", "value": 61.87 }, { "label": "陕西", "value": 5.04 }, { "label": "广东", "value": 4.32 }, { "label": "河南", "value": 3.6 }, { "label": "天津", "value": 2.88 }, { "label": "江苏", "value": 2.88 }] },
+      "comments": [{ "username": "💫Gin", "commentText": "拍摄设备限制不？", "commentTime": "2026-07-24T12:50:00+08:00", "likes": 0 }],
+      "commentKeywords": [{ "label": "拍摄设备", "value": 1 }]
+    },
+    {
+      "title": "大地把最深的裂痕，坦荡成惊世的指纹。 愿你的人生沟壑，也终成独一无二的风景。#这世界咋这么好看 #蓝天白云晴空 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-24T12:06:00+08:00",
+      "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7665940944688123163",
+      "contentType": "video", "views": 339, "likes": 6, "commentsCount": 1, "displayedCommentsCount": 2, "favorites": 0, "shares": 0,
+      "completionRate": 2.44, "skipRate": 43.08, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] },
+      "comments": [{ "username": "诺一", "commentText": "[赞][赞][赞]", "commentTime": "2026-07-24T12:15:00+08:00", "likes": 0 }],
+      "commentKeywords": [{ "label": "赞", "value": 1 }]
+    },
+    {
+      "title": "独山子大峡谷，比拍到的震撼一百倍！ #独库公路 #独库公路必打卡地 #独库公路第一景 #大自然",
+      "publishTime": "2026-07-22T10:56:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 330, "likes": 5, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 1,
+      "completionRate": 5.38, "skipRate": 44.54, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "用agudo卡点打开达瓦孜##独库公路第一景 #独库公路必打卡地 #新疆",
+      "publishTime": "2026-07-20T11:17:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 435, "likes": 7, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 0,
+      "completionRate": 8.75, "skipRate": 53.57, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "用badboy打开独库公路第一景~ #万妮达版badboy #独库公路第一景 #独库公路必打卡地 #达瓦孜",
+      "publishTime": "2026-07-19T10:47:00+08:00", "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7664065096615808319", "contentType": "video",
+      "views": 410, "likes": 15, "commentsCount": 1, "displayedCommentsCount": 2, "favorites": 0, "shares": 3,
+      "completionRate": 2.31, "skipRate": 42.96, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] },
+      "comments": [{ "username": "天山雄鹰艾尼", "commentText": "独山子大峡谷 风景优美 亿年奇观的融雪痕迹 千年以来传承下的达瓦孜非遗 高空走钢丝表演 等你", "commentTime": "2026-07-23T14:51:00+08:00", "likes": 0 }],
+      "commentKeywords": [{ "label": "大峡谷", "value": 1 }, { "label": "达瓦孜", "value": 1 }]
+    },
+    {
+      "title": "用一首枪火打开紧张刺激的达瓦孜表演吧~ #达瓦孜 #枪火 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-18T11:01:00+08:00", "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7663697672670367019", "contentType": "video",
+      "views": 319, "likes": 7, "commentsCount": 5, "displayedCommentsCount": 5, "favorites": 1, "shares": 1,
+      "completionRate": 7.69, "skipRate": 57.02, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] },
+      "comments": [
+        { "username": "BG0FFD", "commentText": "老哥还是以前年轻时候一样精神[666][比心][玫瑰]", "commentTime": "2026-07-18T19:46:00+08:00", "likes": 0 },
+        { "username": "BG0FFD", "commentText": "[666][666][666][666][666]", "commentTime": "2026-07-18T19:44:00+08:00", "likes": 0 },
+        { "username": "BG0FFD", "commentText": "[比心][比心][比心][比心]", "commentTime": "2026-07-18T19:44:00+08:00", "likes": 0 },
+        { "username": "👑古丽👑", "commentText": "[666][666][666][666][666][666][666][666]", "commentTime": "2026-07-18T17:24:00+08:00", "likes": 0 },
+        { "username": "天山雄鹰艾尼", "commentText": "来现场观看太震撼哦[灵机一动][灵机一动][灵机一动]", "commentTime": "2026-07-18T17:19:00+08:00", "likes": 0 }
+      ],
+      "commentKeywords": [{ "label": "666", "value": 3 }, { "label": "震撼", "value": 1 }]
+    },
+    {
+      "title": "快来大峡谷挑战恐惧吧～ #这也能开播 #去旅行 #看风景 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-17T10:55:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 447, "likes": 9, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 4,
+      "completionRate": 12.92, "skipRate": 48.8, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "独山子大峡谷的高空挑战～ 属于游客的高光时刻～#航拍 #高空挑战 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-14T18:37:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 956, "likes": 16, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 3,
+      "completionRate": 7.63, "skipRate": 48.66, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "终有一天你也会抵达这里#独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-07-12T16:19:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 447, "likes": 8, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 0,
+      "completionRate": 5.81, "skipRate": 53.64, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "西藏的风吹到了新疆~ 新疆很美下次约你！#独库公路 #独库公路第一景 #独库公路必打卡地 #寻美新疆 #新疆",
+      "publishTime": "2026-07-09T20:27:00+08:00", "videoUrl": "https://creator.douyin.com/creator-micro/work-management/work-detail/7660503764893191434", "contentType": "video",
+      "views": 1448, "likes": 29, "commentsCount": 2, "displayedCommentsCount": 2, "favorites": 1, "shares": 0,
+      "completionRate": 1.77, "skipRate": 56.82, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] },
+      "comments": [
+        { "username": ".Yr.", "commentText": "拍的好好[爱心]", "commentTime": "2026-07-10T21:56:00+08:00", "likes": 0 },
+        { "username": "ARZU", "commentText": "[爱心][爱心][爱心][爱心][爱心][爱心][爱心][爱心][爱心]", "commentTime": "2026-07-10T00:43:00+08:00", "likes": 0 }
+      ],
+      "commentKeywords": [{ "label": "爱心", "value": 2 }, { "label": "拍摄", "value": 1 }]
+    },
+    {
+      "title": "如果不知道去哪里玩，就来独山子大峡谷吧～ #独库公路第一景 #独库公路必打卡地 #自驾 #高空挑战",
+      "publishTime": "2026-07-08T12:01:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 1158, "likes": 12, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 1,
+      "completionRate": 9.69, "skipRate": 49.09, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "太热啦？跟着峡谷来避暑～ #凉快一夏 #游乐项目 #独库公路第一景 #独库公路必打卡地 #带你看世界",
+      "publishTime": "2026-07-06T16:07:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 1374, "likes": 17, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 1, "shares": 3,
+      "completionRate": 10.44, "skipRate": 48.76, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "地球的血管，独山子秘境～独山子大峡谷 #我用摄影看世界 #自然 #自驾旅行 #独库公路必打卡地 #独库公路第一景",
+      "publishTime": "2026-07-04T16:34:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 625, "likes": 13, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 0, "shares": 2,
+      "completionRate": 4.6, "skipRate": 57.96, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    },
+    {
+      "title": "独库公路第一景独山子大峡谷期待您的到来～ #独库公路第一景#独库公路必打卡地#独库公路#自驾游",
+      "publishTime": "2026-07-02T15:36:00+08:00", "videoUrl": "", "contentType": "video",
+      "views": 744, "likes": 11, "commentsCount": 0, "displayedCommentsCount": 0, "favorites": 1, "shares": 0,
+      "completionRate": 1.48, "skipRate": 57.75, "averagePlayDuration": null, "trafficSources": [], "audience": { "gender": [], "age": [], "region": [] }, "comments": [], "commentKeywords": []
+    }
+  ],
+  "failures": [
+    { "target": "粉丝逐日增长点", "stage": "粉丝分析", "reason": "创作者中心当前仅直接显示7月区间汇总与趋势图，未稳定读取逐日数值；预览保留区间汇总记录" },
+    { "target": "2026-07-25作品评论", "stage": "评论管理", "reason": "作品列表显示12条评论，但评论管理页已显示没有更多评论，未伪造不可见内容" },
+    { "target": "9条作品链接", "stage": "内容管理", "reason": "列表未直接暴露作品唯一链接，未以内容管理公共地址冒充作品链接" },
+    { "target": "15条作品平均观看时长", "stage": "流量分析", "reason": "详情页未在本轮稳定呈现该字段；仅7月30日作品读取到7.59秒" },
+    { "target": "14条作品流量来源", "stage": "流量分析", "reason": "仅7月30日与7月26日作品完成来源占比复核，其余保留为空" },
+    { "target": "15条作品观众画像", "stage": "观众分析", "reason": "仅7月30日、7月26日及7月24日图文作品读取到部分或完整画像，其余保留为空" },
+    { "target": "作品数量口径", "stage": "内容管理", "reason": "内容管理筛选读取16条视频，作品选择器另发现1条7月24日图文；预览按17条作品处理" }
+  ]
+}

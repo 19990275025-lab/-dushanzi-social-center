@@ -393,6 +393,30 @@ test("collection schema and Chrome adapter are packaged", async () => {
   await access(new URL("public/chrome-extension/douyin-collector-v1.zip", root));
 });
 
+test("Douyin V3 confirms the July preview and preserves incomplete real fields", async () => {
+  const [previewRoute, confirmRoute, collectionRoute, schema, bootstrap, migration, preview] = await Promise.all([
+    readFile(new URL("app/api/collections/douyin-v3/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/douyin-v3/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/route.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0010_douyin_collection_v3.sql", root), "utf8"),
+    readFile(new URL("data/collection-previews/douyin-v3-dushanzi-2026-07-01_2026-07-30.json", root), "utf8"),
+  ]);
+  assert.match(previewRoute, /无落库预览/);
+  assert.match(confirmRoute, /confirmed !== true/);
+  assert.match(confirmRoute, /douyin_v3/);
+  assert.match(confirmRoute, /NOT EXISTS/);
+  assert.match(collectionRoute, /collection_log_id IS NOT NULL/);
+  assert.match(collectionRoute, /log\.entity_type === "douyin_v3"/);
+  for (const source of [schema, bootstrap, migration, confirmRoute]) assert.match(source, /skip_rate|skipRate/);
+  const payload = JSON.parse(preview);
+  assert.equal(payload.schemaVersion, "3.0");
+  assert.equal(payload.posts.length, 17);
+  assert.equal(payload.posts.flatMap((post) => post.comments).length, 14);
+  assert.equal(payload.posts.filter((post) => post.videoUrl === "").length, 9);
+});
+
 test("production build artifacts exist", async () => {
   await access(new URL("dist/server/index.js", root));
   await access(new URL("dist/client", root));

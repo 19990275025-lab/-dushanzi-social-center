@@ -164,6 +164,7 @@ export const socialPosts = sqliteTable(
     hashtags: text("hashtags", { mode: "json" }).$type<string[]>().notNull().default([]),
     duration: integer("duration"),
     completionRate: real("completion_rate"),
+    skipRate: real("skip_rate"),
     averagePlayDuration: real("average_play_duration"),
     trafficSources: text("traffic_sources", { mode: "json" })
       .$type<Array<{ label: string; value: number }>>()

@@ -21,7 +21,7 @@ export async function GET() {
       .prepare(`
         SELECT
           COUNT(*) AS total_logs,
-          COALESCE(SUM(CASE WHEN entity_type = 'post' THEN success_count ELSE 0 END), 0) AS imported_posts,
+          COALESCE((SELECT COUNT(*) FROM social_posts p WHERE p.collection_log_id IS NOT NULL), 0) AS imported_posts,
           COALESCE(SUM(comment_count), 0) AS imported_comments,
           COALESCE(SUM(error_count), 0) AS validation_errors,
           MAX(created_at) AS latest_collection
@@ -106,7 +106,8 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "该采集批次已经回滚" }, { status: 409 });
   }
 
-  const deleteRows = log.entity_type === "douyin_v2"
+  const isUnifiedDouyinBatch = log.entity_type === "douyin_v2" || log.entity_type === "douyin_v3";
+  const deleteRows = isUnifiedDouyinBatch
     ? [
         d1.prepare("DELETE FROM social_comments WHERE collection_log_id = ?").bind(id),
         d1.prepare("DELETE FROM content_audience_analysis WHERE collection_log_id = ?").bind(id),
@@ -119,7 +120,7 @@ export async function DELETE(request: Request) {
         : d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id)];
   await d1.batch([
     ...deleteRows,
-    ...(log.entity_type === "douyin_v2" ? [d1.prepare(`
+    ...(isUnifiedDouyinBatch ? [d1.prepare(`
       UPDATE social_accounts
       SET followers_count = COALESCE((
         SELECT fans_count FROM social_fans

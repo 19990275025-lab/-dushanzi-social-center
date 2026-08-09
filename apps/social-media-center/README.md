@@ -38,6 +38,8 @@
 - `POST /api/collections/confirm`：再次校验，新增作品并安全更新已有作品的最新指标。
 - `POST /api/collections/comments`：校验抖音评论采集文件并创建待确认日志，不写评论表。
 - `POST /api/collections/comments/confirm`：再次校验、关联已有作品、跳过重复评论并写入 `social_comments`。
+- `POST /api/collections/douyin-v3`：校验抖音 V3.0 粉丝、作品、详情和评论批次，仅返回预览，不写数据库。
+- `POST /api/collections/douyin-v3/confirm`：要求显式人工确认，以事务幂等写入粉丝、增长、作品、划走率、观众画像和评论，并记录完整采集日志。
 - `DELETE /api/collections?id={id}`：回滚指定采集批次的作品，保留采集日志。
 - `GET /api/comment-insights`：查询当前评论洞察结果。
 - `POST /api/comment-insights`：运行规则模型，并将分析结果写回 `social_comments`。
@@ -119,6 +121,12 @@ V2.1 将粉丝分析与作品详情统一为一个标准 JSON 批次。粉丝数
 - `DELETE /api/collections?id={id}`：V2.1 已确认批次按评论、观众画像、作品、增长、粉丝顺序回滚，日志保留。
 
 V2.1 真实预览范围为 2026-08-01 至 2026-08-07。已读取精确粉丝 161,370 及性别、年龄、地域、兴趣画像，并复用该范围已复核的 3 条作品和 10 条评论；第一条作品补充了完播率、平均播放时长、主要流量来源和观众地域，第二条作品补充了实时播放量与完播率。粉丝增长、活跃时段及未稳定读取的作品图表全部记录为失败项，不生成模拟数据。预览文件位于 `data/collection-previews/douyin-v2-dushanzi-2026-08-01_2026-08-07.json`；当前完整率未达门槛，不能确认入库。
+
+### 抖音平台数据采集 V3.0
+
+V3.0 已完成 2026-07-01 至 2026-07-30 的抖音完整闭环测试。人工确认后的同一事务写入粉丝快照 1 条、粉丝增长区间汇总 1 条、作品 17 条、作品观众分析 3 条和非作者顶级评论 14 条；`collection_logs.entity_type` 使用 `douyin_v3`，失败字段和未稳定读取原因保留在日志中。
+
+作品新增 `skip_rate` 保存划走率。缺失的作品链接、平均观看时长、流量来源和观众画像保持为空；V3.0 确认接口按账号和标题更新作品，并按作品、用户名、内容和评论时间跳过重复评论，可安全重新执行。当前作品全部字段完整率为 66.67%，因此适合“基础数据先入库、详情后补采”，尚未达到建议的 80% 正式运行门槛。完整报告位于 `docs/douyin-v3-july-collection-preview.md`，标准预览数据位于 `data/collection-previews/douyin-v3-dushanzi-2026-07-01_2026-07-30.json`。
 
 ## 游客评论洞察中心 V1.0
 

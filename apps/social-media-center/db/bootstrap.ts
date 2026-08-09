@@ -118,6 +118,7 @@ const schemaStatements = [
     hashtags TEXT NOT NULL DEFAULT '[]',
     duration INTEGER,
     completion_rate REAL,
+    skip_rate REAL,
     average_play_duration REAL,
     traffic_sources TEXT NOT NULL DEFAULT '[]',
     ai_analysis TEXT,
@@ -307,6 +308,9 @@ async function initialize() {
   }
   if (!postColumns.results.some((column) => column.name === "completion_rate")) {
     await d1.prepare("ALTER TABLE social_posts ADD COLUMN completion_rate REAL").run();
+  }
+  if (!postColumns.results.some((column) => column.name === "skip_rate")) {
+    await d1.prepare("ALTER TABLE social_posts ADD COLUMN skip_rate REAL").run();
   }
   if (!postColumns.results.some((column) => column.name === "average_play_duration")) {
     await d1.prepare("ALTER TABLE social_posts ADD COLUMN average_play_duration REAL").run();
