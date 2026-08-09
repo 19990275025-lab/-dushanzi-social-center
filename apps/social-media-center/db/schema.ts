@@ -309,6 +309,33 @@ export const competitorAccounts = sqliteTable(
   ],
 );
 
+export const competitorPosts = sqliteTable(
+  "competitor_posts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    accountName: text("account_name").notNull(),
+    title: text("title").notNull(),
+    publishTime: text("publish_time").notNull(),
+    views: integer("views").notNull().default(0),
+    likes: integer("likes").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
+    favorites: integer("favorites").notNull().default(0),
+    shares: integer("shares").notNull().default(0),
+    sourceType: text("source_type").notNull().default("api"),
+    sourceRecordId: text("source_record_id"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_competitor_posts_platform_publish_time").on(table.platform, table.publishTime),
+    index("idx_competitor_posts_account_publish_time").on(table.accountName, table.publishTime),
+    uniqueIndex("uq_competitor_posts_source_record").on(table.platform, table.sourceRecordId),
+  ],
+);
+
 export const contentTasks = sqliteTable(
   "content_tasks",
   {

@@ -208,6 +208,30 @@ const schemaStatements = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_competitor_accounts_platform_url
     ON competitor_accounts(platform, account_url)`,
+  `CREATE TABLE IF NOT EXISTS competitor_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    account_name TEXT NOT NULL,
+    title TEXT NOT NULL,
+    publish_time TEXT NOT NULL,
+    views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+    likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
+    comments INTEGER NOT NULL DEFAULT 0 CHECK (comments >= 0),
+    favorites INTEGER NOT NULL DEFAULT 0 CHECK (favorites >= 0),
+    shares INTEGER NOT NULL DEFAULT 0 CHECK (shares >= 0),
+    source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual')),
+    source_record_id TEXT,
+    raw_payload TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_competitor_posts_platform_publish_time
+    ON competitor_posts(platform, publish_time DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_competitor_posts_account_publish_time
+    ON competitor_posts(account_name, publish_time DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_competitor_posts_source_record
+    ON competitor_posts(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS content_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_date TEXT NOT NULL,
@@ -377,6 +401,7 @@ async function initialize() {
   if (shouldLoadTestData()) {
     await d1.batch(seedStatements.map((statement) => d1.prepare(statement)));
   }
+  await d1.prepare("PRAGMA optimize").run();
 }
 
 export async function ensureDatabase() {

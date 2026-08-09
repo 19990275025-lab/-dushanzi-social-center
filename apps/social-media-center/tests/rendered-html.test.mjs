@@ -21,7 +21,7 @@ for (const [path, heading] of [
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
   ["app/collector/page.tsx", "新媒体数据采集中心"],
   ["app/comment-insights/page.tsx", "游客评论洞察中心"],
-  ["app/insights/content/page.tsx", "内容分析"],
+  ["app/insights/content/page.tsx", "内容监测中心"],
   ["app/insights/content/detail/page.tsx", "作品数据分析"],
   ["app/insights/fans/page.tsx", "粉丝分析"],
 ]) {
@@ -33,11 +33,18 @@ for (const [path, heading] of [
   });
 }
 
-test("content and user insights landing page keeps both functions separate", async () => {
-  const source = await readFile(new URL("app/insights/page.tsx", root), "utf8");
+test("content monitoring and fan analysis are independent navigation modules", async () => {
+  const [source, shell] = await Promise.all([
+    readFile(new URL("app/insights/page.tsx", root), "utf8"),
+    readFile(new URL("components/AppShell.tsx", root), "utf8"),
+  ]);
   assert.match(source, /内容与用户洞察中心/);
   assert.match(source, /href="\/insights\/content"/);
   assert.match(source, /href="\/insights\/fans"/);
+  assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "02"/);
+  assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "03"/);
+  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "08"/);
+  assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });
 
 test("content and fan insights switch platform themes without changing the app background", async () => {
@@ -52,7 +59,7 @@ test("content and fan insights switch platform themes without changing the app b
     assert.match(source, /当前平台/);
     assert.match(source, /theme-\$\{/);
   }
-  assert.match(content, /`\$\{currentPlatformLabel\}内容分析`/);
+  assert.match(content, /`\$\{currentPlatformLabel\}内容监测`/);
   assert.match(content, /content-platform-grid/);
   assert.match(content, /content-platform-card/);
   assert.match(content, /四平台汇总/);
@@ -188,6 +195,9 @@ test("pages use database-backed API routes", async () => {
   assert.match(commentInsights, /UPDATE social_comments/);
   assert.match(commentInsights, /analyzeComment/);
   assert.match(contentInsights, /FROM social_posts/);
+  assert.match(contentInsights, /FROM competitor_posts/);
+  assert.match(contentInsights, /industryComparison/);
+  assert.match(contentInsights, /dailyReport/);
   assert.match(contentInsights, /contentFanRelations/);
   assert.match(contentDetail, /FROM social_posts/);
   assert.match(contentDetail, /FROM social_comments/);
@@ -195,6 +205,8 @@ test("pages use database-backed API routes", async () => {
   assert.match(contentDetail, /FROM content_audience_analysis/);
   assert.match(fanInsights, /FROM social_fans/);
   assert.match(fanInsights, /FROM fan_growth_records/);
+  assert.match(fanInsights, /trendPeriod/);
+  assert.match(fanInsights, /strategies/);
   assert.match(fanInsights, /FROM social_posts/);
 });
 
@@ -250,6 +262,21 @@ test("content and user insight tables are generated for both databases", async (
   }
   assert.match(schema, /rawPayload/);
   assert.match(postgresMigration, /raw_payload/);
+});
+
+test("content monitoring competitor posts schema supports future collection", async () => {
+  const [d1Migration, postgresMigration, schema, bootstrap] = await Promise.all([
+    readFile(new URL("drizzle/0008_content_monitoring_v1.sql", root), "utf8"),
+    readProjectMigration("006_create_content_monitoring_v1.sql"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+  ]);
+  for (const source of [d1Migration, postgresMigration, schema, bootstrap]) {
+    assert.match(source, /competitor_posts/);
+    assert.match(source, /source_record_id/);
+    assert.match(source, /raw_payload/);
+  }
+  assert.match(bootstrap, /PRAGMA optimize/);
 });
 
 test("comment insight model covers all requested visitor needs", async () => {

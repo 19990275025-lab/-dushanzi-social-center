@@ -5,12 +5,13 @@ import { GlobalDateFilter } from "@/components/GlobalDateFilter";
 
 const navItems = [
   { href: "/", label: "运营驾驶舱", code: "01" },
-  { href: "/insights", label: "内容与用户洞察", code: "02" },
-  { href: "/tasks", label: "任务管理", code: "03" },
+  { href: "/insights/content", label: "内容监测中心", code: "02" },
+  { href: "/insights/fans", label: "粉丝分析中心", code: "03" },
   { href: "/collector", label: "数据采集中心", code: "04" },
   { href: "/hot-topics", label: "热点监测中心", code: "05" },
-  { href: "/ai-analysis", label: "AI内容分析", code: "06" },
-  { href: "/comment-insights", label: "游客评论洞察", code: "07" },
+  { href: "/ai-analysis", label: "AI内容分析中心", code: "06" },
+  { href: "/comment-insights", label: "游客评论洞察中心", code: "07" },
+  { href: "/tasks", label: "任务管理中心", code: "08" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -33,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav aria-label="主要导航">
           {navItems.map((item) => {
             const active = pathname === item.href
-              || (item.href === "/insights" && pathname.startsWith("/insights/"))
+              || (item.href === "/insights/content" && pathname.startsWith("/insights/content/"))
               || (item.href === "/collector" && pathname === "/imports");
             return (
               <a className={active ? "nav-item active" : "nav-item"} href={item.href} key={item.href}>

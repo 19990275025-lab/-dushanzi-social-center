@@ -3,6 +3,12 @@ import { getD1 } from "@/db";
 import { resolveDateRange } from "@/lib/date-range";
 
 const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
+const strategies = {
+  douyin: { positioning: "流量获取与爆款内容", actions: ["复用高完播作品的前三秒结构", "围绕热点连续发布同主题短视频", "用评论问题提升推荐流互动"] },
+  kuaishou: { positioning: "用户关系与直播互动", actions: ["强化主播和游客的真实互动", "用固定直播时段培养观看习惯", "通过评论回复维护熟人关系"] },
+  weibo: { positioning: "品牌传播与热点运营", actions: ["结合城市与旅游热点输出品牌观点", "用图文长帖沉淀完整攻略", "联动文旅账号扩大话题传播"] },
+  wechat_channels: { positioning: "私域沉淀与游客复购", actions: ["将活动内容同步至公众号和社群", "突出家庭与老游客的复游场景", "设计可转发的路线与服务卡片"] },
+} as const;
 
 type AccountRow = { id: number; platform: string; followers_count: number };
 type ProfileRow = {
@@ -48,7 +54,12 @@ function distribution(value: string): DistributionItem[] {
 export async function GET(request: Request) {
   await ensureDatabase();
   const d1 = getD1();
-  const range = resolveDateRange(new URL(request.url).searchParams);
+  const searchParams = new URL(request.url).searchParams;
+  const range = resolveDateRange(searchParams);
+  const requestedPeriod = searchParams.get("trend") ?? "7d";
+  const trendPeriod = (["7d", "30d", "month"] as const).includes(requestedPeriod as "7d" | "30d" | "month") ? requestedPeriod as "7d" | "30d" | "month" : "7d";
+  const endDate = new Date(`${range.to}T00:00:00Z`);
+  const trendFrom = trendPeriod === "month" ? `${range.to.slice(0, 7)}-01` : new Date(endDate.getTime() - (trendPeriod === "30d" ? 29 : 6) * 86400000).toISOString().slice(0, 10);
   const [accounts, profiles, growth, derivedGrowth] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, followers_count
@@ -72,7 +83,7 @@ export async function GET(request: Request) {
       WHERE date(record_date) BETWEEN date(?) AND date(?)
       ORDER BY record_date ASC, id ASC
       LIMIT 1000
-    `).bind(range.from, range.to).all<GrowthRow>(),
+    `).bind(trendFrom, range.to).all<GrowthRow>(),
     d1.prepare(`
       SELECT platform, date(publish_time) AS record_date,
         COALESCE(SUM(fans_growth), 0) AS net_growth
@@ -81,7 +92,7 @@ export async function GET(request: Request) {
       GROUP BY platform, date(publish_time)
       ORDER BY record_date ASC
       LIMIT 1000
-    `).bind(range.from, range.to).all<DerivedGrowthRow>(),
+    `).bind(trendFrom, range.to).all<DerivedGrowthRow>(),
   ]);
 
   const latestProfile = new Map<string, ProfileRow>();
@@ -108,12 +119,18 @@ export async function GET(request: Request) {
       .filter((account) => account.platform === platform)
       .reduce((sum, account) => sum + account.followers_count, 0);
 
+    const netGrowth = trend.reduce((sum, item) => sum + item.net_growth, 0);
+    const newFans = trend.reduce((sum, item) => sum + item.new_fans, 0);
+    const baseFans = Math.max(0, (profile?.fans_count ?? accountFollowers) - netGrowth);
     return {
       platform,
       fansCount: profile?.fans_count ?? accountFollowers,
-      netGrowth: trend.reduce((sum, item) => sum + item.net_growth, 0),
+      netGrowth,
+      newFans,
+      growthRate: baseFans > 0 ? Number(((netGrowth / baseFans) * 100).toFixed(2)) : 0,
       trend,
       trendSource: realTrend.length ? "fan_growth_records" : "social_posts.fans_growth",
+      strategy: strategies[platform],
       profile: profile ? {
         gender: distribution(profile.gender_distribution),
         ages: distribution(profile.age_distribution),
@@ -129,6 +146,8 @@ export async function GET(request: Request) {
   return Response.json({
     platforms: result,
     range,
+    trendPeriod,
+    trendRange: { from: trendFrom, to: range.to },
     sources: ["social_accounts", "social_fans", "fan_growth_records", "social_posts"],
     collectionApi: "/api/v1/social/fans/collect",
     updatedAt: new Date().toISOString(),

@@ -1,34 +1,35 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { resolveDateRange } from "@/lib/date-range";
+import { ruleBasedContentEngine, type AnalysisPost, type AnalysisTopic } from "@/lib/content-analysis-engine";
 
 const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
-const contentTypeNames: Record<string, string> = {
-  video: "短视频",
-  image_text: "图文",
-  text: "文字",
-  article: "文章",
-  live: "直播",
-};
+const targetCompetitors = ["那拉提景区", "喀纳斯景区", "天山天池", "赛里木湖"];
+const contentTypeNames: Record<string, string> = { video: "短视频", image_text: "图文", text: "文字", article: "文章", live: "直播" };
 
-type PostRow = {
-  id: number;
-  platform: string;
-  title: string;
-  content_type: string;
-  publish_time: string;
-  views: number;
-  likes: number;
-  comments: number;
-  favorites: number;
-  shares: number;
-  fans_growth: number;
-};
-
+type PostRow = Omit<AnalysisPost, "hashtags"> & { hashtags: string };
 type AccountRow = { platform: string; followers_count: number };
+type CompetitorPostRow = { platform: string; account_name: string; title: string; publish_time: string; views: number; likes: number; comments: number; favorites: number; shares: number };
 
-function interactions(post: PostRow) {
-  return post.likes + post.comments + post.favorites + post.shares;
+const interactionCount = (post: Pick<PostRow, "likes" | "comments" | "favorites" | "shares">) => post.likes + post.comments + post.favorites + post.shares;
+const percent = (value: number, total: number) => total > 0 ? Number(((value / total) * 100).toFixed(2)) : 0;
+
+function parseHashtags(value: string) {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function contentCategory(post: Pick<PostRow, "title" | "content_type">) {
+  const text = `${post.title} ${post.content_type}`;
+  if (/攻略|路线|交通|门票|怎么玩|打卡|自驾|停车|行程/.test(text)) return "攻略内容";
+  if (/挑战|玻璃桥|项目|体验|达瓦孜|漂流|穿越/.test(text)) return "项目体验";
+  if (/游客|第一视角|问答|评论|互动|导游|相册|大家/.test(text)) return "游客互动";
+  if (/活动|大赛|比赛|开幕|节庆|直播|优惠|招募|宣传/.test(text)) return "活动宣传";
+  return "风景展示";
 }
 
 export async function GET(request: Request) {
@@ -39,26 +40,32 @@ export async function GET(request: Request) {
   const platform = platforms.includes(requested as (typeof platforms)[number]) ? requested : "all";
   const d1 = getD1();
 
-  const [postResult, accountResult] = await Promise.all([
+  const [postResult, accountResult, topicResult, competitorResult] = await Promise.all([
     d1.prepare(`
-      SELECT id, platform, title, content_type, publish_time, views, likes,
-        comments, favorites, shares, fans_growth
+      SELECT id, account_id, platform, title, content_type, publish_time, views, likes,
+        comments, favorites, shares, fans_growth, hashtags, duration
       FROM social_posts
       WHERE date(publish_time) BETWEEN date(?) AND date(?)
       ORDER BY publish_time DESC, id DESC
       LIMIT 500
     `).bind(range.from, range.to).all<PostRow>(),
+    d1.prepare("SELECT platform, followers_count FROM social_accounts WHERE status = 'active'").all<AccountRow>(),
     d1.prepare(`
-      SELECT platform, followers_count
-      FROM social_accounts
-      WHERE status = 'active'
-    `).all<AccountRow>(),
+      SELECT platform, topic_name, keyword, heat_value, trend, related_degree, ai_suggestion
+      FROM hot_topics WHERE status = 'active' ORDER BY heat_value DESC LIMIT 100
+    `).all<AnalysisTopic>(),
+    d1.prepare(`
+      SELECT platform, account_name, title, publish_time, views, likes, comments, favorites, shares
+      FROM competitor_posts
+      WHERE date(publish_time) BETWEEN date(?) AND date(?)
+      ORDER BY publish_time DESC, id DESC LIMIT 1000
+    `).bind(range.from, range.to).all<CompetitorPostRow>(),
   ]);
 
   const allPosts = postResult.results;
-  const selectedPosts = platform === "all"
-    ? allPosts
-    : allPosts.filter((post) => post.platform === platform);
+  const selectedPosts = platform === "all" ? allPosts : allPosts.filter((post) => post.platform === platform);
+  const analyzed = ruleBasedContentEngine.analyzePosts(selectedPosts.map((post) => ({ ...post, hashtags: parseHashtags(post.hashtags) })), topicResult.results);
+  const scoreById = new Map(analyzed.map((post) => [post.id, post]));
 
   const platformOverview = platforms.map((item) => {
     const rows = allPosts.filter((post) => post.platform === item);
@@ -66,70 +73,96 @@ export async function GET(request: Request) {
       platform: item,
       postCount: rows.length,
       totalViews: rows.reduce((sum, post) => sum + post.views, 0),
-      interactions: rows.reduce((sum, post) => sum + interactions(post), 0),
+      interactions: rows.reduce((sum, post) => sum + interactionCount(post), 0),
       fansGrowth: rows.reduce((sum, post) => sum + post.fans_growth, 0),
-      followers: accountResult.results
-        .filter((account) => account.platform === item)
-        .reduce((sum, account) => sum + account.followers_count, 0),
+      followers: accountResult.results.filter((account) => account.platform === item).reduce((sum, account) => sum + account.followers_count, 0),
     };
   });
 
   const typeMap = new Map<string, { postCount: number; views: number; interactions: number; fansGrowth: number }>();
+  const categoryMap = new Map<string, { postCount: number; views: number; interactions: number }>();
   for (const post of selectedPosts) {
-    const current = typeMap.get(post.content_type) ?? { postCount: 0, views: 0, interactions: 0, fansGrowth: 0 };
-    current.postCount += 1;
-    current.views += post.views;
-    current.interactions += interactions(post);
-    current.fansGrowth += post.fans_growth;
-    typeMap.set(post.content_type, current);
+    const type = typeMap.get(post.content_type) ?? { postCount: 0, views: 0, interactions: 0, fansGrowth: 0 };
+    type.postCount += 1; type.views += post.views; type.interactions += interactionCount(post); type.fansGrowth += post.fans_growth;
+    typeMap.set(post.content_type, type);
+    const categoryName = contentCategory(post);
+    const category = categoryMap.get(categoryName) ?? { postCount: 0, views: 0, interactions: 0 };
+    category.postCount += 1; category.views += post.views; category.interactions += interactionCount(post);
+    categoryMap.set(categoryName, category);
   }
 
-  const contentTypes = [...typeMap.entries()]
-    .map(([contentType, value]) => ({ contentType, ...value }))
-    .sort((left, right) => right.views - left.views);
-  const topPosts = [...selectedPosts]
-    .sort((left, right) => right.views - left.views || interactions(right) - interactions(left))
-    .slice(0, 10)
-    .map((post) => ({ ...post, interactions: interactions(post) }));
+  const contentTypes = [...typeMap.entries()].map(([contentType, value]) => ({ contentType, ...value })).sort((a, b) => b.views - a.views);
+  const categoryOrder = ["风景展示", "项目体验", "游客互动", "攻略内容", "活动宣传"];
+  const contentCategories = categoryOrder.map((category) => {
+    const value = categoryMap.get(category) ?? { postCount: 0, views: 0, interactions: 0 };
+    return { category, ...value, ratio: percent(value.postCount, selectedPosts.length) };
+  });
+
   const totals = {
     postCount: selectedPosts.length,
     totalViews: selectedPosts.reduce((sum, post) => sum + post.views, 0),
-    interactions: selectedPosts.reduce((sum, post) => sum + interactions(post), 0),
+    likes: selectedPosts.reduce((sum, post) => sum + post.likes, 0),
+    comments: selectedPosts.reduce((sum, post) => sum + post.comments, 0),
+    favorites: selectedPosts.reduce((sum, post) => sum + post.favorites, 0),
+    shares: selectedPosts.reduce((sum, post) => sum + post.shares, 0),
+    interactions: selectedPosts.reduce((sum, post) => sum + interactionCount(post), 0),
     fansGrowth: selectedPosts.reduce((sum, post) => sum + post.fans_growth, 0),
   };
+  const interactionRate = percent(totals.interactions, totals.totalViews);
+  const monitoredPosts = selectedPosts.map((post) => ({
+    ...post,
+    hashtags: parseHashtags(post.hashtags),
+    category: contentCategory(post),
+    interactions: interactionCount(post),
+    interactionRate: percent(interactionCount(post), post.views),
+    aiScore: scoreById.get(post.id)?.overallScore ?? 0,
+  })).sort((a, b) => b.aiScore - a.aiScore || b.views - a.views);
+  const topPosts = [...monitoredPosts].sort((a, b) => b.views - a.views || b.interactions - a.interactions).slice(0, 10);
 
   const bestType = contentTypes[0];
-  const averageInteractionRate = totals.totalViews > 0 ? totals.interactions / totals.totalViews : 0;
-  const suggestions = selectedPosts.length === 0
-    ? ["该平台暂无作品数据，请先通过导入或采集中心补充真实作品。"]
-    : [
-        bestType
-          ? `优先复用${contentTypeNames[bestType.contentType] ?? bestType.contentType}内容结构，该类型贡献当前最高播放量。`
-          : "持续补充不同内容类型，以建立可比较的内容样本。",
-        averageInteractionRate < 0.03
-          ? "整体互动率偏低，建议在前三秒设置问题，并在结尾加入明确评论引导。"
-          : "互动表现良好，可把高互动作品拆解为系列选题并保持固定更新节奏。",
-        totals.fansGrowth <= 0
-          ? "当前作品涨粉记录不足，后续采集需同步写入 fans_growth 以评估内容转粉。"
-          : "围绕涨粉贡献最高的内容类型增加同主题、同镜头语言的连续发布。",
-      ];
+  const suggestions = selectedPosts.length === 0 ? ["该平台暂无作品数据，请先通过数据采集中心补充真实作品。"] : [
+    bestType ? `优先复用${contentTypeNames[bestType.contentType] ?? bestType.contentType}内容结构，该类型贡献当前最高播放量。` : "持续补充不同内容类型，建立可比较样本。",
+    interactionRate < 3 ? "整体互动率偏低，建议在前三秒设置问题，并在结尾加入明确评论引导。" : "互动表现良好，可把高互动作品拆解为系列选题并保持固定更新节奏。",
+    totals.fansGrowth <= 0 ? "同步采集作品涨粉，建立内容效果与粉丝变化的关联。" : "围绕涨粉贡献最高的内容类型增加同主题连续发布。",
+  ];
+
+  const comparisonNames = [...new Set([...targetCompetitors, ...competitorResult.results.map((row) => row.account_name)])];
+  const industryComparison = [
+    {
+      accountName: "独山子大峡谷",
+      accountType: "本账号",
+      postCount: totals.postCount,
+      averageViews: totals.postCount ? Math.round(totals.totalViews / totals.postCount) : 0,
+      interactionRate,
+      viralCount: selectedPosts.filter((post) => post.views >= 100000).length,
+      status: totals.postCount ? "已接入" : "待采集",
+    },
+    ...comparisonNames.map((accountName) => {
+      const rows = competitorResult.results.filter((row) => row.account_name === accountName && (platform === "all" || row.platform === platform));
+      const views = rows.reduce((sum, row) => sum + row.views, 0);
+      const interactions = rows.reduce((sum, row) => sum + interactionCount(row), 0);
+      const averageViews = rows.length ? Math.round(views / rows.length) : 0;
+      return { accountName, accountType: targetCompetitors.includes(accountName) ? "重点景区" : "文旅同行", postCount: rows.length, averageViews, interactionRate: percent(interactions, views), viralCount: rows.filter((row) => row.views >= Math.max(100000, averageViews * 2)).length, status: rows.length ? "已采集" : "待采集" };
+    }),
+  ];
+
+  const bestPost = monitoredPosts[0];
+  const dailyReport = {
+    title: `${range.to} 内容监测报告`,
+    excellentPost: bestPost ? { id: bestPost.id, title: bestPost.title, score: bestPost.aiScore, reason: bestPost.aiScore >= 75 ? "综合评分和传播表现领先" : "当前样本中相对表现最佳" } : null,
+    problems: [totals.postCount === 0 ? "筛选周期内没有发布记录" : totals.postCount < 3 ? "发布样本较少，难以形成稳定判断" : "发布节奏基本稳定", interactionRate < 3 ? "互动率低于 3%" : "互动率达到基础健康线"],
+    causes: [totals.postCount < 3 ? "内容频次不足，平台学习样本有限" : "需继续比较不同内容分类的持续表现", interactionRate < 3 ? "评论引导和可收藏信息不足" : "高互动结构尚需系列化验证"],
+    suggestions,
+  };
 
   return Response.json({
-    platform,
-    range,
-    totals,
-    platformOverview,
-    contentTypes,
-    topPosts,
-    contentFanRelations: contentTypes.map((item) => ({
-      ...item,
-      fansPerTenThousandViews: item.views > 0
-        ? Number(((item.fansGrowth / item.views) * 10000).toFixed(2))
-        : 0,
-    })),
-    suggestions,
-    sources: ["social_posts", "social_accounts"],
-    engine: "content-user-rules-v1",
+    platform, range, totals: { ...totals, interactionRate }, platformOverview, contentTypes, contentCategories,
+    monitoredPosts, topPosts,
+    contentFanRelations: contentTypes.map((item) => ({ ...item, fansPerTenThousandViews: item.views > 0 ? Number(((item.fansGrowth / item.views) * 10000).toFixed(2)) : 0 })),
+    industryComparison, suggestions, dailyReport,
+    sources: ["social_posts", "social_accounts", "hot_topics", "competitor_posts"],
+    engine: ruleBasedContentEngine.name,
+    competitorCollectionApi: "/api/v1/social/competitors/posts/collect",
     updatedAt: new Date().toISOString(),
   });
 }
