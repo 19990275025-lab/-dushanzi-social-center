@@ -141,7 +141,11 @@ test("global date filter is wired to every requested dashboard and API", async (
   assert.match(filter, /CalendarMonth/);
   assert.doesNotMatch(filter, /type="date"/);
   for (const label of ["昨日", "近一周", "自然月", "自定义"]) assert.match(dateRange, new RegExp(label));
-  for (const page of [dashboardPage, contentPage, fanPage, commentPage, aiPage]) assert.match(page, /dateRangeQuery\(range\)/);
+  for (const page of [dashboardPage, contentPage, commentPage, aiPage]) assert.match(page, /dateRangeQuery\(range\)/);
+  assert.match(fanPage, /dateRangeQuery\(activeTrendRange\)/);
+  assert.match(fanPage, /MonthPicker/);
+  assert.match(fanPage, /CustomDateRange/);
+  assert.match(fanApi, /trendPeriod === "custom"/);
   for (const api of [dashboardApi, contentApi, fanApi, commentApi, aiApi]) {
     assert.match(api, /resolveDateRange/);
     assert.match(api, /BETWEEN date\(\?\) AND date\(\?\)/);

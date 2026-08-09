@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
-import { dateRangeQuery } from "@/lib/date-range";
-import { useGlobalDateRange } from "@/components/GlobalDateFilter";
+import { dateRangeQuery, type DateRange } from "@/lib/date-range";
+import { CustomDateRange, MonthPicker, useGlobalDateRange } from "@/components/GlobalDateFilter";
 
 const platforms = ["all", "douyin", "kuaishou", "weibo"];
-const trendOptions = [{ value: "7d", label: "7天" }, { value: "30d", label: "30天" }, { value: "month", label: "自然月" }];
+const trendOptions = [{ value: "7d", label: "7天" }, { value: "30d", label: "30天" }, { value: "month", label: "自然月" }, { value: "custom", label: "自定义" }] as const;
+type TrendPeriod = typeof trendOptions[number]["value"];
 type Distribution = { label: string; value: number };
 type Trend = { record_date: string; fans_count: number; net_growth: number; new_fans: number; lost_fans: number; source_type: string };
 type Strategy = { positioning: string; actions: string[] };
@@ -35,15 +36,43 @@ export default function FanAnalysisCenterPage() {
   const range = useGlobalDateRange();
   const [data, setData] = useState<FanData | null>(null);
   const [selected, setSelected] = useState("all");
-  const [trendPeriod, setTrendPeriod] = useState("7d");
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("7d");
+  const [trendRange, setTrendRange] = useState<DateRange | null>(null);
+  const [openTrendPicker, setOpenTrendPicker] = useState<"month" | "custom" | null>(null);
   const [error, setError] = useState("");
+  const activeTrendRange = trendRange ?? range;
 
   useEffect(() => {
-    fetch(`/api/insights/fans?${dateRangeQuery(range)}&trend=${trendPeriod}`).then(async (response) => {
+    fetch(`/api/insights/fans?${dateRangeQuery(activeTrendRange)}&trend=${trendPeriod}`).then(async (response) => {
       if (!response.ok) throw new Error("粉丝分析数据读取失败");
       return response.json() as Promise<FanData>;
     }).then((result) => { setData(result); setError(""); }).catch((reason: Error) => setError(reason.message));
-  }, [range, trendPeriod]);
+  }, [activeTrendRange, trendPeriod]);
+
+  useEffect(() => {
+    if (!openTrendPicker) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenTrendPicker(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [openTrendPicker]);
+
+  function selectTrendPeriod(period: TrendPeriod) {
+    if (period === "month" || period === "custom") {
+      setOpenTrendPicker((current) => current === period ? null : period);
+      return;
+    }
+    setTrendPeriod(period);
+    setTrendRange(null);
+    setOpenTrendPicker(null);
+  }
+
+  function applyTrendRange(nextRange: DateRange) {
+    setTrendPeriod(nextRange.preset === "month" ? "month" : "custom");
+    setTrendRange(nextRange);
+    setOpenTrendPicker(null);
+  }
 
   const platformData = useMemo(() => data ? [aggregatePlatforms(data.platforms), ...data.platforms] : [], [data]);
   const current = platformData.find((item) => item.platform === selected) ?? null;
@@ -80,7 +109,7 @@ export default function FanAnalysisCenterPage() {
     </section>
 
     <section className="panel fan-trend-panel">
-      <div className="panel-heading"><div><span className="section-kicker">GROWTH TREND</span><h2>粉丝增长趋势</h2></div><div className="trend-period-switch">{trendOptions.map((item) => <button className={trendPeriod === item.value ? "active" : ""} key={item.value} onClick={() => setTrendPeriod(item.value)}>{item.label}</button>)}</div></div>
+      <div className="panel-heading"><div><span className="section-kicker">GROWTH TREND</span><h2>粉丝增长趋势</h2></div><div className="fan-trend-controls"><div className="trend-period-switch">{trendOptions.map((item) => <button aria-expanded={item.value === "month" || item.value === "custom" ? openTrendPicker === item.value : undefined} className={trendPeriod === item.value || openTrendPicker === item.value ? "active" : ""} key={item.value} onClick={() => selectTrendPeriod(item.value)}>{item.label}</button>)}</div>{openTrendPicker === "month" && <MonthPicker range={activeTrendRange} onClose={() => setOpenTrendPicker(null)} onSelect={applyTrendRange} />}{openTrendPicker === "custom" && <CustomDateRange key={`${activeTrendRange.from}-${activeTrendRange.to}`} range={activeTrendRange} onApply={applyTrendRange} onClose={() => setOpenTrendPicker(null)} />}</div></div>
       {current.trend.length ? <div className="growth-chart" aria-label="粉丝增长趋势图">{current.trend.map((item) => <div key={item.record_date}><span className={item.net_growth >= 0 ? "positive-bar" : "negative-bar"} style={{ height: `${Math.max(8, (Math.abs(item.net_growth) / maxGrowth) * 100)}%` }} /><strong>{item.net_growth >= 0 ? "+" : ""}{item.net_growth}</strong><small>{item.record_date.slice(5)}</small></div>)}</div> : <div className="fan-empty-state"><strong>暂无增长记录</strong><p>自动采集写入 fan_growth_records 后，此处将展示连续趋势。</p></div>}
       <small className="chart-source">来源：{current.trendSource} · {data.trendRange.from} — {data.trendRange.to}</small>
     </section>

@@ -56,9 +56,13 @@ export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const range = resolveDateRange(searchParams);
   const requestedPeriod = searchParams.get("trend") ?? "7d";
-  const trendPeriod = (["7d", "30d", "month"] as const).includes(requestedPeriod as "7d" | "30d" | "month") ? requestedPeriod as "7d" | "30d" | "month" : "7d";
+  const trendPeriod = (["7d", "30d", "month", "custom"] as const).includes(requestedPeriod as "7d" | "30d" | "month" | "custom") ? requestedPeriod as "7d" | "30d" | "month" | "custom" : "7d";
   const endDate = new Date(`${range.to}T00:00:00Z`);
-  const trendFrom = trendPeriod === "month" ? `${range.to.slice(0, 7)}-01` : new Date(endDate.getTime() - (trendPeriod === "30d" ? 29 : 6) * 86400000).toISOString().slice(0, 10);
+  const trendFrom = trendPeriod === "custom"
+    ? range.from
+    : trendPeriod === "month"
+      ? `${range.to.slice(0, 7)}-01`
+      : new Date(endDate.getTime() - (trendPeriod === "30d" ? 29 : 6) * 86400000).toISOString().slice(0, 10);
   const [accounts, profiles, growth, derivedGrowth] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, followers_count

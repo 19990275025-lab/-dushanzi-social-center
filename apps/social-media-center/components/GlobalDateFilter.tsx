@@ -103,7 +103,7 @@ function shiftMonth(year: number, month: number, amount: number) {
   return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1 };
 }
 
-function MonthPicker({ range, onSelect, onClose }: { range: DateRange; onSelect: (range: DateRange) => void; onClose: () => void }) {
+export function MonthPicker({ range, onSelect, onClose }: { range: DateRange; onSelect: (range: DateRange) => void; onClose: () => void }) {
   const today = chinaToday();
   const selected = range.preset === "month" ? parseIso(range.from) : today;
   const [year, setYear] = useState(selected.year);
@@ -150,7 +150,7 @@ function CalendarMonth({ year, month, from, to, maxDate, onSelect }: { year: num
   </section>;
 }
 
-function CustomDateRange({ range, onApply, onClose }: { range: DateRange; onApply: (range: DateRange) => void; onClose: () => void }) {
+export function CustomDateRange({ range, onApply, onClose }: { range: DateRange; onApply: (range: DateRange) => void; onClose: () => void }) {
   const today = chinaToday();
   const [draftFrom, setDraftFrom] = useState(range.from);
   const [draftTo, setDraftTo] = useState(range.to);
