@@ -10,7 +10,6 @@ type DetailData = {
   metrics: { interactionRate: number; likeRate: number; commentRate: number; favoriteRate: number; shareRate: number; fanConversionRate: number; collectedCommentCount: number };
   keywords: { name: string; count: number }[];
   comments: Comment[];
-  trafficSources: { name: string; rate: number }[];
   audience: { gender: { name: string; rate: number }[]; age: { name: string; rate: number }[]; region: { name: string; rate: number }[] };
   dataAvailability: { missing: string[]; note: string };
   updatedAt: string;
@@ -71,14 +70,10 @@ export default function ContentDetailPage() {
         {tabs.map((tab) => <button className={activeTab === tab.id ? "active" : ""} key={tab.id} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
       </nav>
 
-      {activeTab === "traffic" && <section className="detail-analysis-grid">
+      {activeTab === "traffic" && <section className="detail-analysis-grid traffic-overview-grid">
         <div className="detail-column">
           <article className="panel detail-panel"><div className="detail-panel-heading"><div><span className="section-kicker">CONTENT APPEAL</span><h2>内容吸引力</h2></div><span className="source-chip">social_posts</span></div><div className="detail-rate-grid"><RateCard label="互动率" value={metrics.interactionRate} /><RateCard label="点赞率" value={metrics.likeRate} /><RateCard label="评论率" value={metrics.commentRate} /><RateCard label="收藏率" value={metrics.favoriteRate} /><RateCard label="分享率" value={metrics.shareRate} /><RateCard label="完播率" value={post.completion_rate ?? undefined} /></div>{post.average_play_duration !== null && <div className="detail-count-grid"><div><span>平均播放时长</span><strong>{post.average_play_duration} 秒</strong></div></div>}</article>
           <article className="panel detail-panel"><div className="detail-panel-heading"><div><span className="section-kicker">ENGAGEMENT</span><h2>观众参与度</h2></div></div><div className="detail-count-grid"><div><span>点赞</span><strong>{formatCompact(post.likes)}</strong></div><div><span>评论</span><strong>{formatCompact(post.comments)}</strong></div><div><span>收藏</span><strong>{formatCompact(post.favorites)}</strong></div><div><span>分享</span><strong>{formatCompact(post.shares)}</strong></div></div></article>
-        </div>
-        <div className="detail-column">
-          <article className="panel detail-panel traffic-source-panel"><div className="detail-panel-heading"><div><span className="section-kicker">TRAFFIC SOURCE</span><h2>流量来源</h2></div><span className={data.trafficSources.length ? "source-chip" : "pending-chip"}>{data.trafficSources.length ? "V2.0 已采集" : "待采集"}</span></div>{data.trafficSources.length ? <div className="traffic-source-list">{data.trafficSources.map((item) => <div key={item.name}><span>{item.name}</span><i><b style={{ width: `${Math.min(100, item.rate)}%` }} /></i><strong>{item.rate}%</strong></div>)}</div> : <div className="detail-empty-state"><strong>暂无平台流量来源明细</strong><p>后续接入抖音创作者后台指标后，将显示推荐页、个人主页、关注页等来源占比。</p></div>}</article>
-          <article className="panel detail-panel"><div className="detail-panel-heading"><div><span className="section-kicker">SEARCH KEYWORDS</span><h2>搜索与评论关键词</h2></div></div><div className="detail-keyword-cloud">{data.keywords.slice(0, 10).map((item) => <span key={item.name}>{item.name}<b>{item.count}</b></span>)}{!data.keywords.length && <p className="empty-list">暂无标签或评论关键词</p>}</div></article>
         </div>
       </section>}
 

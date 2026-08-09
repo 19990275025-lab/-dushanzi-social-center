@@ -266,6 +266,8 @@ test("top content opens a real-data work analysis with separate tabs", async () 
   assert.match(content, /\/insights\/content\/detail\?id=/);
   assert.match(content, /数据分析/);
   for (const tab of ["流量分析", "观众分析", "评论热词", "评论管理"]) assert.match(detail, new RegExp(tab));
+  assert.doesNotMatch(detail, /<h2>流量来源<\/h2>/);
+  assert.doesNotMatch(detail, /搜索与评论关键词/);
   assert.match(detail, /未采集指标不会生成模拟数据/);
   assert.match(api, /interactionRate: percent/);
   assert.doesNotMatch(api, /个人主页|推荐页|关注页/);
