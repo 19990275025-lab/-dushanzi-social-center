@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     default: "新媒体运营驾驶舱｜独山子大峡谷 AI 营销中台",
     template: "%s｜新媒体运营中心",
   },
-  description: "独山子大峡谷抖音、快手、微博和视频号内容运营数据中心。",
+  description: "独山子大峡谷抖音、快手和微博内容运营数据中心。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

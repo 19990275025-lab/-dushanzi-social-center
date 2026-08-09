@@ -8,7 +8,7 @@
 
 1. 建立统一品牌口径和素材资产规范，避免多账号各自表达。
 2. 跑通“选题 → 采集 → 制作 → 审核 → 发布 → 互动 → 复盘”的日常机制。
-3. 形成抖音、小红书、微信视频号、微信公众号的差异化账号矩阵。
+3. 形成抖音、快手、微博的差异化账号矩阵。
 4. 建立可追踪的内容指标和到访转化链路。
 5. 建立天气、安全、投诉和舆情事件的快速响应机制。
 
@@ -80,4 +80,4 @@
 - `/collector`：抖音 V2.1 粉丝与内容分析采集、无落库预览、三类完整率门禁、确认日志和批次回滚。
 - `/comment-insights`：规则型评论情绪、关键词、游客需求排行与内容建议。
 
-页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/collections`、`/api/comment-insights` 提供数据库操作、分析、采集校验和日志。抖音近 30 天作品与评论结果必须经过服务端校验与人工确认后才写入 `social_posts` 和 `social_comments`。快手、微博、视频号自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
+页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/collections`、`/api/comment-insights` 提供数据库操作、分析、采集校验和日志。抖音近 30 天作品与评论结果必须经过服务端校验与人工确认后才写入 `social_posts` 和 `social_comments`。快手、微博自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。

@@ -111,7 +111,7 @@ export default function TasksPage() {
           <div className="panel-heading"><div><span className="section-kicker">NEW TASK</span><h2>新增内容任务</h2></div></div>
           <form className="task-form" onSubmit={createTask}>
             <label>任务日期<input name="taskDate" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label>
-            <label>平台<select name="platform" required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option><option value="wechat_channels">视频号</option></select></label>
+            <label>平台<select name="platform" required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option></select></label>
             <label>内容类型<select name="contentType" required><option value="video">短视频</option><option value="image_text">图文</option><option value="text">文字</option><option value="live">直播</option><option value="article">长文</option></select></label>
             <label>负责人<input name="responsiblePerson" placeholder="请输入负责人" /></label>
             <label className="task-title-field">任务内容<input name="taskTitle" placeholder="例如：峡谷夏季自驾攻略" required /></label>

@@ -21,6 +21,7 @@ export async function GET() {
       SELECT id, platform, file_name, import_type, status,
         success_count, error_count, created_at
       FROM data_import_logs
+      WHERE platform IN ('douyin', 'kuaishou', 'weibo')
       ORDER BY created_at DESC, id DESC
       LIMIT 50
     `)

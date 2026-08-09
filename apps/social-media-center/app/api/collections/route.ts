@@ -12,6 +12,7 @@ export async function GET() {
           total_count, success_count, error_count, comment_count, error_message,
           collected_at, created_at, updated_at
         FROM collection_logs
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
         ORDER BY created_at DESC, id DESC
         LIMIT 50
       `)
@@ -25,6 +26,7 @@ export async function GET() {
           COALESCE(SUM(error_count), 0) AS validation_errors,
           MAX(created_at) AS latest_collection
         FROM collection_logs
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
       `)
       .first(),
   ]);
@@ -96,7 +98,7 @@ export async function DELETE(request: Request) {
 
   const d1 = getD1();
   const log = await d1
-    .prepare("SELECT id, status, entity_type FROM collection_logs WHERE id = ?")
+    .prepare("SELECT id, status, entity_type FROM collection_logs WHERE id = ? AND platform IN ('douyin', 'kuaishou', 'weibo')")
     .bind(id)
     .first<{ id: number; status: string; entity_type: string }>();
   if (!log) return Response.json({ error: "采集日志不存在" }, { status: 404 });

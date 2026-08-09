@@ -52,7 +52,9 @@ export async function GET(request: Request) {
     d1.prepare("SELECT platform, followers_count FROM social_accounts WHERE status = 'active'").all<AccountRow>(),
     d1.prepare(`
       SELECT platform, topic_name, keyword, heat_value, trend, related_degree, ai_suggestion
-      FROM hot_topics WHERE status = 'active' ORDER BY heat_value DESC LIMIT 100
+      FROM hot_topics
+      WHERE status = 'active' AND platform IN ('douyin', 'kuaishou', 'weibo')
+      ORDER BY heat_value DESC LIMIT 100
     `).all<AnalysisTopic>(),
     d1.prepare(`
       SELECT platform, account_name, title, publish_time, views, likes, comments, favorites, shares

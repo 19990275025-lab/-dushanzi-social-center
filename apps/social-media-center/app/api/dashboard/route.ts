@@ -2,7 +2,7 @@ import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { resolveDateRange } from "@/lib/date-range";
 
-const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
+const platforms = ["douyin", "kuaishou", "weibo"] as const;
 
 type PlatformRow = {
   platform: string;
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       d1.prepare(`
         SELECT platform, COALESCE(SUM(followers_count), 0) AS followers
         FROM social_accounts
-        WHERE status = 'active'
+        WHERE status = 'active' AND platform IN ('douyin', 'kuaishou', 'weibo')
         GROUP BY platform
       `).all<{ platform: string; followers: number }>(),
       d1.prepare(`
@@ -31,7 +31,8 @@ export async function GET(request: Request) {
           COALESCE(SUM(views), 0) AS views,
           COALESCE(SUM(likes + comments + favorites + shares), 0) AS interactions
         FROM social_posts
-        WHERE date(publish_time) BETWEEN date(?) AND date(?)
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
+          AND date(publish_time) BETWEEN date(?) AND date(?)
         GROUP BY platform
       `).bind(range.from, range.to).all<Omit<PlatformRow, "followers">>(),
       d1.prepare(`
@@ -39,13 +40,15 @@ export async function GET(request: Request) {
           COUNT(*) AS total,
           SUM(CASE WHEN status IN ('published', 'done') THEN 1 ELSE 0 END) AS completed
         FROM content_tasks
-        WHERE date(task_date) BETWEEN date(?) AND date(?)
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
+          AND date(task_date) BETWEEN date(?) AND date(?)
         GROUP BY platform
       `).bind(range.from, range.to).all<{ platform: string; total: number; completed: number }>(),
       d1.prepare(`
         SELECT id, platform, title, views, likes, comments, ai_analysis
         FROM social_posts
-        WHERE date(publish_time) BETWEEN date(?) AND date(?)
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
+          AND date(publish_time) BETWEEN date(?) AND date(?)
         ORDER BY views DESC, likes DESC, comments DESC
         LIMIT 5
       `).bind(range.from, range.to).all<{
@@ -60,6 +63,7 @@ export async function GET(request: Request) {
       d1.prepare(`
         SELECT id, platform, topic_name, heat_value, trend, ai_suggestion
         FROM hot_topics
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
         ORDER BY related_degree DESC, heat_value DESC
         LIMIT 5
       `).all<{
@@ -73,7 +77,8 @@ export async function GET(request: Request) {
       d1.prepare(`
         SELECT COUNT(*) AS count
         FROM content_tasks
-        WHERE status NOT IN ('published', 'done', 'cancelled')
+        WHERE platform IN ('douyin', 'kuaishou', 'weibo')
+          AND status NOT IN ('published', 'done', 'cancelled')
           AND date(task_date) BETWEEN date(?) AND date(?)
       `).bind(range.from, range.to).first<{ count: number }>(),
     ]);

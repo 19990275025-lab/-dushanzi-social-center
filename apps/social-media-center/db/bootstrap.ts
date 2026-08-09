@@ -5,7 +5,7 @@ let initialization: Promise<void> | null = null;
 const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS social_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     account_name TEXT NOT NULL,
     account_id TEXT NOT NULL,
     account_url TEXT,
@@ -22,7 +22,7 @@ const schemaStatements = [
     ON social_accounts(platform, status)`,
   `CREATE TABLE IF NOT EXISTS data_import_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     file_name TEXT NOT NULL,
     import_type TEXT NOT NULL CHECK (import_type IN ('excel','image')),
     status TEXT NOT NULL DEFAULT 'pending',
@@ -36,7 +36,7 @@ const schemaStatements = [
     ON data_import_logs(status)`,
   `CREATE TABLE IF NOT EXISTS collection_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     source_type TEXT NOT NULL CHECK (source_type IN ('chrome','excel','api')),
     source_name TEXT NOT NULL,
     source_url TEXT,
@@ -58,7 +58,7 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS social_fans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     fans_count INTEGER NOT NULL DEFAULT 0 CHECK (fans_count >= 0),
     gender_distribution TEXT NOT NULL DEFAULT '[]',
     age_distribution TEXT NOT NULL DEFAULT '[]',
@@ -81,7 +81,7 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS fan_growth_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     record_date TEXT NOT NULL,
     fans_count INTEGER NOT NULL DEFAULT 0 CHECK (fans_count >= 0),
     net_growth INTEGER NOT NULL DEFAULT 0,
@@ -103,7 +103,7 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS social_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     publish_time TEXT NOT NULL,
@@ -137,7 +137,7 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS content_audience_analysis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     gender_distribution TEXT NOT NULL DEFAULT '[]',
     age_distribution TEXT NOT NULL DEFAULT '[]',
     region_distribution TEXT NOT NULL DEFAULT '[]',
@@ -158,7 +158,7 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS social_comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    platform TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     username TEXT NOT NULL,
     comment_text TEXT NOT NULL,
     comment_time TEXT NOT NULL,
@@ -179,7 +179,7 @@ const schemaStatements = [
     ON social_comments(user_need)`,
   `CREATE TABLE IF NOT EXISTS hot_topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     topic_name TEXT NOT NULL,
     keyword TEXT NOT NULL,
     heat_value REAL NOT NULL DEFAULT 0,
@@ -199,7 +199,7 @@ const schemaStatements = [
     ON hot_topics(related_degree DESC)`,
   `CREATE TABLE IF NOT EXISTS competitor_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     account_name TEXT NOT NULL,
     account_url TEXT NOT NULL,
     followers INTEGER NOT NULL DEFAULT 0,
@@ -210,7 +210,7 @@ const schemaStatements = [
     ON competitor_accounts(platform, account_url)`,
   `CREATE TABLE IF NOT EXISTS competitor_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     account_name TEXT NOT NULL,
     title TEXT NOT NULL,
     publish_time TEXT NOT NULL,
@@ -235,7 +235,7 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS content_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_date TEXT NOT NULL,
-    platform TEXT NOT NULL,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     task_title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     responsible_person TEXT,
@@ -283,18 +283,12 @@ const seedStatements = [
   `INSERT OR IGNORE INTO hot_topics
     (platform, topic_name, keyword, heat_value, trend, category, related_degree, ai_suggestion, status)
     VALUES ('weibo', '新疆的夏天有多治愈', '新疆夏天', 7240000, 'rising', '地域', 0.91, '用游客第一视角展示峡谷光影和风声。', 'active')`,
-  `INSERT OR IGNORE INTO hot_topics
-    (platform, topic_name, keyword, heat_value, trend, category, related_degree, ai_suggestion, status)
-    VALUES ('wechat_channels', '周末短途旅行', '周末旅行', 4680000, 'stable', '旅游', 0.78, '强调交通时长、适合人群和安全提示。', 'active')`,
   `INSERT OR IGNORE INTO content_tasks
     (task_date, platform, task_title, content_type, responsible_person, status, review_result)
     VALUES (date('now'), 'douyin', '峡谷晨雾延时拍摄', 'video', '阿依努尔', 'in_production', NULL)`,
   `INSERT OR IGNORE INTO content_tasks
     (task_date, platform, task_title, content_type, responsible_person, status, review_result)
     VALUES (date('now'), 'weibo', '游客问答图文整理', 'image_text', '李明', 'review', '等待交通信息复核')`,
-  `INSERT OR IGNORE INTO content_tasks
-    (task_date, platform, task_title, content_type, responsible_person, status, review_result)
-    VALUES (date('now'), 'wechat_channels', '工作人员带路', 'video', '王雪', 'scheduled', 'L2 安全审核通过')`,
   `INSERT OR IGNORE INTO content_tasks
     (task_date, platform, task_title, content_type, responsible_person, status, review_result)
     VALUES (date('now'), 'douyin', '日落观景点发布', 'video', '张晨', 'published', '审核通过')`,

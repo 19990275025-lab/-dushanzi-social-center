@@ -10,7 +10,7 @@
 
 ## 1. 交付内容
 
-本版本依据 [`social-media-center-v1-architecture.md`](social-media-center-v1-architecture.md) 创建六张基础业务表，用于抖音、快手、微博和微信视频号的账号、作品、评论、热点、竞品和内容任务管理。第四阶段通过增量迁移新增 `data_import_logs`，不改写已经执行的基础迁移。
+本版本依据 [`social-media-center-v1-architecture.md`](social-media-center-v1-architecture.md) 创建六张基础业务表，用于抖音、快手和微博的账号、作品、评论、热点、竞品和内容任务管理。第四阶段通过增量迁移新增 `data_import_logs`，不改写已经执行的基础迁移。
 
 | 文件 | 用途 |
 |---|---|
@@ -38,7 +38,6 @@
 | `douyin` | 抖音 |
 | `kuaishou` | 快手 |
 | `weibo` | 微博 |
-| `wechat_channels` | 视频号 |
 
 ## 3. 表用途与字段说明
 

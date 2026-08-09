@@ -2,7 +2,7 @@ import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { calculateRelevance, ruleBasedTopicEngine, type TopicForAnalysis } from "@/lib/hot-topic-engine";
 
-const platforms = new Set(["douyin", "kuaishou", "weibo", "wechat_channels"]);
+const platforms = new Set(["douyin", "kuaishou", "weibo"]);
 const trends = new Set(["rising", "stable", "falling", "new"]);
 const statuses = new Set(["active", "paused", "archived"]);
 
@@ -17,6 +17,7 @@ type TopicRow = TopicForAnalysis & {
 async function getHistoricalPosts() {
   const result = await getD1().prepare(`
     SELECT title, hashtags FROM social_posts
+    WHERE platform IN ('douyin', 'kuaishou', 'weibo')
     ORDER BY publish_time DESC, id DESC LIMIT 200
   `).all<{ title: string; hashtags: string }>();
   return result.results;
@@ -56,6 +57,7 @@ export async function GET() {
       SELECT id, platform, topic_name, keyword, heat_value, trend, category,
         related_degree, ai_suggestion, status, collect_time, created_at
       FROM hot_topics
+      WHERE platform IN ('douyin', 'kuaishou', 'weibo')
       ORDER BY heat_value DESC, created_at DESC, id DESC
       LIMIT 300
     `).all<TopicRow>(),

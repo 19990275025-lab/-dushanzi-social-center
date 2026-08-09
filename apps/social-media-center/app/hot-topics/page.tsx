@@ -155,7 +155,7 @@ export default function HotTopicsPage() {
         <section className="panel hot-form-panel">
           <div className="panel-heading"><div><span className="section-kicker">{editing ? "EDIT TOPIC" : "NEW TOPIC"}</span><h2>{editing ? "编辑热点" : "新增热点"}</h2></div><span className="section-note">关联程度由关键词、景区名称和历史作品自动计算</span></div>
           <form className="hot-topic-form" onSubmit={saveTopic} key={editing?.id ?? "new"}>
-            <label>平台<select name="platform" defaultValue={editing?.platform ?? "douyin"} required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option><option value="wechat_channels">视频号</option></select></label>
+            <label>平台<select name="platform" defaultValue={editing?.platform ?? "douyin"} required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option></select></label>
             <label className="hot-name-field">热点名称<input name="topicName" defaultValue={editing?.topic_name ?? ""} placeholder="例如：新疆自驾避暑路线" maxLength={500} required /></label>
             <label>关键词<input name="keyword" defaultValue={editing?.keyword ?? ""} placeholder="例如：新疆旅游" maxLength={255} required /></label>
             <label>热度<input name="heatValue" defaultValue={editing?.heat_value ?? ""} type="number" min="0" step="1" required /></label>

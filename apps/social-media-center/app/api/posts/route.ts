@@ -9,6 +9,7 @@ const sortColumns = {
   favorites: "favorites",
   shares: "shares",
 } as const;
+const supportedPlatforms = new Set(["douyin", "kuaishou", "weibo"]);
 
 export async function GET(request: Request) {
   await ensureDatabase();
@@ -20,7 +21,11 @@ export async function GET(request: Request) {
   const requestedSort = params.get("sort") as keyof typeof sortColumns | null;
   const sort = requestedSort && sortColumns[requestedSort] ? sortColumns[requestedSort] : "publish_time";
 
-  const conditions: string[] = [];
+  if (platform !== "all" && !supportedPlatforms.has(platform)) {
+    return Response.json({ error: "请选择有效平台" }, { status: 400 });
+  }
+
+  const conditions: string[] = ["platform IN ('douyin', 'kuaishou', 'weibo')"];
   const values: string[] = [];
 
   if (platform !== "all") {

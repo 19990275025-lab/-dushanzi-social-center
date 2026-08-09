@@ -146,7 +146,6 @@ a { color: inherit; text-decoration: none; }
 .platform-douyin { --platform-color: #1b2825; --platform-tint: #eef2f1; }
 .platform-kuaishou { --platform-color: #ff6c38; --platform-tint: #fff2ed; }
 .platform-weibo { --platform-color: #e9a234; --platform-tint: #fff8e9; }
-.platform-wechat_channels { --platform-color: #19ad73; --platform-tint: #eaf9f3; }
 .platform-card-head { align-items: center; display: flex; }
 .platform-mark { align-items: center; background: var(--platform-tint); border-radius: 9px; color: var(--platform-color); display: flex; font-size: 14px; font-weight: 700; height: 34px; justify-content: center; margin-right: 10px; width: 34px; }
 .platform-card-head strong { display: block; font-size: 14px; }
@@ -202,7 +201,6 @@ tbody tr:hover { background: #fafcfb; }
 .tag-douyin { background: #edf1f0; color: #283b35; }
 .tag-kuaishou { background: #fff0ea; color: #c44f25; }
 .tag-weibo { background: #fff5df; color: #b87511; }
-.tag-wechat_channels { background: #e7f8f1; color: #0c8b5d; }
 .metric-cell { color: #0b7655; font-weight: 700; }
 .analysis-cell { color: #6e7975; line-height: 1.45; max-width: 230px; }
 

@@ -9,7 +9,7 @@ import {
   type AnalyzedPost,
 } from "@/lib/content-analysis-engine";
 
-const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
+const platforms = ["douyin", "kuaishou", "weibo"] as const;
 
 type AccountRow = { platform: string; followers: number; account_count: number };
 
@@ -46,7 +46,6 @@ function platformAdvice(platform: string, posts: AnalyzedPost[], account?: Accou
     douyin: "保持竖屏强视觉开场，用挑战、第一视角和路线攻略提升完播与评论。",
     kuaishou: "增加真实游客与工作人员出镜，强化在地感、连续栏目和评论互动。",
     weibo: "用热点话题串联图文与短视频，补充可转发的路线、天气和攻略信息。",
-    wechat_channels: "突出可信讲解和完整游览信息，适合系列化讲解及私域转发。",
   };
   return {
     platform,
@@ -95,20 +94,23 @@ export async function GET(request: Request) {
       SELECT id, account_id, platform, title, content_type, publish_time,
         views, likes, comments, favorites, shares, fans_growth, hashtags, duration
       FROM social_posts
-      WHERE date(publish_time) BETWEEN date(?) AND date(?)
+      WHERE platform IN ('douyin', 'kuaishou', 'weibo')
+        AND date(publish_time) BETWEEN date(?) AND date(?)
       ORDER BY publish_time DESC, id DESC
       LIMIT 300
     `).bind(range.from, range.to).all<Omit<AnalysisPost, "hashtags"> & { hashtags: string | null }>(),
     d1.prepare(`
       SELECT platform, topic_name, keyword, heat_value, trend, related_degree, ai_suggestion
       FROM hot_topics
-      WHERE status = 'active'
+      WHERE status = 'active' AND platform IN ('douyin', 'kuaishou', 'weibo')
       ORDER BY related_degree DESC, heat_value DESC
       LIMIT 100
     `).all<AnalysisTopic>(),
     d1.prepare(`
       SELECT platform, SUM(followers_count) AS followers, COUNT(*) AS account_count
-      FROM social_accounts WHERE status = 'active' GROUP BY platform
+      FROM social_accounts
+      WHERE status = 'active' AND platform IN ('douyin', 'kuaishou', 'weibo')
+      GROUP BY platform
     `).all<AccountRow>(),
   ]);
 

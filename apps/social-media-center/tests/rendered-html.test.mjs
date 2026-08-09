@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
+const rootPath = fileURLToPath(root);
 
 async function readProjectMigration(fileName) {
   try {
@@ -32,6 +35,17 @@ for (const [path, heading] of [
     assert.doesNotMatch(source, /Your site is taking shape|codex-preview/);
   });
 }
+
+test("active system surfaces only support Douyin, Kuaishou and Weibo", async () => {
+  const sourceFiles = [];
+  for (const directory of ["app", "components", "lib", "db"]) {
+    const names = await readdir(join(rootPath, directory), { recursive: true });
+    sourceFiles.push(...names.filter((name) => /\.(?:ts|tsx|css)$/.test(name)).map((name) => join(rootPath, directory, name)));
+  }
+  sourceFiles.push(join(rootPath, "README.md"));
+  const sources = await Promise.all(sourceFiles.map((path) => readFile(path, "utf8")));
+  for (const source of sources) assert.doesNotMatch(source, /wechat_channels|视频号|微信视频号/);
+});
 
 test("content monitoring and fan analysis are independent navigation modules", async () => {
   const [source, shell] = await Promise.all([

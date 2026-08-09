@@ -1,7 +1,7 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 
-const platforms = new Set(["douyin", "kuaishou", "weibo", "wechat_channels"]);
+const platforms = new Set(["douyin", "kuaishou", "weibo"]);
 const contentTypes = new Set(["video", "image_text", "text", "live", "article"]);
 const statuses = new Set([
   "idea",
@@ -22,6 +22,7 @@ export async function GET() {
       SELECT id, task_date, platform, task_title, content_type,
         responsible_person, status, review_result, created_at
       FROM content_tasks
+      WHERE platform IN ('douyin', 'kuaishou', 'weibo')
       ORDER BY task_date DESC, created_at DESC, id DESC
       LIMIT 200
     `)

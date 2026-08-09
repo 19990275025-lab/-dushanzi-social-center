@@ -2,7 +2,6 @@ export const supportedPlatforms = [
   "douyin",
   "kuaishou",
   "weibo",
-  "wechat_channels",
 ] as const;
 
 export type SupportedPlatform = (typeof supportedPlatforms)[number];

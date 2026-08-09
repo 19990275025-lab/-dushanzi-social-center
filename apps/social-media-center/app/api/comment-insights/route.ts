@@ -34,7 +34,8 @@ async function readComments(range: DateRange) {
       c.ai_analysis, p.title AS post_title
     FROM social_comments c
     INNER JOIN social_posts p ON p.id = c.post_id
-    WHERE date(c.comment_time) BETWEEN date(?) AND date(?)
+    WHERE c.platform IN ('douyin', 'kuaishou', 'weibo')
+      AND date(c.comment_time) BETWEEN date(?) AND date(?)
     ORDER BY c.likes DESC, c.comment_time DESC, c.id DESC
     LIMIT 2000
   `).bind(range.from, range.to).all<CommentRow>();

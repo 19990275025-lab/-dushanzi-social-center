@@ -105,7 +105,7 @@ export const ruleBasedContentEngine: ContentAnalysisEngine = {
 
   analyzePosts(posts, topics) {
     const platformAverages = new Map<string, number>();
-    for (const platform of ["douyin", "kuaishou", "weibo", "wechat_channels"]) {
+    for (const platform of ["douyin", "kuaishou", "weibo"]) {
       const values = posts.filter((post) => post.platform === platform).map((post) => post.views);
       platformAverages.set(platform, values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 1);
     }

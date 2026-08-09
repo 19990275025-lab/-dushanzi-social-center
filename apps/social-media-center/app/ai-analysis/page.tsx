@@ -130,7 +130,7 @@ export default function AiAnalysisPage() {
     <div className="page-stack ai-analysis-page">
       <header className="page-heading compact-heading">
         <div><p className="eyebrow">AI CONTENT INTELLIGENCE</p><h1>AI 内容分析中心</h1><p>从作品表现、五维评分、平台差异到运营行动，形成完整分析闭环。</p></div>
-        <div className="analysis-toolbar"><label>分析平台<select value={platform} onChange={(event) => { setPlatform(event.target.value); setSelectedId(null); }}><option value="all">全部平台</option><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option><option value="wechat_channels">视频号</option></select></label><span className="rule-badge">RULES V1</span></div>
+        <div className="analysis-toolbar"><label>分析平台<select value={platform} onChange={(event) => { setPlatform(event.target.value); setSelectedId(null); }}><option value="all">全部平台</option><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option></select></label><span className="rule-badge">RULES V1</span></div>
       </header>
 
       <section className="analysis-hero">

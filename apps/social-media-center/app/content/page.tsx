@@ -55,7 +55,7 @@ export default function ContentPage() {
       <section className="panel filter-panel">
         <div className="filter-group">
           <label>平台<select value={platform} onChange={(event) => setPlatform(event.target.value)}>
-            <option value="all">全部平台</option><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option><option value="wechat_channels">视频号</option>
+            <option value="all">全部平台</option><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option>
           </select></label>
           <label>开始日期<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
           <label>结束日期<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>

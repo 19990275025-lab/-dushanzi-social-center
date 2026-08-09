@@ -85,7 +85,7 @@ export async function GET(request: Request) {
         completion_rate, average_play_duration, traffic_sources,
         ai_analysis, updated_at
       FROM social_posts
-      WHERE id = ?
+      WHERE id = ? AND platform IN ('douyin', 'kuaishou', 'weibo')
       LIMIT 1
     `).bind(id).first<PostRow>(),
     d1.prepare(`

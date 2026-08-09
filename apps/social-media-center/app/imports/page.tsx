@@ -23,7 +23,6 @@ const platformOptions = [
   { value: "douyin", label: "抖音", note: "短视频 / 直播" },
   { value: "kuaishou", label: "快手", note: "短视频 / 直播" },
   { value: "weibo", label: "微博", note: "视频 / 图文" },
-  { value: "wechat_channels", label: "视频号", note: "短视频 / 直播" },
 ];
 
 const statusNames: Record<string, string> = {
@@ -58,12 +57,9 @@ function normalizePlatform(value: unknown) {
     抖音: "douyin",
     快手: "kuaishou",
     微博: "weibo",
-    视频号: "wechat_channels",
-    微信视频号: "wechat_channels",
     douyin: "douyin",
     kuaishou: "kuaishou",
     weibo: "weibo",
-    wechat_channels: "wechat_channels",
   };
   return aliases[normalized] ?? normalized;
 }
