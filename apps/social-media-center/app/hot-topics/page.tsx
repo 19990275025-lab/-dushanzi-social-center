@@ -55,6 +55,32 @@ type HotTopicData = {
   updatedAt: string;
 };
 
+type AgentHotTopic = {
+  id: number;
+  platform: string;
+  rank: number;
+  topic_title: string;
+  heat_value: string;
+  keyword: string;
+  url: string | null;
+  publish_time: string | null;
+  category: string | null;
+  source_agent: string;
+  ai_relevance_score: number | null;
+  ai_analysis: string | null;
+  ai_recommendation: string | null;
+};
+
+type AgentAiResult = {
+  relevanceScore: number;
+  worthFollowing: boolean;
+  worthFollowingLabel: string;
+  analysis: string;
+  shootingDirection: string;
+  shortVideoTitle: string;
+  liveTheme: string;
+};
+
 const emptyData: HotTopicData = {
   topics: [], ranking: [], relationAnalysis: [], recommendations: [],
   recommendationEngine: "rules-v1", updatedAt: "",
@@ -77,12 +103,19 @@ export default function HotTopicsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Topic | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [agentTopics, setAgentTopics] = useState<AgentHotTopic[]>([]);
+  const [analyzingId, setAnalyzingId] = useState<number | null>(null);
+  const [agentAnalysis, setAgentAnalysis] = useState<{ topic: AgentHotTopic; ai: AgentAiResult } | null>(null);
+  const [agentFile, setAgentFile] = useState<File | null>(null);
+  const [importingAgent, setImportingAgent] = useState(false);
 
   const loadTopics = useCallback(async () => {
     try {
-      const response = await fetch("/api/hot-topics");
-      if (!response.ok) throw new Error("热点数据读取失败");
+      const [response, agentResponse] = await Promise.all([fetch("/api/hot-topics"), fetch("/api/hot-topic-data")]);
+      if (!response.ok || !agentResponse.ok) throw new Error("热点数据读取失败");
       setData(await response.json() as HotTopicData);
+      const agentResult = await agentResponse.json() as { topics: AgentHotTopic[] };
+      setAgentTopics(agentResult.topics);
       setMessage((current) => current?.type === "error" ? null : current);
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "热点数据读取失败" });
@@ -198,6 +231,46 @@ export default function HotTopicsPage() {
     await loadTopics();
   }
 
+  async function analyzeAgentTopic(topic: AgentHotTopic) {
+    setAnalyzingId(topic.id);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/hot-topic-data/analyze", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: topic.id }),
+      });
+      const result = await response.json() as { error?: string; ai?: AgentAiResult };
+      if (!response.ok || !result.ai) throw new Error(result.error || "AI热点分析失败");
+      setAgentAnalysis({ topic, ai: result.ai });
+      setAgentTopics((current) => current.map((item) => item.id === topic.id
+        ? { ...item, ai_relevance_score: result.ai?.relevanceScore ?? item.ai_relevance_score }
+        : item));
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "AI热点分析失败" });
+    } finally {
+      setAnalyzingId(null);
+    }
+  }
+
+  async function importAgentFile() {
+    if (!agentFile) return;
+    setImportingAgent(true);
+    setMessage(null);
+    try {
+      const form = new FormData();
+      form.set("file", agentFile);
+      const response = await fetch("/api/hot-topic/import", { method: "POST", body: form });
+      const result = await response.json() as { error?: string; successCount?: number };
+      if (!response.ok) throw new Error(result.error || "WorkBuddy热点文件导入失败");
+      setMessage({ type: "success", text: `WorkBuddy热点已导入 ${result.successCount ?? 0} 条。` });
+      setAgentFile(null);
+      await loadTopics();
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "WorkBuddy热点文件导入失败" });
+    } finally {
+      setImportingAgent(false);
+    }
+  }
+
   return (
     <div className="page-stack hot-topic-page">
       <header className="page-heading compact-heading">
@@ -212,6 +285,21 @@ export default function HotTopicsPage() {
         <div className="table-wrap"><table className="hot-preview-table"><thead><tr><th>排名</th><th>热点名称</th><th>热度</th><th>趋势</th><th>分类</th><th>关联度</th></tr></thead><tbody>{preview.top10.map((topic) => <tr key={topic.ranking}><td><strong>TOP {topic.ranking}</strong></td><td>{topic.topic_name}</td><td>{formatCompact(topic.heat_value)}</td><td><span className="trend-pill trend-new" title={topic.trend_note}>首次采集</span></td><td>{topic.category}</td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td></tr>)}</tbody></table></div>
         <div className="preview-opportunities"><h3>AI 热点机会分析</h3>{preview.analysis.recommendedTopics.map((item) => <article key={item.ranking}><span>热榜 {item.ranking}</span><div><strong>{item.topic} · 关联 {item.relevance}%</strong><h4>{item.recommendedTitle}</h4><p><b>内容方向：</b>{item.direction}</p><p><b>拍摄方向：</b>{item.shootingDirection}</p></div></article>)}</div>
         <div className="hot-preview-actions"><button className="secondary-button" onClick={() => setPreview(null)}>取消本次预览</button><button className="primary-button" onClick={() => void confirmPreview()} disabled={confirming}>{confirming ? "写入中…" : `人工确认并写入 ${preview.totalCount} 条`}</button></div>
+      </section>}
+
+      <section className="panel agent-data-panel">
+        <div className="panel-heading"><div><span className="section-kicker">AI AGENT DATA CENTER</span><h2>AI Agent数据接入中心</h2></div><div className="agent-import-actions"><label className="agent-file-button">{agentFile ? agentFile.name : "选择WorkBuddy文件"}<input type="file" accept=".json,.xlsx,.xls" onChange={(event) => setAgentFile(event.target.files?.[0] ?? null)} /></label><button className="primary-button" onClick={() => void importAgentFile()} disabled={!agentFile || importingAgent}>{importingAgent ? "导入中…" : "导入数据"}</button><span className="agent-source-badge">WorkBuddy热点监测Agent · {agentTopics.length} 条</span></div></div>
+        <p className="panel-intro">展示 WorkBuddy 生成并导入的热点数据；本系统仅负责接收、存储、分析和业务应用。</p>
+        <div className="table-wrap"><table className="agent-hot-table"><thead><tr><th>平台</th><th>排名</th><th>热点标题</th><th>热度</th><th>关键词</th><th>来源</th><th>AI分析</th></tr></thead><tbody>
+          {agentTopics.map((topic) => <tr key={topic.id}><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><strong>TOP {topic.rank}</strong></td><td><strong>{topic.topic_title}</strong><small>{topic.category || "未分类"} · {topic.publish_time || "时间未知"}</small></td><td className="agent-heat-value">{topic.heat_value}</td><td><span className="keyword-chip">{topic.keyword}</span></td><td className="agent-source-cell">{topic.source_agent}</td><td><button className="analysis-action" onClick={() => void analyzeAgentTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : topic.ai_relevance_score === null ? "AI分析" : `重新分析 · ${Math.round(topic.ai_relevance_score)}分`}</button></td></tr>)}
+          {!agentTopics.length && <tr><td className="empty-cell" colSpan={7}>等待 WorkBuddy 最新 JSON 文件导入。</td></tr>}
+        </tbody></table></div>
+      </section>
+
+      {agentAnalysis && <section className="panel agent-analysis-panel">
+        <div className="panel-heading"><div><span className="section-kicker">AI OPPORTUNITY ANALYSIS</span><h2>{agentAnalysis.topic.topic_title}</h2></div><button className="secondary-button" onClick={() => setAgentAnalysis(null)}>关闭分析</button></div>
+        <div className="agent-analysis-score"><strong>{agentAnalysis.ai.relevanceScore}</strong><span>关联度评分</span><em className={agentAnalysis.ai.worthFollowing ? "follow-yes" : "follow-no"}>{agentAnalysis.ai.worthFollowingLabel}</em></div>
+        <div className="agent-analysis-grid"><article><span>关联分析</span><p>{agentAnalysis.ai.analysis}</p></article><article><span>推荐拍摄方向</span><p>{agentAnalysis.ai.shootingDirection}</p></article><article><span>推荐短视频标题</span><p>{agentAnalysis.ai.shortVideoTitle}</p></article><article><span>推荐直播主题</span><p>{agentAnalysis.ai.liveTheme}</p></article></div>
       </section>}
 
       <section className="task-summary-grid hot-summary-grid">

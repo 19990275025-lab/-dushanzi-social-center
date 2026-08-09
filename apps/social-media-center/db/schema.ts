@@ -306,6 +306,30 @@ export const hotTopics = sqliteTable(
   ],
 );
 
+export const hotTopicData = sqliteTable(
+  "HOT_TOPIC_DATA",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    rank: integer("rank").notNull(),
+    topicTitle: text("topic_title").notNull(),
+    heatValue: text("heat_value").notNull(),
+    keyword: text("keyword").notNull(),
+    url: text("url"),
+    publishTime: text("publish_time"),
+    category: text("category"),
+    sourceAgent: text("source_agent").notNull(),
+    aiRelevanceScore: real("ai_relevance_score"),
+    aiAnalysis: text("ai_analysis", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    aiRecommendation: text("ai_recommendation", { mode: "json" }).$type<Record<string, unknown> | null>(),
+  },
+  (table) => [
+    uniqueIndex("uq_hot_topic_data_source_topic").on(table.sourceAgent, table.platform, table.topicTitle, table.publishTime),
+    index("idx_hot_topic_data_platform_rank").on(table.platform, table.rank),
+    index("idx_hot_topic_data_relevance").on(table.aiRelevanceScore),
+  ],
+);
+
 export const competitorAccounts = sqliteTable(
   "competitor_accounts",
   {

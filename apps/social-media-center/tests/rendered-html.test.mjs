@@ -233,25 +233,39 @@ test("pages use database-backed API routes", async () => {
 });
 
 test("external agents can import hot topics as JSON or Excel without collection logic", async () => {
-  const [route, module, schema, migration] = await Promise.all([
+  const [route, module, schema, migration, workbuddyMigration, page, analysisRoute, localService] = await Promise.all([
     readFile(new URL("app/api/hot-topic/import/route.ts", root), "utf8"),
     readFile(new URL("lib/external-hot-topic-import.ts", root), "utf8"),
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("drizzle/0012_external_agent_hot_topic_import.sql", root), "utf8"),
+    readFile(new URL("drizzle/0013_workbuddy_agent_data_center.sql", root), "utf8"),
+    readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-data/analyze/route.ts", root), "utf8"),
+    readFile(new URL("scripts/import-workbuddy-hot-topics.mjs", root), "utf8"),
   ]);
   assert.match(route, /application\/json/);
   assert.match(route, /multipart\/form-data/);
-  assert.match(route, /parseExternalHotTopicExcel/);
-  assert.match(route, /INSERT INTO hot_topics/);
+  assert.match(route, /parseWorkBuddyExcel/);
   assert.match(route, /source_agent/);
-  assert.match(route, /recommended_topic/);
-  assert.match(route, /publish_time_suggestion/);
+  assert.match(route, /INSERT INTO HOT_TOPIC_DATA/);
+  assert.match(route, /WorkBuddy热点监测Agent|WORKBUDDY_SOURCE_AGENT/);
   assert.doesNotMatch(route, /playwright|douyin\.com|采集今日热点/);
   assert.match(module, /sourceAgent/);
-  assert.match(module, /hotScore/);
-  assert.match(module, /videoDirection/);
   assert.match(schema, /sourceAgent: text\("source_agent"\)/);
   assert.match(migration, /CREATE VIEW `HOT_TOPIC_DATA`/);
+  assert.match(workbuddyMigration, /CREATE TABLE `HOT_TOPIC_DATA`/);
+  assert.match(schema, /sqliteTable\(\s*"HOT_TOPIC_DATA"/);
+  for (const field of ["ai_relevance_score", "ai_analysis", "ai_recommendation"]) assert.match(workbuddyMigration, new RegExp(field));
+  assert.match(page, /AI Agent数据接入中心/);
+  assert.match(page, /AI分析/);
+  assert.match(page, /选择WorkBuddy文件/);
+  assert.match(page, /\/api\/hot-topic\/import/);
+  assert.match(analysisRoute, /analyzeWorkBuddyTopic/);
+  assert.match(analysisRoute, /shortVideoTitle/);
+  assert.match(analysisRoute, /liveTheme/);
+  assert.match(localService, /hot_topic_\\d\{8\}/);
+  assert.match(localService, /--dry-run/);
+  assert.doesNotMatch(localService, /playwright|douyin\.com|weibo\.com|kuaishou\.com/);
 });
 
 test("Douyin V2.1 preview is database-free and blocks confirmation below 80 percent", async () => {

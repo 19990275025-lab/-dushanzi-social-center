@@ -208,6 +208,27 @@ const schemaStatements = [
     ON hot_topics(platform, collect_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topics_related_degree
     ON hot_topics(related_degree DESC)`,
+  `CREATE TABLE IF NOT EXISTS HOT_TOPIC_DATA (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),
+    rank INTEGER NOT NULL CHECK (rank > 0),
+    topic_title TEXT NOT NULL,
+    heat_value TEXT NOT NULL,
+    keyword TEXT NOT NULL,
+    url TEXT,
+    publish_time TEXT,
+    category TEXT,
+    source_agent TEXT NOT NULL,
+    ai_relevance_score REAL,
+    ai_analysis TEXT,
+    ai_recommendation TEXT
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topic_data_source_topic
+    ON HOT_TOPIC_DATA(source_agent, platform, topic_title, publish_time)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_data_platform_rank
+    ON HOT_TOPIC_DATA(platform, rank)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_data_relevance
+    ON HOT_TOPIC_DATA(ai_relevance_score DESC)`,
   `CREATE TABLE IF NOT EXISTS competitor_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
@@ -297,6 +318,11 @@ const schemaStatements = [
 
 async function initialize() {
   const d1 = getD1();
+  const legacyHotTopicDataset = await d1.prepare("SELECT type FROM sqlite_schema WHERE name = 'HOT_TOPIC_DATA'")
+    .first<{ type: string }>();
+  if (legacyHotTopicDataset?.type === "view") {
+    await d1.prepare("DROP VIEW HOT_TOPIC_DATA").run();
+  }
   await d1.batch(schemaStatements.map((statement) => d1.prepare(statement)));
 
   const postColumns = await d1
@@ -419,13 +445,6 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_ranking ON hot_topics(platform, ranking)"),
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_source_record ON hot_topics(platform, source_record_id) WHERE source_record_id IS NOT NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_source_agent_collect_time ON hot_topics(source_agent, collect_time DESC)"),
-    d1.prepare("DROP VIEW IF EXISTS HOT_TOPIC_DATA"),
-    d1.prepare(`CREATE VIEW HOT_TOPIC_DATA AS
-      SELECT id, platform, topic_name, keyword, heat_value, ranking, trend, category,
-        related_degree, hot_score, ai_suggestion, recommended_topic, video_direction,
-        publish_time_suggestion, source_agent, source_url, source_record_id,
-        status, collect_time, created_at
-      FROM hot_topics`),
   ]);
 
   await d1.prepare("PRAGMA optimize").run();
