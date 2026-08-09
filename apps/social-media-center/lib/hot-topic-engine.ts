@@ -18,6 +18,20 @@ export type TopicRecommendation = {
   relevance: number;
 };
 
+export const HOT_TOPIC_CATEGORIES = ["旅游", "新疆", "自驾", "户外", "摄影", "活动", "人物", "其他"] as const;
+
+export function classifyHotTopic(topicName: string) {
+  const text = topicName.toLowerCase();
+  if (/新疆|独山子|独库|草原|火把节|民俗/.test(text)) return "新疆";
+  if (/自驾|公路|开车|慢充/.test(text)) return "自驾";
+  if (/旅行|旅游|暑期|美食|海滩/.test(text)) return "旅游";
+  if (/徒步|户外|露营|登山|健身/.test(text)) return "户外";
+  if (/摄影|随拍|拍照|镜头/.test(text)) return "摄影";
+  if (/节|赛事|决赛|挑战|活动|演出|大会|展/.test(text)) return "活动";
+  if (/嘉宾|少年|学长|白鹿|杨洋|陈楚生|王玉雯|宋茜|拜登|伦纳德/.test(text)) return "人物";
+  return "其他";
+}
+
 export function calculateRelevance(input: {
   topicName: string;
   keyword: string;
@@ -36,7 +50,7 @@ export function calculateRelevance(input: {
     if (subject.includes("新疆")) score += 28;
     if (subject.includes("旅游") || subject.includes("旅行")) score += 22;
   }
-  for (const [signal, weight] of [["自驾", 25], ["独库", 26], ["日落", 18], ["玻璃桥", 18], ["游客", 12], ["周末", 10], ["避暑", 12], ["风景", 10]] as Array<[string, number]>) {
+  for (const [signal, weight] of [["自驾", 25], ["独库", 26], ["日落", 18], ["玻璃桥", 18], ["游客", 12], ["周末", 10], ["避暑", 12], ["风景", 10], ["草原", 24], ["徒步", 25], ["户外", 20], ["摄影", 18], ["随拍", 15], ["民俗", 26], ["火把节", 28], ["治愈", 15], ["暑期", 8]] as Array<[string, number]>) {
     if (subject.includes(signal)) score += weight;
   }
   if (["旅游", "地域", "文旅", "户外"].some((item) => input.category?.includes(item))) score += 8;

@@ -184,11 +184,15 @@ const schemaStatements = [
     topic_name TEXT NOT NULL,
     keyword TEXT NOT NULL,
     heat_value REAL NOT NULL DEFAULT 0,
+    ranking INTEGER,
     trend TEXT NOT NULL DEFAULT 'new',
     category TEXT,
     related_degree REAL,
     ai_suggestion TEXT,
     status TEXT NOT NULL DEFAULT 'active',
+    source_url TEXT,
+    source_record_id TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     collect_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -371,11 +375,25 @@ async function initialize() {
   if (!topicColumnNames.has("created_at")) {
     await d1.prepare("ALTER TABLE hot_topics ADD COLUMN created_at TEXT").run();
   }
+  if (!topicColumnNames.has("ranking")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN ranking INTEGER").run();
+  }
+  if (!topicColumnNames.has("source_url")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN source_url TEXT").run();
+  }
+  if (!topicColumnNames.has("source_record_id")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN source_record_id TEXT").run();
+  }
+  if (!topicColumnNames.has("collection_log_id")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL").run();
+  }
   await d1.batch([
     d1.prepare("UPDATE hot_topics SET keyword = topic_name WHERE keyword IS NULL OR trim(keyword) = ''"),
     d1.prepare("UPDATE hot_topics SET created_at = COALESCE(collect_time, CURRENT_TIMESTAMP) WHERE created_at IS NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_status_heat ON hot_topics(status, heat_value DESC)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_ranking ON hot_topics(platform, ranking)"),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_source_record ON hot_topics(platform, source_record_id) WHERE source_record_id IS NOT NULL"),
   ]);
 
   await d1.prepare("PRAGMA optimize").run();

@@ -5,6 +5,7 @@ import { formatCompact, platformLabel } from "@/lib/format";
 
 type Topic = {
   id: number;
+  ranking: number | null;
   platform: string;
   topic_name: string;
   keyword: string;
@@ -15,6 +16,20 @@ type Topic = {
   ai_suggestion: string | null;
   status: string;
   created_at: string;
+};
+
+type DouyinPreview = {
+  previewToken: string;
+  previewOnly: boolean;
+  collectedAt: string;
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  top10: Array<Omit<Topic, "id" | "created_at"> & { ranking: number; trend_note: string }>;
+  analysis: {
+    top10Conclusion: string;
+    recommendedTopics: Array<{ ranking: number; topic: string; relevance: number; reason: string; recommendedTitle: string; direction: string; shootingDirection: string }>;
+  };
 };
 
 type Recommendation = {
@@ -51,6 +66,9 @@ export default function HotTopicsPage() {
   const [data, setData] = useState<HotTopicData>(emptyData);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [collecting, setCollecting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [preview, setPreview] = useState<DouyinPreview | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Topic | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -90,6 +108,44 @@ export default function HotTopicsPage() {
     setEditing(null);
     setShowForm(true);
     setMessage(null);
+  }
+
+  async function collectPreview() {
+    setCollecting(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/hot-topics/douyin/preview", { cache: "no-store" });
+      const result = await response.json() as DouyinPreview & { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "抖音热点预览生成失败");
+      setPreview(result);
+      setMessage({ type: "success", text: `已读取抖音官方热榜 ${result.successCount} 条；当前仅为预览，尚未写入数据库。` });
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "抖音热点预览生成失败" });
+    } finally {
+      setCollecting(false);
+    }
+  }
+
+  async function confirmPreview() {
+    if (!preview || !window.confirm(`确认将本次抖音热榜 ${preview.totalCount} 条写入 hot_topics？`)) return;
+    setConfirming(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/hot-topics/douyin/confirm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ confirmed: true, previewToken: preview.previewToken }),
+      });
+      const result = await response.json() as { error?: string; successCount?: number };
+      if (!response.ok) throw new Error(result.error ?? "热点写入失败");
+      setPreview(null);
+      setMessage({ type: "success", text: `抖音今日热点已写入 ${result.successCount ?? 0} 条，采集日志已保存。` });
+      await loadTopics();
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "热点写入失败" });
+    } finally {
+      setConfirming(false);
+    }
   }
 
   function openEdit(topic: Topic) {
@@ -140,9 +196,18 @@ export default function HotTopicsPage() {
   return (
     <div className="page-stack hot-topic-page">
       <header className="page-heading compact-heading">
-        <div><p className="eyebrow">TREND INTELLIGENCE</p><h1>新媒体热点监测中心</h1><p>统一管理平台热点，评估景区关联度，并将趋势转化为可执行选题。</p></div>
-        <button className="primary-button" onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? "收起表单" : "＋ 新增热点"}</button>
+        <div><p className="eyebrow">DOUYIN TREND INTELLIGENCE</p><h1>抖音热点监测中心</h1><p>采集抖音今日热榜，评估景区关联度，并将趋势转化为可执行选题。</p></div>
+        <div className="hot-heading-actions"><button className="secondary-button" onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? "收起表单" : "＋ 手工新增"}</button><button className="primary-button" onClick={() => void collectPreview()} disabled={collecting}>{collecting ? "采集中…" : "采集今日热点"}</button></div>
       </header>
+
+      {preview && <section className="panel hot-preview-panel">
+        <div className="panel-heading"><div><span className="section-kicker">PREVIEW ONLY</span><h2>抖音今日热点采集预览</h2></div><span className="preview-lock">未入库</span></div>
+        <div className="preview-summary"><span>读取 <strong>{preview.totalCount}</strong> 条</span><span>成功 <strong>{preview.successCount}</strong> 条</span><span>失败 <strong>{preview.failedCount}</strong> 条</span><span>采集时间 <strong>{new Date(preview.collectedAt).toLocaleString("zh-CN")}</strong></span></div>
+        <p className="preview-conclusion">{preview.analysis.top10Conclusion}</p>
+        <div className="table-wrap"><table className="hot-preview-table"><thead><tr><th>排名</th><th>热点名称</th><th>热度</th><th>趋势</th><th>分类</th><th>关联度</th></tr></thead><tbody>{preview.top10.map((topic) => <tr key={topic.ranking}><td><strong>TOP {topic.ranking}</strong></td><td>{topic.topic_name}</td><td>{formatCompact(topic.heat_value)}</td><td><span className="trend-pill trend-new" title={topic.trend_note}>首次采集</span></td><td>{topic.category}</td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td></tr>)}</tbody></table></div>
+        <div className="preview-opportunities"><h3>AI 热点机会分析</h3>{preview.analysis.recommendedTopics.map((item) => <article key={item.ranking}><span>热榜 {item.ranking}</span><div><strong>{item.topic} · 关联 {item.relevance}%</strong><h4>{item.recommendedTitle}</h4><p><b>内容方向：</b>{item.direction}</p><p><b>拍摄方向：</b>{item.shootingDirection}</p></div></article>)}</div>
+        <div className="hot-preview-actions"><button className="secondary-button" onClick={() => setPreview(null)}>取消本次预览</button><button className="primary-button" onClick={() => void confirmPreview()} disabled={confirming}>{confirming ? "写入中…" : `人工确认并写入 ${preview.totalCount} 条`}</button></div>
+      </section>}
 
       <section className="task-summary-grid hot-summary-grid">
         <article><span>监测中热点</span><strong>{summary.active}</strong><small>状态为监测中的记录</small></article>
@@ -172,11 +237,11 @@ export default function HotTopicsPage() {
       {loading ? <div className="loading-panel"><span className="loading-dot" />正在读取热点数据库…</div> : <>
         <section className="hot-insight-grid">
           <article className="panel ranking-panel">
-            <div className="panel-heading"><div><span className="section-kicker">TOP 10</span><h2>热点排行榜</h2></div><span className="section-note">按 heat_value 降序</span></div>
+            <div className="panel-heading"><div><span className="section-kicker">TODAY TOP 10</span><h2>今日热点 TOP10</h2></div><span className="section-note">优先按官方 ranking</span></div>
             <ol className="hot-ranking-list">
               {data.ranking.map((topic, index) => {
                 const width = data.ranking[0]?.heat_value ? Math.max(8, topic.heat_value / data.ranking[0].heat_value * 100) : 8;
-                return <li key={topic.id}><span className="rank-number">{String(index + 1).padStart(2, "0")}</span><div><div className="rank-copy"><strong>{topic.topic_name}</strong><span>{formatCompact(topic.heat_value)}</span></div><div className="rank-track"><i style={{ width: `${width}%` }} /></div><small>{platformLabel(topic.platform)} · {trendNames[topic.trend]}</small></div></li>;
+                return <li key={topic.id}><span className="rank-number">{String(topic.ranking ?? index + 1).padStart(2, "0")}</span><div><div className="rank-copy"><strong>{topic.topic_name}</strong><span>{formatCompact(topic.heat_value)}</span></div><div className="rank-track"><i style={{ width: `${width}%` }} /></div><small>{trendNames[topic.trend]} · 关联 {Math.round((topic.related_degree ?? 0) * 100)}%</small></div></li>;
               })}
               {!data.ranking.length && <li className="empty-list">暂无监测中热点</li>}
             </ol>
@@ -203,9 +268,9 @@ export default function HotTopicsPage() {
 
         <section className="panel data-panel hot-table-panel">
           <div className="panel-heading"><div><span className="section-kicker">HOT TOPICS</span><h2>热点列表</h2></div><span className="count-badge">{data.topics.length} 条</span></div>
-          <div className="table-wrap"><table className="hot-topic-table"><thead><tr><th>平台</th><th>热点名称</th><th>关键词</th><th>热度</th><th>趋势</th><th>关联程度</th><th>AI 建议</th><th>状态</th><th>操作</th></tr></thead><tbody>
-            {data.topics.map((topic) => <tr key={topic.id}><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><strong>{topic.topic_name}</strong><small className="topic-category">{topic.category || "未分类"}</small></td><td><span className="keyword-chip">{topic.keyword}</span></td><td className="metric-cell"><strong>{formatCompact(topic.heat_value)}</strong></td><td><span className={`trend-pill trend-${topic.trend}`}>{trendNames[topic.trend]}</span></td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td><td className="suggestion-cell">{topic.ai_suggestion || "—"}</td><td><span className={`topic-status status-${topic.status}`}>{statusNames[topic.status]}</span></td><td><div className="row-actions"><button onClick={() => openEdit(topic)}>编辑</button><button className="danger-link" onClick={() => void deleteTopic(topic)}>删除</button></div></td></tr>)}
-            {!data.topics.length && <tr><td className="empty-cell" colSpan={9}>暂无热点，点击右上角新增第一条记录。</td></tr>}
+          <div className="table-wrap"><table className="hot-topic-table"><thead><tr><th>排名</th><th>平台</th><th>热点名称</th><th>关键词</th><th>热度</th><th>趋势</th><th>关联程度</th><th>AI 建议</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            {data.topics.map((topic) => <tr key={topic.id}><td><strong>{topic.ranking ? `TOP ${topic.ranking}` : "—"}</strong></td><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><strong>{topic.topic_name}</strong><small className="topic-category">{topic.category || "未分类"}</small></td><td><span className="keyword-chip">{topic.keyword}</span></td><td className="metric-cell"><strong>{formatCompact(topic.heat_value)}</strong></td><td><span className={`trend-pill trend-${topic.trend}`}>{trendNames[topic.trend]}</span></td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td><td className="suggestion-cell">{topic.ai_suggestion || "—"}</td><td><span className={`topic-status status-${topic.status}`}>{statusNames[topic.status]}</span></td><td><div className="row-actions"><button onClick={() => openEdit(topic)}>编辑</button><button className="danger-link" onClick={() => void deleteTopic(topic)}>删除</button></div></td></tr>)}
+            {!data.topics.length && <tr><td className="empty-cell" colSpan={10}>暂无已确认热点。点击“采集今日热点”先生成预览。</td></tr>}
           </tbody></table></div>
         </section>
       </>}

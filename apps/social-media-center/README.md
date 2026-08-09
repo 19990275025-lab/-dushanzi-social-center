@@ -62,6 +62,8 @@ Excel 支持以下字段名：`标题`、`平台`、`发布时间`、`播放量`
 
 `hot_topics` 在原有字段上增加 `keyword`、`status` 与 `created_at`，保留 `collect_time` 作为最近采集或编辑时间，确保驾驶舱已有查询兼容。关联度由服务端规则引擎根据热点关键词、景区名称和 `social_posts` 历史标题/标签计算；选题推荐返回标题、内容方向、适合平台和拍摄建议。
 
+抖音热点监测中心 V1.0 使用当前已登录 Chrome 环境读取抖音官方今日热榜。系统先通过 `GET /api/hot-topics/douyin/preview` 返回标准化预览（官方 TOP10 展示、Top50 机会分析），不会直接写库；只有用户在页面明确确认后才调用 `POST /api/hot-topics/douyin/confirm`，批量更新 `hot_topics` 并记录 `collection_logs`。`hot_topics` 新增 `ranking`、`source_url`、`source_record_id` 与 `collection_log_id`，首次采集无历史快照时趋势标记为 `new`，不生成虚假涨跌。当前阶段仅支持抖音。
+
 当前 `recommendationEngine` 为 `rules-v1`。接口响应预留 `/api/v1/social/ai/topic-recommendations` 作为未来大模型适配路径，但 V1.0 不调用外部模型，也不实现自动采集。
 
 ## AI 内容分析中心 V1.0

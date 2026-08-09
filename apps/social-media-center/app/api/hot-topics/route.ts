@@ -8,6 +8,7 @@ const statuses = new Set(["active", "paused", "archived"]);
 
 type TopicRow = TopicForAnalysis & {
   id: number;
+  ranking: number | null;
   ai_suggestion: string | null;
   status: string;
   collect_time: string;
@@ -55,25 +56,30 @@ export async function GET() {
   const [topicResult, posts] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, topic_name, keyword, heat_value, trend, category,
-        related_degree, ai_suggestion, status, collect_time, created_at
+        ranking, related_degree, ai_suggestion, status, collect_time, created_at
       FROM hot_topics
       WHERE platform IN ('douyin', 'kuaishou', 'weibo')
-      ORDER BY heat_value DESC, created_at DESC, id DESC
+      ORDER BY CASE WHEN ranking IS NULL THEN 1 ELSE 0 END, ranking ASC, heat_value DESC, created_at DESC, id DESC
       LIMIT 300
     `).all<TopicRow>(),
     getHistoricalPosts(),
   ]);
   const topics = topicResult.results;
   const activeTopics = topics.filter((topic) => topic.status === "active");
+  const currentTopics = activeTopics.some((topic) => topic.ranking !== null)
+    ? activeTopics.filter((topic) => topic.ranking !== null)
+    : activeTopics;
   const postTitles = posts.map((post) => post.title);
 
   return Response.json({
     topics,
-    ranking: activeTopics.slice(0, 10),
-    relationAnalysis: [...activeTopics]
+    ranking: [...currentTopics].sort((a, b) =>
+      (a.ranking ?? Number.MAX_SAFE_INTEGER) - (b.ranking ?? Number.MAX_SAFE_INTEGER)
+      || b.heat_value - a.heat_value).slice(0, 10),
+    relationAnalysis: [...currentTopics]
       .sort((a, b) => (b.related_degree ?? 0) - (a.related_degree ?? 0))
       .slice(0, 8),
-    recommendations: ruleBasedTopicEngine.generate(activeTopics, postTitles),
+    recommendations: ruleBasedTopicEngine.generate(currentTopics, postTitles),
     recommendationEngine: ruleBasedTopicEngine.name,
     futureAiEndpoint: "/api/v1/social/ai/topic-recommendations",
     updatedAt: new Date().toISOString(),

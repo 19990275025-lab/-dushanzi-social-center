@@ -274,11 +274,17 @@ export const hotTopics = sqliteTable(
     topicName: text("topic_name").notNull(),
     keyword: text("keyword").notNull(),
     heatValue: real("heat_value").notNull().default(0),
+    ranking: integer("ranking"),
     trend: text("trend").notNull().default("new"),
     category: text("category"),
     relatedDegree: real("related_degree"),
     aiSuggestion: text("ai_suggestion"),
     status: text("status").notNull().default("active"),
+    sourceUrl: text("source_url"),
+    sourceRecordId: text("source_record_id"),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
+      onDelete: "set null",
+    }),
     collectTime: text("collect_time").notNull().default(sql`CURRENT_TIMESTAMP`),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -288,6 +294,8 @@ export const hotTopics = sqliteTable(
     index("idx_hot_topics_related_degree").on(table.relatedDegree),
     index("idx_hot_topics_status_heat").on(table.status, table.heatValue),
     index("idx_hot_topics_keyword").on(table.keyword),
+    index("idx_hot_topics_platform_ranking").on(table.platform, table.ranking),
+    uniqueIndex("uq_hot_topics_source_record").on(table.platform, table.sourceRecordId),
   ],
 );
 
