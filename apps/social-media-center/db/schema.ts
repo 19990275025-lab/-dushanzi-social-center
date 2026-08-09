@@ -336,6 +336,44 @@ export const competitorPosts = sqliteTable(
   ],
 );
 
+export const viralVideos = sqliteTable(
+  "viral_videos",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    category: text("category").notNull(),
+    accountName: text("account_name"),
+    title: text("title").notNull(),
+    publishTime: text("publish_time").notNull(),
+    videoUrl: text("video_url"),
+    views: integer("views").notNull().default(0),
+    likes: integer("likes").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
+    favorites: integer("favorites").notNull().default(0),
+    shares: integer("shares").notNull().default(0),
+    videoStructure: text("video_structure"),
+    titlePattern: text("title_pattern"),
+    firstThreeSeconds: text("first_three_seconds"),
+    shootingMethod: text("shooting_method"),
+    interactionMethod: text("interaction_method"),
+    commentFeedback: text("comment_feedback"),
+    breakoutReason: text("breakout_reason"),
+    replicableElements: text("replicable_elements"),
+    dushanziSuggestion: text("dushanzi_suggestion"),
+    sourceType: text("source_type").notNull().default("manual"),
+    sourceRecordId: text("source_record_id"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_viral_videos_category_publish_time").on(table.category, table.publishTime),
+    index("idx_viral_videos_platform_views").on(table.platform, table.views),
+    uniqueIndex("uq_viral_videos_source_record").on(table.platform, table.sourceRecordId),
+  ],
+);
+
 export const contentTasks = sqliteTable(
   "content_tasks",
   {

@@ -4,12 +4,19 @@ import { resolveDateRange } from "@/lib/date-range";
 import { ruleBasedContentEngine, type AnalysisPost, type AnalysisTopic } from "@/lib/content-analysis-engine";
 
 const platforms = ["douyin", "kuaishou", "weibo"] as const;
-const targetCompetitors = ["那拉提景区", "喀纳斯景区", "天山天池", "赛里木湖"];
 const contentTypeNames: Record<string, string> = { video: "短视频", image_text: "图文", text: "文字", article: "文章", live: "直播" };
+const viralCategoryLabels = { tourism: "旅游类爆款", scenic: "景区类爆款", xinjiang: "新疆旅游爆款", nature: "自然风景爆款" } as const;
 
 type PostRow = Omit<AnalysisPost, "hashtags"> & { hashtags: string };
 type AccountRow = { platform: string; followers_count: number };
-type CompetitorPostRow = { platform: string; account_name: string; title: string; publish_time: string; views: number; likes: number; comments: number; favorites: number; shares: number };
+type ViralVideoRow = {
+  id: number; platform: string; category: keyof typeof viralCategoryLabels; account_name: string | null;
+  title: string; publish_time: string; video_url: string | null; views: number; likes: number;
+  comments: number; favorites: number; shares: number; video_structure: string | null;
+  title_pattern: string | null; first_three_seconds: string | null; shooting_method: string | null;
+  interaction_method: string | null; comment_feedback: string | null; breakout_reason: string | null;
+  replicable_elements: string | null; dushanzi_suggestion: string | null;
+};
 
 const interactionCount = (post: Pick<PostRow, "likes" | "comments" | "favorites" | "shares">) => post.likes + post.comments + post.favorites + post.shares;
 const percent = (value: number, total: number) => total > 0 ? Number(((value / total) * 100).toFixed(2)) : 0;
@@ -40,7 +47,7 @@ export async function GET(request: Request) {
   const platform = platforms.includes(requested as (typeof platforms)[number]) ? requested : "all";
   const d1 = getD1();
 
-  const [postResult, accountResult, topicResult, competitorResult] = await Promise.all([
+  const [postResult, accountResult, topicResult, viralResult] = await Promise.all([
     d1.prepare(`
       SELECT id, account_id, platform, title, content_type, publish_time, views, likes,
         comments, favorites, shares, fans_growth, hashtags, duration
@@ -57,11 +64,14 @@ export async function GET(request: Request) {
       ORDER BY heat_value DESC LIMIT 100
     `).all<AnalysisTopic>(),
     d1.prepare(`
-      SELECT platform, account_name, title, publish_time, views, likes, comments, favorites, shares
-      FROM competitor_posts
+      SELECT id, platform, category, account_name, title, publish_time, video_url, views, likes,
+        comments, favorites, shares, video_structure, title_pattern, first_three_seconds,
+        shooting_method, interaction_method, comment_feedback, breakout_reason,
+        replicable_elements, dushanzi_suggestion
+      FROM viral_videos
       WHERE date(publish_time) BETWEEN date(?) AND date(?)
-      ORDER BY publish_time DESC, id DESC LIMIT 1000
-    `).bind(range.from, range.to).all<CompetitorPostRow>(),
+      ORDER BY views DESC, publish_time DESC, id DESC LIMIT 1000
+    `).bind(range.from, range.to).all<ViralVideoRow>(),
   ]);
 
   const allPosts = postResult.results.filter((post) => platforms.includes(post.platform as (typeof platforms)[number]));
@@ -128,26 +138,29 @@ export async function GET(request: Request) {
     totals.fansGrowth <= 0 ? "同步采集作品涨粉，建立内容效果与粉丝变化的关联。" : "围绕涨粉贡献最高的内容类型增加同主题连续发布。",
   ];
 
-  const competitorPosts = competitorResult.results.filter((row) => platforms.includes(row.platform as (typeof platforms)[number]));
-  const comparisonNames = [...new Set([...targetCompetitors, ...competitorPosts.map((row) => row.account_name)])];
-  const industryComparison = [
-    {
-      accountName: "独山子大峡谷",
-      accountType: "本账号",
-      postCount: totals.postCount,
-      averageViews: totals.postCount ? Math.round(totals.totalViews / totals.postCount) : 0,
-      interactionRate,
-      viralCount: selectedPosts.filter((post) => post.views >= 100000).length,
-      status: totals.postCount ? "已接入" : "待采集",
-    },
-    ...comparisonNames.map((accountName) => {
-      const rows = competitorPosts.filter((row) => row.account_name === accountName && (platform === "all" || row.platform === platform));
-      const views = rows.reduce((sum, row) => sum + row.views, 0);
-      const interactions = rows.reduce((sum, row) => sum + interactionCount(row), 0);
-      const averageViews = rows.length ? Math.round(views / rows.length) : 0;
-      return { accountName, accountType: targetCompetitors.includes(accountName) ? "重点景区" : "文旅同行", postCount: rows.length, averageViews, interactionRate: percent(interactions, views), viralCount: rows.filter((row) => row.views >= Math.max(100000, averageViews * 2)).length, status: rows.length ? "已采集" : "待采集" };
-    }),
-  ];
+  const viralVideos = viralResult.results
+    .filter((row) => platforms.includes(row.platform as (typeof platforms)[number]))
+    .filter((row) => platform === "all" || row.platform === platform)
+    .map((row) => ({
+      ...row,
+      categoryLabel: viralCategoryLabels[row.category],
+      interactions: interactionCount(row),
+      interactionRate: percent(interactionCount(row), row.views),
+    }));
+  const viralCategoryComparison = Object.entries(viralCategoryLabels).map(([category, label]) => {
+    const rows = viralVideos.filter((row) => row.category === category);
+    const views = rows.reduce((sum, row) => sum + row.views, 0);
+    const interactions = rows.reduce((sum, row) => sum + row.interactions, 0);
+    const first = (field: keyof ViralVideoRow) => rows.map((row) => row[field]).find((value) => typeof value === "string" && value.trim()) as string | undefined;
+    return {
+      category, label, sampleCount: rows.length, averageViews: rows.length ? Math.round(views / rows.length) : 0,
+      interactionRate: percent(interactions, views), topVideo: rows[0] ? { id: rows[0].id, title: rows[0].title, views: rows[0].views } : null,
+      videoStructure: first("video_structure"), titlePattern: first("title_pattern"), firstThreeSeconds: first("first_three_seconds"),
+      shootingMethod: first("shooting_method"), interactionMethod: first("interaction_method"), commentFeedback: first("comment_feedback"),
+      breakoutReason: first("breakout_reason"), replicableElements: first("replicable_elements"), dushanziSuggestion: first("dushanzi_suggestion"),
+      status: rows.length ? "已接入" : "待采集",
+    };
+  });
 
   const bestPost = monitoredPosts[0];
   const dailyReport = {
@@ -162,10 +175,10 @@ export async function GET(request: Request) {
     platform, range, totals: { ...totals, interactionRate }, platformOverview, contentTypes, contentCategories,
     monitoredPosts, topPosts,
     contentFanRelations: contentTypes.map((item) => ({ ...item, fansPerTenThousandViews: item.views > 0 ? Number(((item.fansGrowth / item.views) * 10000).toFixed(2)) : 0 })),
-    industryComparison, suggestions, dailyReport,
-    sources: ["social_posts", "social_accounts", "hot_topics", "competitor_posts"],
+    viralVideos, viralCategoryComparison, suggestions, dailyReport,
+    sources: ["social_posts", "social_accounts", "hot_topics", "viral_videos"],
     engine: ruleBasedContentEngine.name,
-    competitorCollectionApi: "/api/v1/social/competitors/posts/collect",
+    viralLibraryImportApi: "/api/imports",
     updatedAt: new Date().toISOString(),
   });
 }

@@ -211,8 +211,8 @@ test("pages use database-backed API routes", async () => {
   assert.match(commentInsights, /UPDATE social_comments/);
   assert.match(commentInsights, /analyzeComment/);
   assert.match(contentInsights, /FROM social_posts/);
-  assert.match(contentInsights, /FROM competitor_posts/);
-  assert.match(contentInsights, /industryComparison/);
+  assert.match(contentInsights, /FROM viral_videos/);
+  assert.match(contentInsights, /viralCategoryComparison/);
   assert.match(contentInsights, /dailyReport/);
   assert.match(contentInsights, /contentFanRelations/);
   assert.doesNotMatch(contentInsights, /"wechat_channels"/);
@@ -295,6 +295,23 @@ test("content monitoring competitor posts schema supports future collection", as
     assert.match(source, /raw_payload/);
   }
   assert.match(bootstrap, /PRAGMA optimize/);
+});
+
+test("viral content comparison uses a category library without fixed scenic accounts", async () => {
+  const [page, api, migration, postgresMigration, schema, bootstrap] = await Promise.all([
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/insights/content/route.ts", root), "utf8"),
+    readFile(new URL("drizzle/0009_viral_video_library.sql", root), "utf8"),
+    readProjectMigration("007_create_viral_video_library.sql"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+  ]);
+  for (const source of [api, migration, postgresMigration, schema, bootstrap]) assert.match(source, /viral_videos/);
+  for (const label of ["旅游类爆款", "景区类爆款", "新疆旅游爆款", "自然风景爆款"]) assert.match(api, new RegExp(label));
+  for (const label of ["视频结构", "标题方式", "前三秒内容", "拍摄方式", "互动方式", "评论反馈", "爆款原因", "可复制元素", "适合独山子大峡谷的内容建议"]) assert.match(page, new RegExp(label));
+  assert.doesNotMatch(api, /那拉提景区|喀纳斯景区|天山天池|赛里木湖/);
+  assert.match(migration, /source_record_id/);
+  assert.match(migration, /raw_payload/);
 });
 
 test("comment insight model covers all requested visitor needs", async () => {

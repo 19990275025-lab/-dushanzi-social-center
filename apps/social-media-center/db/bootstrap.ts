@@ -232,6 +232,41 @@ const schemaStatements = [
     ON competitor_posts(account_name, publish_time DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_competitor_posts_source_record
     ON competitor_posts(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS viral_videos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    category TEXT NOT NULL CHECK (category IN ('tourism','scenic','xinjiang','nature')),
+    account_name TEXT,
+    title TEXT NOT NULL,
+    publish_time TEXT NOT NULL,
+    video_url TEXT,
+    views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+    likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
+    comments INTEGER NOT NULL DEFAULT 0 CHECK (comments >= 0),
+    favorites INTEGER NOT NULL DEFAULT 0 CHECK (favorites >= 0),
+    shares INTEGER NOT NULL DEFAULT 0 CHECK (shares >= 0),
+    video_structure TEXT,
+    title_pattern TEXT,
+    first_three_seconds TEXT,
+    shooting_method TEXT,
+    interaction_method TEXT,
+    comment_feedback TEXT,
+    breakout_reason TEXT,
+    replicable_elements TEXT,
+    dushanzi_suggestion TEXT,
+    source_type TEXT NOT NULL DEFAULT 'manual' CHECK (source_type IN ('chrome','excel','api','manual')),
+    source_record_id TEXT,
+    raw_payload TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_viral_videos_category_publish_time
+    ON viral_videos(category, publish_time DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_viral_videos_platform_views
+    ON viral_videos(platform, views DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_viral_videos_source_record
+    ON viral_videos(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS content_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     task_date TEXT NOT NULL,

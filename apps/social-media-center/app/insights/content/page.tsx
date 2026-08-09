@@ -11,7 +11,8 @@ type Overview = { platform: string; postCount: number; totalViews: number; inter
 type Category = { category: string; postCount: number; views: number; interactions: number; ratio: number };
 type ContentType = { contentType: string; postCount: number; views: number; interactions: number; fansGrowth: number; fansPerTenThousandViews?: number };
 type MonitoredPost = { id: number; platform: string; title: string; content_type: string; publish_time: string; views: number; likes: number; comments: number; favorites: number; shares: number; fans_growth: number; interactions: number; interactionRate: number; aiScore: number; category: string };
-type Comparison = { accountName: string; accountType: string; postCount: number; averageViews: number; interactionRate: number; viralCount: number; status: string };
+type ViralVideo = { id: number; platform: string; category: string; categoryLabel: string; account_name: string | null; title: string; publish_time: string; views: number; likes: number; comments: number; favorites: number; shares: number; interactions: number; interactionRate: number };
+type ViralComparison = { category: string; label: string; sampleCount: number; averageViews: number; interactionRate: number; topVideo: null | { id: number; title: string; views: number }; videoStructure?: string; titlePattern?: string; firstThreeSeconds?: string; shootingMethod?: string; interactionMethod?: string; commentFeedback?: string; breakoutReason?: string; replicableElements?: string; dushanziSuggestion?: string; status: string };
 type ContentData = {
   platform: string;
   totals: { postCount: number; totalViews: number; likes: number; comments: number; favorites: number; shares: number; interactions: number; interactionRate: number; fansGrowth: number };
@@ -20,10 +21,11 @@ type ContentData = {
   topPosts: MonitoredPost[];
   monitoredPosts: MonitoredPost[];
   contentFanRelations: ContentType[];
-  industryComparison: Comparison[];
+  viralVideos: ViralVideo[];
+  viralCategoryComparison: ViralComparison[];
   suggestions: string[];
   dailyReport: { title: string; excellentPost: null | { id: number; title: string; score: number; reason: string }; problems: string[]; causes: string[]; suggestions: string[] };
-  competitorCollectionApi: string;
+  viralLibraryImportApi: string;
   updatedAt: string;
 };
 
@@ -31,6 +33,7 @@ export default function ContentMonitoringPage() {
   const range = useGlobalDateRange();
   const [platform, setPlatform] = useState("all");
   const [data, setData] = useState<ContentData | null>(null);
+  const [viralCategory, setViralCategory] = useState("tourism");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -56,6 +59,8 @@ export default function ContentMonitoringPage() {
     return platformOptions.map((item) => item === "all" ? all : data.platformOverview.find((row) => row.platform === item)).filter((item): item is Overview => Boolean(item));
   }, [data]);
   const currentPlatformLabel = platform === "all" ? "全部平台" : platformLabel(platform);
+  const activeViralComparison = data?.viralCategoryComparison.find((item) => item.category === viralCategory) ?? data?.viralCategoryComparison[0];
+  const activeViralVideos = data?.viralVideos.filter((item) => item.category === activeViralComparison?.category).slice(0, 10) ?? [];
 
   if (loading && !data) return <div className="loading-panel"><span className="loading-dot" />正在读取内容监测数据…</div>;
   if (error || !data) return <div className="error-panel">{error || "暂无内容数据"}</div>;
@@ -91,10 +96,23 @@ export default function ContentMonitoringPage() {
       </article>
     </section>
 
-    <section className="panel competitor-comparison-panel">
-      <div className="panel-heading"><div><span className="section-kicker">INDUSTRY BENCHMARK</span><h2>同行业对比分析</h2></div><span className="section-note">景区及风景、亲子、旅游、游玩账号</span></div>
-      <div className="table-wrap"><table><thead><tr><th>账号</th><th>类型</th><th>发布数量</th><th>平均播放</th><th>互动率</th><th>爆款数量</th><th>数据状态</th></tr></thead><tbody>{data.industryComparison.map((item) => <tr key={item.accountName}><td><strong>{item.accountName}</strong></td><td>{item.accountType}</td><td>{item.postCount}</td><td>{formatCompact(item.averageViews)}</td><td>{item.interactionRate}%</td><td>{item.viralCount}</td><td><span className={`collection-status ${item.status === "待采集" ? "status-pending" : "status-completed"}`}>{item.status}</span></td></tr>)}</tbody></table></div>
-      <p className="source-ready-note">竞品作品统一写入 <code>competitor_posts</code>，已预留自动采集来源、外部记录编号、原始响应和采集日志关联。</p>
+    <section className="panel viral-comparison-panel">
+      <div className="panel-heading"><div><span className="section-kicker">VIRAL CONTENT LAB</span><h2>爆款内容对比分析</h2></div><span className="section-note">按内容赛道对比，不绑定固定账号</span></div>
+      <div className="viral-category-grid" aria-label="爆款视频类别">
+        {data.viralCategoryComparison.map((item) => <button aria-pressed={viralCategory === item.category} className={viralCategory === item.category ? "active" : ""} key={item.category} onClick={() => setViralCategory(item.category)}><span>{item.label}</span><strong>{item.sampleCount}<small>条样本</small></strong><p>平均播放 {formatCompact(item.averageViews)} · 互动率 {item.interactionRate}%</p><em className={`collection-status ${item.status === "待采集" ? "status-pending" : "status-completed"}`}>{item.status}</em></button>)}
+      </div>
+      {activeViralComparison && <>
+        <div className="viral-dimension-grid">
+          {[['视频结构', activeViralComparison.videoStructure], ['标题方式', activeViralComparison.titlePattern], ['前三秒内容', activeViralComparison.firstThreeSeconds], ['拍摄方式', activeViralComparison.shootingMethod], ['互动方式', activeViralComparison.interactionMethod], ['评论反馈', activeViralComparison.commentFeedback]].map(([label, value]) => <article key={label}><span>{label}</span><p>{value || "待样本补充"}</p></article>)}
+        </div>
+        <div className="viral-output-grid">
+          <article><span>爆款原因</span><p>{activeViralComparison.breakoutReason || "样本入库后根据传播与互动数据生成"}</p></article>
+          <article><span>可复制元素</span><p>{activeViralComparison.replicableElements || "待提取可复用的开场、镜头与互动结构"}</p></article>
+          <article className="dushanzi-output"><span>适合独山子大峡谷的内容建议</span><p>{activeViralComparison.dushanziSuggestion || "待真实爆款样本达到分析条件后生成针对性建议"}</p></article>
+        </div>
+        <div className="table-wrap viral-library-table"><table><thead><tr><th>爆款视频</th><th>平台</th><th>发布时间</th><th>播放</th><th>点赞</th><th>评论</th><th>收藏</th><th>分享</th><th>互动率</th></tr></thead><tbody>{activeViralVideos.map((video) => <tr key={video.id}><td><strong>{video.title}</strong>{video.account_name && <small className="table-subline">来源：{video.account_name}</small>}</td><td><span className={`platform-tag tag-${video.platform}`}>{platformLabel(video.platform)}</span></td><td className="date-cell">{formatDate(video.publish_time)}</td><td className="metric-cell">{formatCompact(video.views)}</td><td>{formatCompact(video.likes)}</td><td>{formatCompact(video.comments)}</td><td>{formatCompact(video.favorites)}</td><td>{formatCompact(video.shares)}</td><td>{video.interactionRate}%</td></tr>)}{!activeViralVideos.length && <tr><td className="empty-cell" colSpan={9}>该类别暂无真实爆款样本，请通过数据导入中心补充</td></tr>}</tbody></table></div>
+      </>}
+      <p className="source-ready-note">爆款样本统一写入 <code>viral_videos</code>，支持 Chrome、Excel、API 和人工录入来源；账号仅作为可选来源信息，不作为固定对标维度。</p>
     </section>
 
     <section className="panel daily-content-report">
@@ -111,6 +129,6 @@ export default function ContentMonitoringPage() {
       <div className="panel-heading"><div><span className="section-kicker">CONTENT × FANS</span><h2>内容与粉丝关联分析</h2></div><span className="section-note">复用 social_posts.fans_growth</span></div>
       <div className="relation-summary-grid">{data.contentFanRelations.map((item) => <article key={item.contentType}><span>{contentTypeLabels[item.contentType] ?? item.contentType}</span><strong>{formatCompact(item.fansGrowth)}<small>涨粉</small></strong><p>每万次播放带来 <b>{item.fansPerTenThousandViews}</b> 位粉丝</p></article>)}{!data.contentFanRelations.length && <p className="empty-list">暂无可计算的内容转粉数据</p>}</div>
     </section>
-    <p className="analysis-disclaimer">更新时间：{formatDate(data.updatedAt)} · 数据来自 social_posts、hot_topics 与 competitor_posts。</p>
+    <p className="analysis-disclaimer">更新时间：{formatDate(data.updatedAt)} · 数据来自 social_posts、hot_topics 与 viral_videos。</p>
   </div>;
 }
