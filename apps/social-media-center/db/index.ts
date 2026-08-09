@@ -5,7 +5,6 @@ import * as schema from "./schema";
 type RuntimeEnv = {
   DB?: D1Database;
   UPLOADS?: R2Bucket;
-  LOAD_TEST_DATA?: string;
 };
 
 export function getD1() {
@@ -28,8 +27,4 @@ export function getUploads() {
     throw new Error("上传文件存储连接不可用");
   }
   return bucket;
-}
-
-export function shouldLoadTestData() {
-  return (env as unknown as RuntimeEnv).LOAD_TEST_DATA === "true";
 }
