@@ -1,0 +1,187 @@
+{
+  "schemaVersion": "2.1",
+  "source": "chrome-creator-center",
+  "platform": "douyin",
+  "accountName": "独山子大峡谷",
+  "collectedAt": "2026-08-09T12:30:00+08:00",
+  "pageUrl": "https://creator.douyin.com/creator-micro/data/following/follower?tab=portrait",
+  "collectionRange": {
+    "start": "2026-08-01T00:00:00+08:00",
+    "end": "2026-08-07T23:59:59+08:00"
+  },
+  "fans": {
+    "total": 161370,
+    "gender": [
+      { "label": "男性", "value": 64 },
+      { "label": "女性", "value": 36 }
+    ],
+    "age": [
+      { "label": "<23", "value": 7 },
+      { "label": "24-30", "value": 11 },
+      { "label": "31-40", "value": 34 },
+      { "label": "41-50", "value": 22 },
+      { "label": ">50", "value": 26 }
+    ],
+    "region": [
+      { "label": "新疆", "value": 22 },
+      { "label": "江苏", "value": 8 },
+      { "label": "浙江", "value": 7 },
+      { "label": "广东", "value": 6 },
+      { "label": "安徽", "value": 5 },
+      { "label": "河南", "value": 4 },
+      { "label": "山东", "value": 4 },
+      { "label": "上海", "value": 4 },
+      { "label": "湖南", "value": 3 },
+      { "label": "四川", "value": 3 },
+      { "label": "陕西", "value": 3 },
+      { "label": "河北", "value": 3 },
+      { "label": "湖北", "value": 3 },
+      { "label": "江西", "value": 3 },
+      { "label": "山西", "value": 3 },
+      { "label": "福建", "value": 2 },
+      { "label": "黑龙江", "value": 2 },
+      { "label": "辽宁", "value": 2 },
+      { "label": "北京", "value": 2 },
+      { "label": "甘肃", "value": 2 },
+      { "label": "内蒙古", "value": 2 },
+      { "label": "贵州", "value": 1 },
+      { "label": "吉林", "value": 1 },
+      { "label": "广西", "value": 1 },
+      { "label": "云南", "value": 1 },
+      { "label": "重庆", "value": 1 },
+      { "label": "天津", "value": 1 },
+      { "label": "海南", "value": 1 }
+    ],
+    "interests": [
+      { "label": "随拍", "value": 37 },
+      { "label": "亲子", "value": 15 },
+      { "label": "美食", "value": 10 },
+      { "label": "社会时政", "value": 9 },
+      { "label": "剧情", "value": 7 },
+      { "label": "体育", "value": 5 },
+      { "label": "三农", "value": 5 },
+      { "label": "旅行", "value": 4 },
+      { "label": "汽车", "value": 4 },
+      { "label": "颜值", "value": 4 }
+    ],
+    "activeTime": [],
+    "growth": []
+  },
+  "posts": [
+    {
+      "title": "30块能玩一天吗？ 我来挑战一下#挑战 #独库公路第一景 #独库公路必打卡地 #小众打卡拍照地点",
+      "publishTime": "2026-08-06T11:53:00+08:00",
+      "videoUrl": "https://www.douyin.com/video/7670761823309778202",
+      "contentType": "video",
+      "views": 680,
+      "likes": 31,
+      "commentsCount": 11,
+      "favorites": 1,
+      "shares": 11,
+      "completionRate": 12.58,
+      "averagePlayDuration": 9,
+      "trafficSources": [
+        { "label": "推荐页", "value": 55.1 },
+        { "label": "关注页", "value": 13 },
+        { "label": "同城", "value": 8.7 },
+        { "label": "朋友", "value": 7.1 },
+        { "label": "消息页", "value": 6.5 }
+      ],
+      "audience": {
+        "gender": [],
+        "age": [],
+        "region": [
+          { "label": "新疆", "value": 75.05 },
+          { "label": "江苏", "value": 3.46 },
+          { "label": "山东", "value": 2.55 },
+          { "label": "广东", "value": 2.37 },
+          { "label": "河南", "value": 2 },
+          { "label": "上海", "value": 1.46 },
+          { "label": "北京", "value": 1.28 },
+          { "label": "四川", "value": 1.28 },
+          { "label": "浙江", "value": 1.28 },
+          { "label": "甘肃", "value": 1.09 },
+          { "label": "天津", "value": 1.09 },
+          { "label": "福建", "value": 0.91 },
+          { "label": "陕西", "value": 0.91 },
+          { "label": "山西", "value": 0.91 },
+          { "label": "河北", "value": 0.73 },
+          { "label": "湖南", "value": 0.55 },
+          { "label": "贵州", "value": 0.55 },
+          { "label": "黑龙江", "value": 0.36 },
+          { "label": "内蒙古", "value": 0.36 },
+          { "label": "重庆", "value": 0.36 },
+          { "label": "湖北", "value": 0.36 },
+          { "label": "吉林", "value": 0.18 },
+          { "label": "云南", "value": 0.18 },
+          { "label": "安徽", "value": 0.18 },
+          { "label": "海南", "value": 0.18 },
+          { "label": "青海", "value": 0.18 },
+          { "label": "宁夏", "value": 0.18 }
+        ]
+      },
+      "comments": [
+        { "username": "5 1", "commentText": "[赞][赞][赞]", "commentTime": "2026-08-07T12:52:01+08:00", "likes": 0, "keyword": "赞" },
+        { "username": "独山子大峡谷", "commentText": "[心动]", "commentTime": "2026-08-07T16:52:01+08:00", "likes": 0, "keyword": "心动" },
+        { "username": "❤♚ZδHЯa♛❤", "commentText": "[图片评论]", "commentTime": "2026-08-07T10:52:01+08:00", "likes": 0 },
+        { "username": "ريىــــــم بەگــــــ", "commentText": "哇哦 妹子好棒👍[赞][赞][赞]", "commentTime": "2026-08-06T20:52:01+08:00", "likes": 0, "keyword": "好棒" },
+        { "username": "Mirban.", "commentText": "美丽的导游[赞][赞]", "commentTime": "2026-08-06T20:52:01+08:00", "likes": 0, "keyword": "导游" },
+        { "username": "加点糖", "commentText": "这位小导游好漂亮呀😍[舔屏][舔屏][舔屏][图片评论]", "commentTime": "2026-08-06T20:52:01+08:00", "likes": 0, "keyword": "导游" },
+        { "username": "5 1", "commentText": "@抖音创作灵感", "commentTime": "2026-08-07T12:52:01+08:00", "likes": 0, "keyword": "创作灵感" }
+      ],
+      "commentKeywords": [
+        { "label": "导游", "value": 2 },
+        { "label": "赞", "value": 2 }
+      ]
+    },
+    {
+      "title": "想看大家相册里的黄昏～ #黄昏 #独库公路第一景 #独库公路必打卡地 #相册里记录的生活边角料",
+      "publishTime": "2026-08-03T14:43:00+08:00",
+      "videoUrl": "https://www.douyin.com/video/7669692256378473780",
+      "contentType": "video",
+      "views": 526,
+      "likes": 16,
+      "commentsCount": 2,
+      "favorites": 0,
+      "shares": 0,
+      "completionRate": 3.95,
+      "averagePlayDuration": null,
+      "trafficSources": [],
+      "audience": { "gender": [], "age": [], "region": [] },
+      "comments": [
+        { "username": "山海寄余生", "commentText": "[比心][比心][比心]", "commentTime": "2026-08-04T20:52:01+08:00", "likes": 0, "keyword": "比心" },
+        { "username": "乌鲁木齐魅族魅友家", "commentText": "不错", "commentTime": "2026-08-04T20:52:01+08:00", "likes": 0, "keyword": "不错" }
+      ],
+      "commentKeywords": [
+        { "label": "比心", "value": 1 },
+        { "label": "不错", "value": 1 }
+      ]
+    },
+    {
+      "title": "万丈深渊之上，他走成了云端的诗, 风是观众...#穿越机 #达瓦孜 #独库公路第一景 #独库公路必打卡地",
+      "publishTime": "2026-08-01T17:44:00+08:00",
+      "videoUrl": "https://www.douyin.com/video/7668996694981266726",
+      "contentType": "video",
+      "views": 1311,
+      "likes": 26,
+      "commentsCount": 1,
+      "favorites": 3,
+      "shares": 5,
+      "completionRate": null,
+      "averagePlayDuration": null,
+      "trafficSources": [],
+      "audience": { "gender": [], "age": [], "region": [] },
+      "comments": [
+        { "username": "akag oynayduharjayda", "commentText": "[图片评论]", "commentTime": "2026-08-02T20:52:01+08:00", "likes": 0 }
+      ],
+      "commentKeywords": []
+    }
+  ],
+  "failures": [
+    { "target": "粉丝增长趋势", "stage": "粉丝分析", "reason": "当前画像页未稳定呈现日期序列，未补造增长记录" },
+    { "target": "粉丝活跃时间", "stage": "粉丝分析", "reason": "活跃分布图未稳定读取到具体时段数值" },
+    { "target": "2026-08-06 作品详情", "stage": "内容分析", "reason": "已读取完播率、平均播放时长、流量来源和观众地域；性别、年龄图表未稳定读取" },
+    { "target": "2026-08-03 作品详情", "stage": "内容分析", "reason": "已读取实时播放量和完播率；平均播放时长、流量来源及观众画像因页面切换被抢占未稳定读取" },
+    { "target": "2026-08-01 作品详情", "stage": "内容分析", "reason": "本次未稳定读取完播率、平均播放时长、流量来源和作品观众画像" }
+  ]
+}

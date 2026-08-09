@@ -17,8 +17,18 @@ type PostRow = {
   fans_growth: number;
   hashtags: string;
   duration: number | null;
+  completion_rate: number | null;
+  average_play_duration: number | null;
+  traffic_sources: string;
   ai_analysis: string | null;
   updated_at: string;
+};
+
+type AudienceRow = {
+  gender_distribution: string;
+  age_distribution: string;
+  region_distribution: string;
+  collected_at: string;
 };
 
 type CommentRow = {
@@ -47,6 +57,20 @@ function parseList(value: string | null) {
   return value.split(/[,，、#\s]+/).map((item) => item.trim()).filter(Boolean);
 }
 
+function parseDistribution(value: string | null) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item) => {
+      const row = item as { label?: unknown; value?: unknown };
+      return { name: String(row.label ?? ""), rate: Number(row.value) };
+    }).filter((item) => item.name && Number.isFinite(item.rate) && item.rate >= 0);
+  } catch {
+    return [];
+  }
+}
+
 export async function GET(request: Request) {
   await ensureDatabase();
   const rawId = new URL(request.url).searchParams.get("id");
@@ -54,10 +78,11 @@ export async function GET(request: Request) {
   if (!Number.isInteger(id) || id <= 0) return Response.json({ error: "作品编号无效" }, { status: 400 });
 
   const d1 = getD1();
-  const [post, commentResult] = await Promise.all([
+  const [post, commentResult, audience] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, title, content_type, publish_time, video_url, cover_url,
         views, likes, comments, favorites, shares, fans_growth, hashtags, duration,
+        completion_rate, average_play_duration, traffic_sources,
         ai_analysis, updated_at
       FROM social_posts
       WHERE id = ?
@@ -70,6 +95,10 @@ export async function GET(request: Request) {
       ORDER BY likes DESC, comment_time DESC, id DESC
       LIMIT 100
     `).bind(id).all<CommentRow>(),
+    d1.prepare(`
+      SELECT gender_distribution, age_distribution, region_distribution, collected_at
+      FROM content_audience_analysis WHERE post_id = ? LIMIT 1
+    `).bind(id).first<AudienceRow>(),
   ]);
 
   if (!post) return Response.json({ error: "未找到该作品" }, { status: 404 });
@@ -98,12 +127,21 @@ export async function GET(request: Request) {
       .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name, "zh-CN"))
       .slice(0, 20),
     comments: collectedComments,
-    trafficSources: [],
-    dataAvailability: {
-      missing: ["完播率", "封面点击率", "主页进入率", "流量来源", "观众画像"],
-      note: "当前采集数据不包含抖音创作者后台的专属流量与观众画像指标，相关位置显示待采集。",
+    trafficSources: parseDistribution(post.traffic_sources),
+    audience: {
+      gender: parseDistribution(audience?.gender_distribution ?? null),
+      age: parseDistribution(audience?.age_distribution ?? null),
+      region: parseDistribution(audience?.region_distribution ?? null),
     },
-    sources: ["social_posts", "social_comments"],
+    dataAvailability: {
+      missing: [
+        ...(post.completion_rate === null ? ["完播率"] : []),
+        ...(!parseDistribution(post.traffic_sources).length ? ["流量来源"] : []),
+        ...(!audience ? ["观众画像"] : []),
+      ],
+      note: audience ? "观众画像来自抖音创作者中心 V2.0。" : "当前作品尚未采集抖音创作者后台观众画像。",
+    },
+    sources: ["social_posts", "social_comments", "content_audience_analysis"],
     updatedAt: post.updated_at,
   });
 }

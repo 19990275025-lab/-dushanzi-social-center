@@ -3,6 +3,7 @@
 import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import type { CollectionPayload, CollectionValidationError } from "@/lib/collections";
 import type { CommentCollectionPayload } from "@/lib/comment-collections";
+import type { DouyinCollectionV2Payload } from "@/lib/douyin-collection-v2";
 import { formatCompact, formatDateTime } from "@/lib/format";
 import { DataImportPanel } from "@/app/imports/page";
 
@@ -12,7 +13,7 @@ type CollectionLog = {
   source_type: string;
   source_name: string;
   source_url: string | null;
-  entity_type: "post" | "comment";
+  entity_type: "post" | "comment" | "douyin_v2";
   status: string;
   total_count: number;
   success_count: number;
@@ -42,6 +43,8 @@ export default function CollectorPage() {
   const [activeTab, setActiveTab] = useState<"automatic" | "import">("automatic");
   const [payload, setPayload] = useState<CollectionPayload | null>(null);
   const [commentPayload, setCommentPayload] = useState<CommentCollectionPayload | null>(null);
+  const [v2Payload, setV2Payload] = useState<DouyinCollectionV2Payload | null>(null);
+  const [v2Summary, setV2Summary] = useState<{ fanSnapshots: number; fanGrowthRecords: number; posts: number; comments: number; completePosts: number; failures: number; successRate: number; completeness: { fans: number; posts: number; comments: number; overall: number; threshold: number }; eligibleForConfirmation: boolean; failedFields: string[] } | null>(null);
   const [logId, setLogId] = useState<number | null>(null);
   const [commentLogId, setCommentLogId] = useState<number | null>(null);
   const [logs, setLogs] = useState<CollectionLog[]>([]);
@@ -73,6 +76,73 @@ export default function CollectorPage() {
     setCommentLogId(null);
     setErrors([]);
     setMessage(null);
+  }
+
+  function resetV2Preview() {
+    setV2Payload(null);
+    setV2Summary(null);
+    setErrors([]);
+    setMessage(null);
+  }
+
+  async function uploadV2Collection(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    resetV2Preview();
+    if (!file.name.toLowerCase().endsWith(".json") || file.size > 5 * 1024 * 1024) {
+      setMessage({ type: "error", text: "仅支持 5MB 以内的抖音 V2.1 JSON 文件。" });
+      event.target.value = "";
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/collections/douyin-v2", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: await file.text(),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        errors?: CollectionValidationError[];
+        payload?: DouyinCollectionV2Payload;
+        summary?: typeof v2Summary;
+      };
+      setErrors(result.errors ?? []);
+      if (!response.ok || !result.payload || !result.summary) {
+        setMessage({ type: "error", text: result.error ?? "V2.1 采集数据校验失败" });
+      } else {
+        setV2Payload(result.payload);
+        setV2Summary(result.summary);
+        setMessage({ type: "success", text: "V2.1 无落库预览已生成；数据库写入为 0 条。" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "V2.1 JSON 文件无法解析。" });
+    } finally {
+      setBusy(false);
+      event.target.value = "";
+    }
+  }
+
+  async function confirmV2Collection() {
+    if (!v2Payload || !v2Summary?.eligibleForConfirmation) return;
+    if (!window.confirm(`确认写入粉丝画像、${v2Payload.posts.length} 条作品及其评论？`)) return;
+    setBusy(true);
+    const response = await fetch("/api/collections/douyin-v2/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ payload: v2Payload }),
+    });
+    const result = (await response.json()) as { message?: string; error?: string; errors?: CollectionValidationError[] };
+    setBusy(false);
+    setErrors(result.errors ?? []);
+    if (!response.ok) {
+      setMessage({ type: "error", text: result.error ?? "V2.1 数据入库失败" });
+    } else {
+      setMessage({ type: "success", text: result.message ?? "V2.1 数据已入库" });
+      setV2Payload(null);
+      setV2Summary(null);
+    }
+    loadLogs();
   }
 
   const activeProgress = commentPayload?.progress ?? payload?.progress;
@@ -206,8 +276,9 @@ export default function CollectorPage() {
     loadLogs();
   }
 
-  async function rollbackCollection(id: number, entityType: "post" | "comment") {
-    if (!window.confirm(`确认回滚该采集批次写入的${entityType === "comment" ? "评论" : "作品"}？采集日志仍会保留。`)) return;
+  async function rollbackCollection(id: number, entityType: "post" | "comment" | "douyin_v2") {
+    const label = entityType === "douyin_v2" ? "粉丝、作品、观众和评论数据" : entityType === "comment" ? "评论" : "作品";
+    if (!window.confirm(`确认回滚该采集批次写入的${label}？采集日志仍会保留。`)) return;
     const response = await fetch(`/api/collections?id=${id}`, { method: "DELETE" });
     const result = (await response.json()) as { error?: string };
     setMessage(
@@ -222,7 +293,7 @@ export default function CollectorPage() {
     <div className="page-stack collector-page">
       <header className="page-heading compact-heading">
         <div>
-          <p className="eyebrow">SOCIAL DATA COLLECTION CENTER · V1.0</p>
+          <p className="eyebrow">DOUYIN INTELLIGENT COLLECTION · V2.1</p>
           <h1>新媒体数据采集中心</h1>
           <p>自动采集与人工导入统一入口，保留预览、校验、日志和人工确认机制。</p>
         </div>
@@ -230,7 +301,7 @@ export default function CollectorPage() {
       </header>
 
       <nav className="collection-center-tabs" aria-label="数据采集中心功能">
-        <button className={activeTab === "automatic" ? "active" : ""} onClick={() => setActiveTab("automatic")} type="button"><span>01</span><div><strong>自动采集</strong><small>Chrome · 抖音作品与评论</small></div></button>
+        <button className={activeTab === "automatic" ? "active" : ""} onClick={() => setActiveTab("automatic")} type="button"><span>01</span><div><strong>自动采集</strong><small>抖音 V2.1 · 完整率门禁</small></div></button>
         <button className={activeTab === "import" ? "active" : ""} onClick={() => setActiveTab("import")} type="button"><span>02</span><div><strong>数据导入</strong><small>Excel · 图片上传</small></div></button>
       </nav>
 
@@ -241,6 +312,71 @@ export default function CollectorPage() {
         <article><span>采集批次</span><strong>{formatCompact(summary?.total_logs ?? 0)}</strong><small>含失败与回滚记录</small></article>
         <article><span>已入库作品</span><strong>{formatCompact(summary?.imported_posts ?? 0)}</strong><small>评论 {formatCompact(summary?.imported_comments ?? 0)} 条</small></article>
         <article><span>最近采集</span><strong className="summary-time">{summary?.latest_collection ? formatDateTime(summary.latest_collection) : "暂无"}</strong><small>Chrome / 人工确认</small></article>
+      </section>
+
+      <section className="panel collector-workflow collector-v2-workflow">
+        <div className="panel-heading">
+          <div><span>DOUYIN APP · V2.1</span><h2>粉丝与内容分析采集</h2></div>
+          <small>固定测试范围：2026-08-01 至 2026-08-07</small>
+        </div>
+        <ol className="collector-steps">
+          <li><span>1</span><div><strong>粉丝分析</strong><small>总量、增长、画像、兴趣与活跃时间</small></div></li>
+          <li><span>2</span><div><strong>内容详情</strong><small>流量来源、完播率、平均播放时长</small></div></li>
+          <li><span>3</span><div><strong>观众与评论</strong><small>年龄地域性别、评论内容与热词</small></div></li>
+          <li><span>4</span><div><strong>人工确认</strong><small>预览通过后一次性写入业务表</small></div></li>
+        </ol>
+        <label className="collector-dropzone">
+          <input accept="application/json,.json" disabled={busy} onChange={uploadV2Collection} type="file" />
+          <span>V2</span>
+          <div><strong>{busy ? "正在校验 V2.1 采集结果……" : "上传抖音 App V2.1 标准 JSON"}</strong><small>三类数据完整率均达到 80% 后才允许人工确认</small></div>
+          <b>选择文件</b>
+        </label>
+        {message && <div className={`collector-message ${message.type}`}>{message.text}</div>}
+        {errors.length > 0 && (
+          <div className="collector-errors">
+            <strong>校验错误 · {errors.length}</strong>
+            <ul>{errors.slice(0, 12).map((error, index) => <li key={`v2-${error.rowNumber}-${error.field}-${index}`}>第 {error.rowNumber || "文件"} 行 · {error.message}</li>)}</ul>
+          </div>
+        )}
+
+        {v2Payload && v2Summary && (
+          <div className="collector-preview douyin-v2-preview">
+            <div className="collector-preview-head">
+              <div><strong>V{v2Payload.schemaVersion} 待确认预览</strong><small>{v2Payload.accountName} · {v2Payload.collectionRange.start.slice(0, 10)} 至 {v2Payload.collectionRange.end.slice(0, 10)}</small></div>
+              <button className="primary-button" disabled={busy || !v2Summary.eligibleForConfirmation} onClick={confirmV2Collection} type="button">{v2Summary.eligibleForConfirmation ? "人工确认并入库" : "完整率未达 80%"}</button>
+            </div>
+            <div className="collector-summary-strip v2-preview-summary">
+              <article><span>粉丝完整率</span><strong>{v2Summary.completeness.fans}%</strong><small>总量、增长与详细画像</small></article>
+              <article><span>作品完整率</span><strong>{v2Summary.completeness.posts}%</strong><small>流量与观众分析</small></article>
+              <article><span>评论完整率</span><strong>{v2Summary.completeness.comments}%</strong><small>数量、内容与热词</small></article>
+              <article><span>综合完整率</span><strong>{v2Summary.completeness.overall}%</strong><small>门槛 {v2Summary.completeness.threshold}%</small></article>
+            </div>
+            <div className="collector-summary-strip v2-preview-summary">
+              <article><span>粉丝总量</span><strong>{formatCompact(v2Payload.fans.total)}</strong><small>增长记录 {v2Summary.fanGrowthRecords} 条</small></article>
+              <article><span>作品数据</span><strong>{v2Summary.posts}</strong><small>完整详情 {v2Summary.completePosts} 条</small></article>
+              <article><span>评论内容</span><strong>{v2Summary.comments}</strong><small>失败 {v2Summary.failures} 项</small></article>
+              <article><span>采集成功率</span><strong>{v2Summary.successRate}%</strong><small>确认前写入 0 条</small></article>
+            </div>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>作品</th><th>发布时间</th><th>播放</th><th>完播率</th><th>平均时长</th><th>观众画像</th><th>评论内容</th></tr></thead>
+                <tbody>{v2Payload.posts.map((post) => (
+                  <tr key={post.videoUrl}>
+                    <td><a href={post.videoUrl} rel="noreferrer" target="_blank">{post.title}</a></td>
+                    <td>{formatDateTime(post.publishTime)}</td>
+                    <td>{formatCompact(post.views)}</td>
+                    <td>{post.completionRate === null ? "未读取" : `${post.completionRate}%`}</td>
+                    <td>{post.averagePlayDuration === null ? "未读取" : `${post.averagePlayDuration} 秒`}</td>
+                    <td>{post.audience.age.length + post.audience.gender.length + post.audience.region.length ? "已读取" : "未读取"}</td>
+                    <td>{post.comments.length} / {post.commentsCount}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+            {v2Payload.failures.length > 0 && <details className="collector-failure-details"><summary>失败原因 · {v2Payload.failures.length} 项</summary><ul>{v2Payload.failures.map((failure, index) => <li key={`${failure.target}-${index}`}><strong>{failure.target} / {failure.stage}</strong>：{failure.reason}</li>)}</ul></details>}
+            {v2Summary.failedFields.length > 0 && <details className="collector-failure-details"><summary>缺失字段 · {v2Summary.failedFields.length} 项</summary><ul>{v2Summary.failedFields.map((field) => <li key={field}>{field}</li>)}</ul></details>}
+          </div>
+        )}
       </section>
 
       <section className="panel collector-progress-panel">
@@ -379,7 +515,7 @@ export default function CollectorPage() {
               {logs.map((log) => (
                 <tr key={log.id}>
                   <td><strong>#{log.id}</strong><small>{log.source_name}</small></td>
-                  <td>抖音<small>{log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
+                  <td>抖音<small>{log.entity_type === "douyin_v2" ? "粉丝与内容分析 V2.1" : log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
                   <td><span className={`collection-status status-${log.status}`}>{statusNames[log.status] ?? log.status}</span></td>
                   <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}{log.entity_type === "comment" && <small>评论 {log.comment_count}</small>}{log.error_message && <small className="log-error-summary" title={log.error_message}>含失败明细</small>}</td><td>{formatDateTime(log.created_at)}</td>
                   <td>{log.status === "completed" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id, log.entity_type)} type="button">回滚数据</button> : "—"}</td>

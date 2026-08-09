@@ -163,6 +163,12 @@ export const socialPosts = sqliteTable(
     fansGrowth: integer("fans_growth").notNull().default(0),
     hashtags: text("hashtags", { mode: "json" }).$type<string[]>().notNull().default([]),
     duration: integer("duration"),
+    completionRate: real("completion_rate"),
+    averagePlayDuration: real("average_play_duration"),
+    trafficSources: text("traffic_sources", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
     aiAnalysis: text("ai_analysis", { mode: "json" }).$type<{
       summary?: string;
       confidence?: number;
@@ -183,6 +189,43 @@ export const socialPosts = sqliteTable(
     index("idx_social_posts_platform_publish_time").on(table.platform, table.publishTime),
     index("idx_social_posts_import_log_id").on(table.importLogId),
     index("idx_social_posts_collection_log_id").on(table.collectionLogId),
+  ],
+);
+
+export const contentAudienceAnalysis = sqliteTable(
+  "content_audience_analysis",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    postId: integer("post_id")
+      .notNull()
+      .references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    platform: text("platform").notNull(),
+    genderDistribution: text("gender_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    ageDistribution: text("age_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    regionDistribution: text("region_distribution", { mode: "json" })
+      .$type<Array<{ label: string; value: number }>>()
+      .notNull()
+      .default([]),
+    sourceType: text("source_type").notNull().default("api"),
+    sourceRecordId: text("source_record_id"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
+      onDelete: "set null",
+    }),
+    collectedAt: text("collected_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_content_audience_post").on(table.postId),
+    index("idx_content_audience_platform_collected_at").on(table.platform, table.collectedAt),
+    uniqueIndex("uq_content_audience_source_record").on(table.platform, table.sourceRecordId),
   ],
 );
 

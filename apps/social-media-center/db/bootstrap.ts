@@ -117,8 +117,12 @@ const schemaStatements = [
     fans_growth INTEGER NOT NULL DEFAULT 0,
     hashtags TEXT NOT NULL DEFAULT '[]',
     duration INTEGER,
+    completion_rate REAL,
+    average_play_duration REAL,
+    traffic_sources TEXT NOT NULL DEFAULT '[]',
     ai_analysis TEXT,
     import_log_id INTEGER REFERENCES data_import_logs(id) ON DELETE SET NULL,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -128,6 +132,29 @@ const schemaStatements = [
     ON social_posts(account_id, publish_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_social_posts_platform_publish_time
     ON social_posts(platform, publish_time DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_posts_collection_log_id
+    ON social_posts(collection_log_id)`,
+  `CREATE TABLE IF NOT EXISTS content_audience_analysis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','wechat_channels')),
+    gender_distribution TEXT NOT NULL DEFAULT '[]',
+    age_distribution TEXT NOT NULL DEFAULT '[]',
+    region_distribution TEXT NOT NULL DEFAULT '[]',
+    source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual','douyin_app')),
+    source_record_id TEXT,
+    raw_payload TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_audience_post
+    ON content_audience_analysis(post_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_content_audience_platform_collected_at
+    ON content_audience_analysis(platform, collected_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_audience_source_record
+    ON content_audience_analysis(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS social_comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -275,6 +302,15 @@ async function initialize() {
         "ALTER TABLE social_posts ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL",
       )
       .run();
+  }
+  if (!postColumns.results.some((column) => column.name === "completion_rate")) {
+    await d1.prepare("ALTER TABLE social_posts ADD COLUMN completion_rate REAL").run();
+  }
+  if (!postColumns.results.some((column) => column.name === "average_play_duration")) {
+    await d1.prepare("ALTER TABLE social_posts ADD COLUMN average_play_duration REAL").run();
+  }
+  if (!postColumns.results.some((column) => column.name === "traffic_sources")) {
+    await d1.prepare("ALTER TABLE social_posts ADD COLUMN traffic_sources TEXT NOT NULL DEFAULT '[]'").run();
   }
   await d1
     .prepare(

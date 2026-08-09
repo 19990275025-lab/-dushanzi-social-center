@@ -126,7 +126,7 @@ test("global date filter is wired to every requested dashboard and API", async (
 });
 
 test("pages use database-backed API routes", async () => {
-  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, commentInsights, contentInsights, contentDetail, fanInsights] = await Promise.all([
+  const [dashboard, posts, tasks, imports, confirm, hotTopics, aiAnalysis, collections, collectionConfirm, commentCollections, commentConfirm, v2Collections, v2Confirm, commentInsights, contentInsights, contentDetail, fanInsights] = await Promise.all([
     readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
     readFile(new URL("app/api/posts/route.ts", root), "utf8"),
     readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
@@ -138,6 +138,8 @@ test("pages use database-backed API routes", async () => {
     readFile(new URL("app/api/collections/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/comments/route.ts", root), "utf8"),
     readFile(new URL("app/api/collections/comments/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/douyin-v2/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/douyin-v2/confirm/route.ts", root), "utf8"),
     readFile(new URL("app/api/comment-insights/route.ts", root), "utf8"),
     readFile(new URL("app/api/insights/content/route.ts", root), "utf8"),
     readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
@@ -177,6 +179,11 @@ test("pages use database-backed API routes", async () => {
   assert.match(commentConfirm, /INSERT INTO social_comments/);
   assert.match(commentConfirm, /collection_log_id/);
   assert.match(commentConfirm, /d1\.batch/);
+  assert.doesNotMatch(v2Collections, /ensureDatabase|getD1|INSERT INTO collection_logs/);
+  assert.match(v2Confirm, /INSERT INTO social_fans/);
+  assert.match(v2Confirm, /INSERT INTO content_audience_analysis/);
+  assert.match(v2Confirm, /INSERT INTO social_comments/);
+  assert.match(v2Confirm, /d1\.batch/);
   assert.match(commentInsights, /FROM social_comments/);
   assert.match(commentInsights, /UPDATE social_comments/);
   assert.match(commentInsights, /analyzeComment/);
@@ -184,10 +191,36 @@ test("pages use database-backed API routes", async () => {
   assert.match(contentInsights, /contentFanRelations/);
   assert.match(contentDetail, /FROM social_posts/);
   assert.match(contentDetail, /FROM social_comments/);
-  assert.match(contentDetail, /trafficSources: \[\]/);
+  assert.match(contentDetail, /trafficSources: parseDistribution/);
+  assert.match(contentDetail, /FROM content_audience_analysis/);
   assert.match(fanInsights, /FROM social_fans/);
   assert.match(fanInsights, /FROM fan_growth_records/);
   assert.match(fanInsights, /FROM social_posts/);
+});
+
+test("Douyin V2.1 preview is database-free and blocks confirmation below 80 percent", async () => {
+  const [previewRoute, confirmRoute, collector, rawPreview, collectionModule] = await Promise.all([
+    readFile(new URL("app/api/collections/douyin-v2/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/douyin-v2/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/collector/page.tsx", root), "utf8"),
+    readFile(new URL("data/collection-previews/douyin-v2-dushanzi-2026-08-01_2026-08-07.json", root), "utf8"),
+    import(new URL("../lib/douyin-collection-v2.ts", import.meta.url)),
+  ]);
+  assert.doesNotMatch(previewRoute, /ensureDatabase|getD1|INSERT INTO/);
+  assert.match(previewRoute, /无落库预览/);
+  assert.ok(confirmRoute.indexOf("eligibleForConfirmation") < confirmRoute.indexOf("await ensureDatabase"));
+  assert.match(collector, /完整率未达 80%/);
+  assert.match(collector, /数据库写入为 0 条/);
+
+  const payload = collectionModule.normalizeDouyinCollectionV2(JSON.parse(rawPreview));
+  assert.ok(payload);
+  assert.equal(collectionModule.validateDouyinCollectionV2(payload).length, 0);
+  const summary = collectionModule.summarizeDouyinCollectionV2(payload);
+  assert.deepEqual(summary.completeness, { fans: 71.43, posts: 56.67, comments: 88.89, overall: 65.22, threshold: 80 });
+  assert.equal(summary.eligibleForConfirmation, false);
+  for (const field of ["粉丝增长趋势", "粉丝活跃时间", "作品1.观众性别", "作品2.平均播放时长", "作品3.评论热词"]) {
+    assert.ok(summary.failedFields.includes(field), field);
+  }
 });
 
 test("top content opens a real-data work analysis with separate tabs", async () => {

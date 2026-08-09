@@ -104,11 +104,28 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "该采集批次已经回滚" }, { status: 409 });
   }
 
-  const deleteRows = log.entity_type === "comment"
-    ? d1.prepare("DELETE FROM social_comments WHERE collection_log_id = ?").bind(id)
-    : d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id);
+  const deleteRows = log.entity_type === "douyin_v2"
+    ? [
+        d1.prepare("DELETE FROM social_comments WHERE collection_log_id = ?").bind(id),
+        d1.prepare("DELETE FROM content_audience_analysis WHERE collection_log_id = ?").bind(id),
+        d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id),
+        d1.prepare("DELETE FROM fan_growth_records WHERE collection_log_id = ?").bind(id),
+        d1.prepare("DELETE FROM social_fans WHERE collection_log_id = ?").bind(id),
+      ]
+    : [log.entity_type === "comment"
+        ? d1.prepare("DELETE FROM social_comments WHERE collection_log_id = ?").bind(id)
+        : d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id)];
   await d1.batch([
-    deleteRows,
+    ...deleteRows,
+    ...(log.entity_type === "douyin_v2" ? [d1.prepare(`
+      UPDATE social_accounts
+      SET followers_count = COALESCE((
+        SELECT fans_count FROM social_fans
+        WHERE social_fans.account_id = social_accounts.id
+        ORDER BY collected_at DESC, id DESC LIMIT 1
+      ), 0), updated_at = CURRENT_TIMESTAMP
+      WHERE platform = 'douyin'
+    `)] : []),
     d1
       .prepare(`
         UPDATE collection_logs
