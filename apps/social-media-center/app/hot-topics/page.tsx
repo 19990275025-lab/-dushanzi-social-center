@@ -16,6 +16,11 @@ type Topic = {
   ai_suggestion: string | null;
   status: string;
   created_at: string;
+  source_agent: string | null;
+  hot_score: number | null;
+  recommended_topic: string | null;
+  video_direction: string | null;
+  publish_time_suggestion: string | null;
 };
 
 type DouyinPreview = {
@@ -196,7 +201,7 @@ export default function HotTopicsPage() {
   return (
     <div className="page-stack hot-topic-page">
       <header className="page-heading compact-heading">
-        <div><p className="eyebrow">DOUYIN TREND INTELLIGENCE</p><h1>抖音热点监测中心</h1><p>采集抖音今日热榜，评估景区关联度，并将趋势转化为可执行选题。</p></div>
+        <div><p className="eyebrow">HOT TOPIC INTELLIGENCE</p><h1>新媒体热点监测中心</h1><p>接收外部 Agent 与抖音测试数据，评估景区关联度，并将趋势转化为可执行选题。</p></div>
         <div className="hot-heading-actions"><button className="secondary-button" onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? "收起表单" : "＋ 手工新增"}</button><button className="primary-button" onClick={() => void collectPreview()} disabled={collecting}>{collecting ? "采集中…" : "采集今日热点"}</button></div>
       </header>
 
@@ -220,7 +225,7 @@ export default function HotTopicsPage() {
         <section className="panel hot-form-panel">
           <div className="panel-heading"><div><span className="section-kicker">{editing ? "EDIT TOPIC" : "NEW TOPIC"}</span><h2>{editing ? "编辑热点" : "新增热点"}</h2></div><span className="section-note">关联程度由关键词、景区名称和历史作品自动计算</span></div>
           <form className="hot-topic-form" onSubmit={saveTopic} key={editing?.id ?? "new"}>
-            <label>平台<select name="platform" defaultValue={editing?.platform ?? "douyin"} required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option></select></label>
+            <label>平台<select name="platform" defaultValue={editing?.platform ?? "douyin"} required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option><option value="web">全网</option></select></label>
             <label className="hot-name-field">热点名称<input name="topicName" defaultValue={editing?.topic_name ?? ""} placeholder="例如：新疆自驾避暑路线" maxLength={500} required /></label>
             <label>关键词<input name="keyword" defaultValue={editing?.keyword ?? ""} placeholder="例如：新疆旅游" maxLength={255} required /></label>
             <label>热度<input name="heatValue" defaultValue={editing?.heat_value ?? ""} type="number" min="0" step="1" required /></label>
@@ -268,9 +273,9 @@ export default function HotTopicsPage() {
 
         <section className="panel data-panel hot-table-panel">
           <div className="panel-heading"><div><span className="section-kicker">HOT TOPICS</span><h2>热点列表</h2></div><span className="count-badge">{data.topics.length} 条</span></div>
-          <div className="table-wrap"><table className="hot-topic-table"><thead><tr><th>排名</th><th>平台</th><th>热点名称</th><th>关键词</th><th>热度</th><th>趋势</th><th>关联程度</th><th>AI 建议</th><th>状态</th><th>操作</th></tr></thead><tbody>
-            {data.topics.map((topic) => <tr key={topic.id}><td><strong>{topic.ranking ? `TOP ${topic.ranking}` : "—"}</strong></td><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><strong>{topic.topic_name}</strong><small className="topic-category">{topic.category || "未分类"}</small></td><td><span className="keyword-chip">{topic.keyword}</span></td><td className="metric-cell"><strong>{formatCompact(topic.heat_value)}</strong></td><td><span className={`trend-pill trend-${topic.trend}`}>{trendNames[topic.trend]}</span></td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td><td className="suggestion-cell">{topic.ai_suggestion || "—"}</td><td><span className={`topic-status status-${topic.status}`}>{statusNames[topic.status]}</span></td><td><div className="row-actions"><button onClick={() => openEdit(topic)}>编辑</button><button className="danger-link" onClick={() => void deleteTopic(topic)}>删除</button></div></td></tr>)}
-            {!data.topics.length && <tr><td className="empty-cell" colSpan={10}>暂无已确认热点。点击“采集今日热点”先生成预览。</td></tr>}
+          <div className="table-wrap"><table className="hot-topic-table"><thead><tr><th>排名</th><th>平台</th><th>热点名称</th><th>来源 Agent</th><th>热度</th><th>趋势</th><th>热点评分</th><th>关联程度</th><th>推荐选题</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            {data.topics.map((topic) => <tr key={topic.id}><td><strong>{topic.ranking ? `TOP ${topic.ranking}` : "—"}</strong></td><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><strong>{topic.topic_name}</strong><small className="topic-category">{topic.category || "未分类"}</small></td><td className="agent-source-cell">{topic.source_agent || "系统内置"}</td><td className="metric-cell"><strong>{formatCompact(topic.heat_value)}</strong></td><td><span className={`trend-pill trend-${topic.trend}`}>{trendNames[topic.trend]}</span></td><td><strong>{topic.hot_score === null ? "—" : Math.round(topic.hot_score)}</strong></td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td><td className="suggestion-cell"><strong>{topic.recommended_topic || topic.ai_suggestion || "—"}</strong>{topic.video_direction && <small>{topic.video_direction}</small>}{topic.publish_time_suggestion && <small>{topic.publish_time_suggestion}</small>}</td><td><span className={`topic-status status-${topic.status}`}>{statusNames[topic.status]}</span></td><td><div className="row-actions"><button onClick={() => openEdit(topic)}>编辑</button><button className="danger-link" onClick={() => void deleteTopic(topic)}>删除</button></div></td></tr>)}
+            {!data.topics.length && <tr><td className="empty-cell" colSpan={11}>暂无已确认热点，可通过外部 Agent 接口或抖音测试采集导入。</td></tr>}
           </tbody></table></div>
         </section>
       </>}

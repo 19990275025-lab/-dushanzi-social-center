@@ -232,6 +232,28 @@ test("pages use database-backed API routes", async () => {
   assert.doesNotMatch(fanInsights, /wechat_channels/);
 });
 
+test("external agents can import hot topics as JSON or Excel without collection logic", async () => {
+  const [route, module, schema, migration] = await Promise.all([
+    readFile(new URL("app/api/hot-topic/import/route.ts", root), "utf8"),
+    readFile(new URL("lib/external-hot-topic-import.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0012_external_agent_hot_topic_import.sql", root), "utf8"),
+  ]);
+  assert.match(route, /application\/json/);
+  assert.match(route, /multipart\/form-data/);
+  assert.match(route, /parseExternalHotTopicExcel/);
+  assert.match(route, /INSERT INTO hot_topics/);
+  assert.match(route, /source_agent/);
+  assert.match(route, /recommended_topic/);
+  assert.match(route, /publish_time_suggestion/);
+  assert.doesNotMatch(route, /playwright|douyin\.com|采集今日热点/);
+  assert.match(module, /sourceAgent/);
+  assert.match(module, /hotScore/);
+  assert.match(module, /videoDirection/);
+  assert.match(schema, /sourceAgent: text\("source_agent"\)/);
+  assert.match(migration, /CREATE VIEW `HOT_TOPIC_DATA`/);
+});
+
 test("Douyin V2.1 preview is database-free and blocks confirmation below 80 percent", async () => {
   const [previewRoute, confirmRoute, collector, rawPreview, collectionModule] = await Promise.all([
     readFile(new URL("app/api/collections/douyin-v2/route.ts", root), "utf8"),

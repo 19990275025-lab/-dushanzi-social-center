@@ -282,6 +282,12 @@ export const hotTopics = sqliteTable(
     status: text("status").notNull().default("active"),
     sourceUrl: text("source_url"),
     sourceRecordId: text("source_record_id"),
+    sourceAgent: text("source_agent"),
+    hotScore: real("hot_score"),
+    recommendedTopic: text("recommended_topic"),
+    videoDirection: text("video_direction"),
+    publishTimeSuggestion: text("publish_time_suggestion"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
     collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
       onDelete: "set null",
     }),
@@ -296,6 +302,7 @@ export const hotTopics = sqliteTable(
     index("idx_hot_topics_keyword").on(table.keyword),
     index("idx_hot_topics_platform_ranking").on(table.platform, table.ranking),
     uniqueIndex("uq_hot_topics_source_record").on(table.platform, table.sourceRecordId),
+    index("idx_hot_topics_source_agent_collect_time").on(table.sourceAgent, table.collectTime),
   ],
 );
 

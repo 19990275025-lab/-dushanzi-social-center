@@ -309,6 +309,9 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
 .import-status.status-completed { background: #e7f8f1; color: #0e8058; }
 .import-status.status-failed { background: #fdecee; color: #a23f48; }
 .import-status.status-deleted { background: #edf0ef; color: #6e7975; }
+.agent-source-cell { color: #557168; font-size: 10px; max-width: 150px; }
+.suggestion-cell small { color: #72817c; display: block; font-weight: 400; line-height: 1.55; margin-top: 5px; max-width: 320px; }
+.tag-web { background: #e8eef8; color: #365b8c; }
 .row-actions { display: flex; gap: 8px; white-space: nowrap; }
 .row-actions button { background: transparent; border: 0; color: #167a59; font-size: 9px; padding: 3px; }
 .row-actions .danger-link { color: #b44c55; }

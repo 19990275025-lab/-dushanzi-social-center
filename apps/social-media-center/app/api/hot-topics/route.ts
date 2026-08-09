@@ -2,7 +2,7 @@ import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { calculateRelevance, ruleBasedTopicEngine, type TopicForAnalysis } from "@/lib/hot-topic-engine";
 
-const platforms = new Set(["douyin", "kuaishou", "weibo"]);
+const platforms = new Set(["douyin", "kuaishou", "weibo", "web"]);
 const trends = new Set(["rising", "stable", "falling", "new"]);
 const statuses = new Set(["active", "paused", "archived"]);
 
@@ -13,6 +13,11 @@ type TopicRow = TopicForAnalysis & {
   status: string;
   collect_time: string;
   created_at: string;
+  source_agent: string | null;
+  hot_score: number | null;
+  recommended_topic: string | null;
+  video_direction: string | null;
+  publish_time_suggestion: string | null;
 };
 
 async function getHistoricalPosts() {
@@ -56,9 +61,11 @@ export async function GET() {
   const [topicResult, posts] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, topic_name, keyword, heat_value, trend, category,
-        ranking, related_degree, ai_suggestion, status, collect_time, created_at
+        ranking, related_degree, ai_suggestion, status, source_agent, hot_score,
+        recommended_topic, video_direction, publish_time_suggestion,
+        collect_time, created_at
       FROM hot_topics
-      WHERE platform IN ('douyin', 'kuaishou', 'weibo')
+      WHERE platform IN ('douyin', 'kuaishou', 'weibo', 'web')
       ORDER BY CASE WHEN ranking IS NULL THEN 1 ELSE 0 END, ranking ASC, heat_value DESC, created_at DESC, id DESC
       LIMIT 300
     `).all<TopicRow>(),

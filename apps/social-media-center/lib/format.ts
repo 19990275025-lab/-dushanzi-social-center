@@ -2,6 +2,7 @@ export const platformNames: Record<string, string> = {
   douyin: "抖音",
   kuaishou: "快手",
   weibo: "微博",
+  web: "全网",
 };
 
 export function platformLabel(platform: string) {

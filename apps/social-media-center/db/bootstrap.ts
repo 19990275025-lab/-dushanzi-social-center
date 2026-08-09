@@ -180,7 +180,7 @@ const schemaStatements = [
     ON social_comments(user_need)`,
   `CREATE TABLE IF NOT EXISTS hot_topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),
     topic_name TEXT NOT NULL,
     keyword TEXT NOT NULL,
     heat_value REAL NOT NULL DEFAULT 0,
@@ -192,6 +192,12 @@ const schemaStatements = [
     status TEXT NOT NULL DEFAULT 'active',
     source_url TEXT,
     source_record_id TEXT,
+    source_agent TEXT,
+    hot_score REAL,
+    recommended_topic TEXT,
+    video_direction TEXT,
+    publish_time_suggestion TEXT,
+    raw_payload TEXT,
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     collect_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -387,6 +393,24 @@ async function initialize() {
   if (!topicColumnNames.has("collection_log_id")) {
     await d1.prepare("ALTER TABLE hot_topics ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL").run();
   }
+  if (!topicColumnNames.has("source_agent")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN source_agent TEXT").run();
+  }
+  if (!topicColumnNames.has("hot_score")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN hot_score REAL").run();
+  }
+  if (!topicColumnNames.has("recommended_topic")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN recommended_topic TEXT").run();
+  }
+  if (!topicColumnNames.has("video_direction")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN video_direction TEXT").run();
+  }
+  if (!topicColumnNames.has("publish_time_suggestion")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN publish_time_suggestion TEXT").run();
+  }
+  if (!topicColumnNames.has("raw_payload")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN raw_payload TEXT").run();
+  }
   await d1.batch([
     d1.prepare("UPDATE hot_topics SET keyword = topic_name WHERE keyword IS NULL OR trim(keyword) = ''"),
     d1.prepare("UPDATE hot_topics SET created_at = COALESCE(collect_time, CURRENT_TIMESTAMP) WHERE created_at IS NULL"),
@@ -394,6 +418,14 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_ranking ON hot_topics(platform, ranking)"),
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_source_record ON hot_topics(platform, source_record_id) WHERE source_record_id IS NOT NULL"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_source_agent_collect_time ON hot_topics(source_agent, collect_time DESC)"),
+    d1.prepare("DROP VIEW IF EXISTS HOT_TOPIC_DATA"),
+    d1.prepare(`CREATE VIEW HOT_TOPIC_DATA AS
+      SELECT id, platform, topic_name, keyword, heat_value, ranking, trend, category,
+        related_degree, hot_score, ai_suggestion, recommended_topic, video_direction,
+        publish_time_suggestion, source_agent, source_url, source_record_id,
+        status, collect_time, created_at
+      FROM hot_topics`),
   ]);
 
   await d1.prepare("PRAGMA optimize").run();

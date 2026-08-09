@@ -64,6 +64,12 @@ Excel 支持以下字段名：`标题`、`平台`、`发布时间`、`播放量`
 
 抖音热点监测中心 V1.0 使用当前已登录 Chrome 环境读取抖音官方今日热榜。系统先通过 `GET /api/hot-topics/douyin/preview` 返回标准化预览（官方 TOP10 展示、Top50 机会分析），不会直接写库；只有用户在页面明确确认后才调用 `POST /api/hot-topics/douyin/confirm`，批量更新 `hot_topics` 并记录 `collection_logs`。`hot_topics` 新增 `ranking`、`source_url`、`source_record_id` 与 `collection_log_id`，首次采集无历史快照时趋势标记为 `new`，不生成虚假涨跌。当前阶段仅支持抖音。
 
+### 外部 Agent 热点接入
+
+`POST /api/hot-topic/import` 接收 WorkBuddy 等外部 Agent 提供的热点数据，本系统不在该接口内执行采集。接口支持 JSON，以及 `multipart/form-data` 上传的 XLSX/XLS；Excel 文件字段支持中英文表头。必填字段为 `source_agent`、`platform`、`topic_name`、`heat_value`，平台可使用 `douyin`、`kuaishou`、`weibo`、`web`（也接受“抖音、快手、微博、全网”）。单次最多 500 条，Excel 最大 5MB，任一行校验失败时整批拒绝。
+
+所有数据写入统一热点表 `hot_topics`，并通过只读逻辑数据集 `HOT_TOPIC_DATA` 对外表达。系统保存 `source_agent` 和原始载荷，自动生成热点评分、景区关联度、推荐选题、视频方向与发布时间建议；同平台同名热点再次导入时更新原记录。可选配置 `EXTERNAL_AGENT_API_KEY`，配置后调用方必须传入 `x-agent-key` 请求头。`GET /api/hot-topic/import` 返回字段规范和 JSON 示例。
+
 当前 `recommendationEngine` 为 `rules-v1`。接口响应预留 `/api/v1/social/ai/topic-recommendations` 作为未来大模型适配路径，但 V1.0 不调用外部模型，也不实现自动采集。
 
 ## AI 内容分析中心 V1.0

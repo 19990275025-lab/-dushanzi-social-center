@@ -2,6 +2,7 @@ export const supportedPlatforms = [
   "douyin",
   "kuaishou",
   "weibo",
+  "web",
 ] as const;
 
 export type SupportedPlatform = (typeof supportedPlatforms)[number];
