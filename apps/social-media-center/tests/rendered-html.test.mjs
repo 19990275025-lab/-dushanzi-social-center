@@ -62,16 +62,18 @@ test("content and fan insights switch platform themes without changing the app b
   assert.match(content, /`\$\{currentPlatformLabel\}内容监测`/);
   assert.match(content, /content-platform-grid/);
   assert.match(content, /content-platform-card/);
-  assert.match(content, /四平台汇总/);
+  assert.match(content, /三平台汇总/);
   assert.match(fans, /`\$\{currentPlatformLabel\}粉丝分析`/);
   assert.match(fans, /platform: "all"/);
-  for (const theme of ["theme-douyin", "theme-kuaishou", "theme-weibo", "theme-wechat_channels"]) assert.match(styles, new RegExp(theme));
+  for (const theme of ["theme-douyin", "theme-kuaishou", "theme-weibo"]) assert.match(styles, new RegExp(theme));
   const themeStyles = styles.slice(styles.indexOf("/* 内容与用户洞察的平台主题"), styles.indexOf(".loading-panel"));
   assert.doesNotMatch(themeStyles, /linear-gradient/);
   assert.match(styles, /theme-douyin[^}]+#ef2b55[^}]+#20cfe1[^}]+#171a1f/);
   assert.match(styles, /theme-kuaishou[^}]+#f26522[^}]+#ffc33d/);
   assert.match(styles, /theme-weibo[^}]+#d9273f/);
-  assert.match(styles, /theme-wechat_channels[^}]+#08a957[^}]+#ff8a34/);
+  assert.doesNotMatch(content, /wechat_channels|视频号/);
+  assert.doesNotMatch(fans, /wechat_channels|视频号/);
+  assert.doesNotMatch(styles, /platform-themed-page\.theme-wechat_channels/);
 });
 
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {
@@ -199,6 +201,7 @@ test("pages use database-backed API routes", async () => {
   assert.match(contentInsights, /industryComparison/);
   assert.match(contentInsights, /dailyReport/);
   assert.match(contentInsights, /contentFanRelations/);
+  assert.doesNotMatch(contentInsights, /"wechat_channels"/);
   assert.match(contentDetail, /FROM social_posts/);
   assert.match(contentDetail, /FROM social_comments/);
   assert.match(contentDetail, /trafficSources: parseDistribution/);
@@ -208,6 +211,7 @@ test("pages use database-backed API routes", async () => {
   assert.match(fanInsights, /trendPeriod/);
   assert.match(fanInsights, /strategies/);
   assert.match(fanInsights, /FROM social_posts/);
+  assert.doesNotMatch(fanInsights, /wechat_channels/);
 });
 
 test("Douyin V2.1 preview is database-free and blocks confirmation below 80 percent", async () => {

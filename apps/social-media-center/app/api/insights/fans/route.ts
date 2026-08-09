@@ -2,12 +2,11 @@ import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { resolveDateRange } from "@/lib/date-range";
 
-const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
+const platforms = ["douyin", "kuaishou", "weibo"] as const;
 const strategies = {
   douyin: { positioning: "流量获取与爆款内容", actions: ["复用高完播作品的前三秒结构", "围绕热点连续发布同主题短视频", "用评论问题提升推荐流互动"] },
   kuaishou: { positioning: "用户关系与直播互动", actions: ["强化主播和游客的真实互动", "用固定直播时段培养观看习惯", "通过评论回复维护熟人关系"] },
   weibo: { positioning: "品牌传播与热点运营", actions: ["结合城市与旅游热点输出品牌观点", "用图文长帖沉淀完整攻略", "联动文旅账号扩大话题传播"] },
-  wechat_channels: { positioning: "私域沉淀与游客复购", actions: ["将活动内容同步至公众号和社群", "突出家庭与老游客的复游场景", "设计可转发的路线与服务卡片"] },
 } as const;
 
 type AccountRow = { id: number; platform: string; followers_count: number };

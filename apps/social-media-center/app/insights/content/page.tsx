@@ -5,7 +5,7 @@ import { formatCompact, formatDate, platformLabel } from "@/lib/format";
 import { dateRangeQuery } from "@/lib/date-range";
 import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
-const platformOptions = ["all", "douyin", "kuaishou", "weibo", "wechat_channels"];
+const platformOptions = ["all", "douyin", "kuaishou", "weibo"];
 const contentTypeLabels: Record<string, string> = { video: "短视频", image_text: "图文", live: "直播", article: "文章" };
 type Overview = { platform: string; postCount: number; totalViews: number; interactions: number; fansGrowth: number; followers: number };
 type Category = { category: string; postCount: number; views: number; interactions: number; ratio: number };
@@ -67,7 +67,7 @@ export default function ContentMonitoringPage() {
     </header>
 
     <section className="content-platform-grid" aria-label="内容监测平台筛选">
-      {platformCards.map((item) => <button aria-pressed={platform === item.platform} className={`fan-platform-card content-platform-card platform-${item.platform} ${platform === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setPlatform(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{platform === item.platform ? "当前平台" : item.platform === "all" ? "四平台汇总" : item.postCount ? "已有作品数据" : "等待数据"}</small></div><strong>{item.postCount}<em>作品</em></strong><p><span>播放 {formatCompact(item.totalViews)}</span><span>互动 {formatCompact(item.interactions)}</span></p></button>)}
+      {platformCards.map((item) => <button aria-pressed={platform === item.platform} className={`fan-platform-card content-platform-card platform-${item.platform} ${platform === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setPlatform(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{platform === item.platform ? "当前平台" : item.platform === "all" ? "三平台汇总" : item.postCount ? "已有作品数据" : "等待数据"}</small></div><strong>{item.postCount}<em>作品</em></strong><p><span>播放 {formatCompact(item.totalViews)}</span><span>互动 {formatCompact(item.interactions)}</span></p></button>)}
     </section>
 
     <section className="monitor-metric-grid">

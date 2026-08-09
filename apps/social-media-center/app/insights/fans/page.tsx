@@ -5,7 +5,7 @@ import { formatCompact, formatDate, platformLabel } from "@/lib/format";
 import { dateRangeQuery } from "@/lib/date-range";
 import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 
-const platforms = ["all", "douyin", "kuaishou", "weibo", "wechat_channels"];
+const platforms = ["all", "douyin", "kuaishou", "weibo"];
 const trendOptions = [{ value: "7d", label: "7天" }, { value: "30d", label: "30天" }, { value: "month", label: "自然月" }];
 type Distribution = { label: string; value: number };
 type Trend = { record_date: string; fans_count: number; net_growth: number; new_fans: number; lost_fans: number; source_type: string };
@@ -28,7 +28,7 @@ function aggregatePlatforms(items: FanPlatform[]): FanPlatform {
   const trend = [...trendMap.values()].sort((a, b) => a.record_date.localeCompare(b.record_date));
   const fansCount = items.reduce((sum, item) => sum + item.fansCount, 0);
   const netGrowth = items.reduce((sum, item) => sum + item.netGrowth, 0);
-  return { platform: "all", fansCount, netGrowth, newFans: items.reduce((sum, item) => sum + item.newFans, 0), growthRate: fansCount - netGrowth > 0 ? Number(((netGrowth / (fansCount - netGrowth)) * 100).toFixed(2)) : 0, trend, trendSource: "四平台增长记录汇总", strategy: { positioning: "分平台制定运营策略", actions: ["选择具体平台查看定位建议"] }, profile: null };
+  return { platform: "all", fansCount, netGrowth, newFans: items.reduce((sum, item) => sum + item.newFans, 0), growthRate: fansCount - netGrowth > 0 ? Number(((netGrowth / (fansCount - netGrowth)) * 100).toFixed(2)) : 0, trend, trendSource: "三平台增长记录汇总", strategy: { positioning: "分平台制定运营策略", actions: ["选择具体平台查看定位建议"] }, profile: null };
 }
 
 export default function FanAnalysisCenterPage() {
@@ -56,8 +56,8 @@ export default function FanAnalysisCenterPage() {
   const weeklyReport = {
     change: `${currentPlatformLabel}粉丝净增长 ${current.netGrowth >= 0 ? "+" : ""}${formatCompact(current.netGrowth)}，新增粉丝 ${formatCompact(current.newFans)}。`,
     issue: current.trend.length === 0 ? "当前周期缺少连续增长记录，暂不能判断增长稳定性。" : current.growthRate <= 0 ? "粉丝净增长未转正，需要复盘内容触达与取关原因。" : "粉丝保持增长，应继续验证增长来源是否可持续。",
-    suggestion: selected === "all" ? "分别进入四个平台，按平台定位制定差异化运营动作。" : current.strategy.actions[0],
-    nextWeek: selected === "all" ? "完成四平台粉丝画像和增长记录补采。" : `围绕“${current.strategy.positioning}”执行 1 个重点动作，并在下周复盘增长率。`,
+    suggestion: selected === "all" ? "分别进入三个平台，按平台定位制定差异化运营动作。" : current.strategy.actions[0],
+    nextWeek: selected === "all" ? "完成三平台粉丝画像和增长记录补采。" : `围绕“${current.strategy.positioning}”执行 1 个重点动作，并在下周复盘增长率。`,
   };
 
   return <div className={`page-stack fan-analysis-center-page fan-insights-page platform-themed-page theme-${selected}`}>
@@ -67,7 +67,7 @@ export default function FanAnalysisCenterPage() {
     </header>
 
     <section className="fan-platform-grid">
-      {platformData.map((item) => <button aria-pressed={selected === item.platform} className={`fan-platform-card platform-${item.platform} ${selected === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setSelected(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{selected === item.platform ? "当前平台" : item.platform === "all" ? "四平台汇总" : item.profile ? "画像已采集" : "画像待采集"}</small></div><strong>{formatCompact(item.fansCount)}<em>粉丝</em></strong><p className={item.netGrowth >= 0 ? "growth-up" : "growth-down"}>{item.netGrowth >= 0 ? "+" : ""}{formatCompact(item.netGrowth)} 净增长</p></button>)}
+      {platformData.map((item) => <button aria-pressed={selected === item.platform} className={`fan-platform-card platform-${item.platform} ${selected === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setSelected(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{selected === item.platform ? "当前平台" : item.platform === "all" ? "三平台汇总" : item.profile ? "画像已采集" : "画像待采集"}</small></div><strong>{formatCompact(item.fansCount)}<em>粉丝</em></strong><p className={item.netGrowth >= 0 ? "growth-up" : "growth-down"}>{item.netGrowth >= 0 ? "+" : ""}{formatCompact(item.netGrowth)} 净增长</p></button>)}
     </section>
 
     <nav className="insight-platform-tabs fan-tabs" aria-label="粉丝分析平台筛选">{platforms.map((item) => <button aria-pressed={selected === item} className={`${selected === item ? "active" : ""} platform-tab-${item}`} key={item} onClick={() => setSelected(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}</nav>

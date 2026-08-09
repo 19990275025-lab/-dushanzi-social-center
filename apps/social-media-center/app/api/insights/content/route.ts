@@ -3,7 +3,7 @@ import { getD1 } from "@/db";
 import { resolveDateRange } from "@/lib/date-range";
 import { ruleBasedContentEngine, type AnalysisPost, type AnalysisTopic } from "@/lib/content-analysis-engine";
 
-const platforms = ["douyin", "kuaishou", "weibo", "wechat_channels"] as const;
+const platforms = ["douyin", "kuaishou", "weibo"] as const;
 const targetCompetitors = ["那拉提景区", "喀纳斯景区", "天山天池", "赛里木湖"];
 const contentTypeNames: Record<string, string> = { video: "短视频", image_text: "图文", text: "文字", article: "文章", live: "直播" };
 
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     `).bind(range.from, range.to).all<CompetitorPostRow>(),
   ]);
 
-  const allPosts = postResult.results;
+  const allPosts = postResult.results.filter((post) => platforms.includes(post.platform as (typeof platforms)[number]));
   const selectedPosts = platform === "all" ? allPosts : allPosts.filter((post) => post.platform === platform);
   const analyzed = ruleBasedContentEngine.analyzePosts(selectedPosts.map((post) => ({ ...post, hashtags: parseHashtags(post.hashtags) })), topicResult.results);
   const scoreById = new Map(analyzed.map((post) => [post.id, post]));
@@ -126,7 +126,8 @@ export async function GET(request: Request) {
     totals.fansGrowth <= 0 ? "同步采集作品涨粉，建立内容效果与粉丝变化的关联。" : "围绕涨粉贡献最高的内容类型增加同主题连续发布。",
   ];
 
-  const comparisonNames = [...new Set([...targetCompetitors, ...competitorResult.results.map((row) => row.account_name)])];
+  const competitorPosts = competitorResult.results.filter((row) => platforms.includes(row.platform as (typeof platforms)[number]));
+  const comparisonNames = [...new Set([...targetCompetitors, ...competitorPosts.map((row) => row.account_name)])];
   const industryComparison = [
     {
       accountName: "独山子大峡谷",
@@ -138,7 +139,7 @@ export async function GET(request: Request) {
       status: totals.postCount ? "已接入" : "待采集",
     },
     ...comparisonNames.map((accountName) => {
-      const rows = competitorResult.results.filter((row) => row.account_name === accountName && (platform === "all" || row.platform === platform));
+      const rows = competitorPosts.filter((row) => row.account_name === accountName && (platform === "all" || row.platform === platform));
       const views = rows.reduce((sum, row) => sum + row.views, 0);
       const interactions = rows.reduce((sum, row) => sum + interactionCount(row), 0);
       const averageViews = rows.length ? Math.round(views / rows.length) : 0;

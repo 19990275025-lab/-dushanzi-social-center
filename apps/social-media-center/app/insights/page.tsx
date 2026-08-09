@@ -24,7 +24,7 @@ export default function InsightsHomePage() {
           <div className="entry-icon">粉</div>
           <p>FAN ANALYSIS</p>
           <h2>粉丝分析</h2>
-          <small>查看四平台粉丝量、增长趋势、地域、年龄、兴趣及活跃时间画像。</small>
+          <small>查看抖音、快手、微博粉丝量、增长趋势、地域、年龄、兴趣及活跃时间画像。</small>
           <strong>进入粉丝分析 <i>→</i></strong>
         </a>
       </section>

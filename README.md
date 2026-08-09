@@ -27,7 +27,7 @@
 | [新媒体运营中心 V1.0 架构设计](docs/social-media-center-v1-architecture.md) | AI 营销中台新增模块的架构、页面、API 与阶段规划 |
 | [新媒体运营数据库 V1.0](docs/social-media-database-v1.md) | 六张核心表、关系、迁移、测试数据与自动采集预留说明 |
 | [新媒体运营驾驶舱 V1.0](apps/social-media-center/README.md) | 平台总览、内容分析和任务管理的可运行页面 |
-| [内容监测中心 V1.0](apps/social-media-center/README.md#内容监测中心-v10) | 四平台作品监测、内容分类、同行对比和 AI 每日报告 |
+| [内容监测中心 V1.0](apps/social-media-center/README.md#内容监测中心-v10) | 抖音、快手、微博作品监测、内容分类、同行对比和 AI 每日报告 |
 | [粉丝分析中心 V1.0](apps/social-media-center/README.md#粉丝分析中心-v10) | 粉丝总览、增长周期、画像、平台定位和 AI 周报 |
 | [新媒体智能数据导入中心 V1.0](apps/social-media-center/README.md#数据导入中心-v10) | Excel 预览确认、图片留档、导入记录与安全回滚 |
 | [新媒体热点监测中心 V1.0](apps/social-media-center/README.md#热点监测中心-v10) | 热点管理、TOP10、景区关联评分与规则型 AI 选题推荐 |
