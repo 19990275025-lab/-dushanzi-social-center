@@ -91,7 +91,10 @@ export async function POST(request: Request) {
     SELECT title, hashtags FROM social_posts
     ORDER BY publish_time DESC, id DESC LIMIT 300
   `).all<{ title: string; hashtags: string | null }>();
-  const historicalText = posts.results.map((post) => `${post.title} ${post.hashtags ?? ""}`).join(" ");
+  const historicalText = [
+    ...posts.results.map((post) => `${post.title} ${post.hashtags ?? ""}`),
+    ...parsed.rows.map((topic) => `${topic.topicTitle} ${topic.keyword} ${topic.category ?? ""}`),
+  ].join(" ");
   const analyzed = parsed.rows.map((topic) => ({ topic, ai: analyzeWorkBuddyTopic(topic, historicalText) }));
 
   try {
