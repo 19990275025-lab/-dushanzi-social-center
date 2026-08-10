@@ -249,6 +249,8 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.match(route, /parseWorkBuddyExcel/);
   assert.match(route, /source_agent/);
   assert.match(route, /INSERT INTO HOT_TOPIC_DATA/);
+  assert.match(route, /replace_existing/);
+  assert.match(route, /DELETE FROM HOT_TOPIC_DATA WHERE source_agent = \?/);
   assert.match(route, /WorkBuddy热点监测Agent|WORKBUDDY_SOURCE_AGENT/);
   assert.doesNotMatch(route, /playwright|douyin\.com|采集今日热点/);
   assert.match(module, /sourceAgent/);

@@ -38,22 +38,25 @@ async function requestRows(request: Request) {
     if (extension === "json") {
       const raw = JSON.parse(await file.text()) as unknown;
       if (!Array.isArray(raw)) throw new Error("WorkBuddy JSON 顶层必须是数组");
-      return { ...parseWorkBuddyRows(raw as Array<Record<string, unknown>>), fileName: file.name, importType: "json" };
+      return { ...parseWorkBuddyRows(raw as Array<Record<string, unknown>>), fileName: file.name, importType: "json", replaceExisting: false };
     }
     if (extension && excelExtensions.has(extension)) {
-      return { ...parseWorkBuddyExcel(await file.arrayBuffer()), fileName: file.name, importType: "excel" };
+      return { ...parseWorkBuddyExcel(await file.arrayBuffer()), fileName: file.name, importType: "excel", replaceExisting: false };
     }
     throw new Error("仅支持 JSON、XLSX 或 XLS 文件");
   }
 
   if (!contentType.includes("application/json")) throw new Error("Content-Type 仅支持 application/json 或 multipart/form-data");
   const payload = await request.json() as unknown;
+  const replaceExisting = !Array.isArray(payload)
+    && payload && typeof payload === "object"
+    && (payload as { replace_existing?: unknown }).replace_existing === true;
   const rawRows = Array.isArray(payload)
     ? payload
     : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)
       ? (payload as { data: Array<Record<string, unknown>> }).data
       : [];
-  return { ...parseWorkBuddyRows(rawRows as Array<Record<string, unknown>>), fileName: null, importType: "json" };
+  return { ...parseWorkBuddyRows(rawRows as Array<Record<string, unknown>>), fileName: null, importType: "json", replaceExisting };
 }
 
 export async function OPTIONS() {
@@ -98,7 +101,7 @@ export async function POST(request: Request) {
   const analyzed = parsed.rows.map((topic) => ({ topic, ai: analyzeWorkBuddyTopic(topic, historicalText) }));
 
   try {
-    await d1.batch(analyzed.map(({ topic, ai }) => d1.prepare(`
+    const writeStatements = analyzed.map(({ topic, ai }) => d1.prepare(`
       INSERT INTO HOT_TOPIC_DATA
         (platform, rank, topic_title, heat_value, keyword, url, publish_time,
          category, source_agent, ai_relevance_score, ai_analysis, ai_recommendation)
@@ -114,7 +117,10 @@ export async function POST(request: Request) {
       ai.relevanceScore,
       JSON.stringify({ worthFollowing: ai.worthFollowing, worthFollowingLabel: ai.worthFollowingLabel, analysis: ai.analysis }),
       JSON.stringify({ shootingDirection: ai.shootingDirection, shortVideoTitle: ai.shortVideoTitle, liveTheme: ai.liveTheme }),
-    )));
+    ));
+    await d1.batch(parsed.replaceExisting
+      ? [d1.prepare("DELETE FROM HOT_TOPIC_DATA WHERE source_agent = ?").bind(WORKBUDDY_SOURCE_AGENT), ...writeStatements]
+      : writeStatements);
   } catch (error) {
     console.error("WorkBuddy hot topic import failed", error);
     return json({ error: "WorkBuddy热点批量写入失败，未产生部分写入" }, { status: 500 });
@@ -129,5 +135,6 @@ export async function POST(request: Request) {
     receivedCount: parsed.totalRows,
     successCount: analyzed.length,
     errorCount: 0,
+    replaceExisting: parsed.replaceExisting,
   }, { status: 201 });
 }

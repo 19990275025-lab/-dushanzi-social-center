@@ -74,6 +74,8 @@ AI 热点分析综合当前 WorkBuddy 热点、独山子大峡谷景区资源与
 
 `POST /api/hot-topic/import` 接收 WorkBuddy 等外部 Agent 提供的热点数据，本系统不在该接口内执行采集。接口支持 JSON，以及 `multipart/form-data` 上传的 XLSX/XLS；Excel 文件字段支持中英文表头。必填字段为 `source_agent`、`platform`、`topic_name`、`heat_value`，平台可使用 `douyin`、`kuaishou`、`weibo`、`web`（也接受“抖音、快手、微博、全网”）。单次最多 500 条，Excel 最大 5MB，任一行校验失败时整批拒绝。
 
+日常 Agent 调用保持增量更新语义不变。经过人工核验的 JSON 可显式传入 `replace_existing: true`，系统会在同一个 D1 批处理中替换 WorkBuddy 当前快照；任一写入失败时整批回滚，避免出现先清空后写入失败的中间状态。
+
 AI Agent数据接入中心 V1.0 使用独立实体表 `HOT_TOPIC_DATA` 保存 WorkBuddy 热点。字段包括平台、排名、热点标题、原始热度、关键词、链接、发布时间、分类、来源 Agent，以及 AI 关联评分、分析和推荐。`source_agent` 由接收服务固定为“WorkBuddy热点监测Agent”，同来源、同平台、同标题和同发布时间的数据重复导入时更新原记录。
 
 本机导入服务 `scripts/import-workbuddy-hot-topics.mjs` 会读取 `~/Desktop/景区AI营销数据/hot_topics/` 中日期最新的 `hot_topic_YYYYMMDD.json`，校验后提交至 `POST /api/hot-topic/import`。运行 `pnpm import:workbuddy-hot-topics -- --dry-run` 可仅检查最新文件而不写库；正式导入可配置 `WORKBUDDY_API_BASE_URL`、`WORKBUDDY_AGENT_KEY`，私有站点机器调用还需 `WORKBUDDY_SITES_BEARER_TOKEN`。该服务不访问抖音、快手、微博或其他平台，不包含采集功能。
