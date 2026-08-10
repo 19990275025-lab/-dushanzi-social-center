@@ -268,6 +268,29 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.doesNotMatch(localService, /playwright|douyin\.com|weibo\.com|kuaishou\.com/);
 });
 
+test("hot topic center filters platforms and Douyin ranking categories", async () => {
+  const [page, api, agentApi, schema, migration] = await Promise.all([
+    readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/hot-topics/route.ts", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-data/route.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0014_hot_topic_platform_categories.sql", root), "utf8"),
+  ]);
+  for (const label of ["全部热点", "抖音热点", "快手热点", "微博热点", "热点榜", "种草榜", "挑战榜"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(api, /searchParams/);
+  assert.match(api, /platform = \?/);
+  assert.match(api, /topic_type = \?/);
+  assert.match(agentApi, /WHERE platform = \?/);
+  for (const label of ["互联网趋势分析", "短视频内容机会", "互动运营建议", "品牌传播建议"]) {
+    assert.match(api, new RegExp(label));
+  }
+  assert.match(schema, /topicType: text\("topic_type"\)/);
+  assert.match(schema, /source: text\("source"\)/);
+  assert.match(migration, /idx_hot_topics_platform_type_ranking/);
+});
+
 test("Douyin V2.1 preview is database-free and blocks confirmation below 80 percent", async () => {
   const [previewRoute, confirmRoute, collector, rawPreview, collectionModule] = await Promise.all([
     readFile(new URL("app/api/collections/douyin-v2/route.ts", root), "utf8"),

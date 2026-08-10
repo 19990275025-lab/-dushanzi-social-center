@@ -271,6 +271,8 @@ export const hotTopics = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     platform: text("platform").notNull(),
+    topicType: text("topic_type").notNull().default("hot_rank"),
+    source: text("source").notNull().default("system"),
     topicName: text("topic_name").notNull(),
     keyword: text("keyword").notNull(),
     heatValue: real("heat_value").notNull().default(0),
@@ -301,6 +303,7 @@ export const hotTopics = sqliteTable(
     index("idx_hot_topics_status_heat").on(table.status, table.heatValue),
     index("idx_hot_topics_keyword").on(table.keyword),
     index("idx_hot_topics_platform_ranking").on(table.platform, table.ranking),
+    index("idx_hot_topics_platform_type_ranking").on(table.platform, table.topicType, table.ranking),
     uniqueIndex("uq_hot_topics_source_record").on(table.platform, table.sourceRecordId),
     index("idx_hot_topics_source_agent_collect_time").on(table.sourceAgent, table.collectTime),
   ],

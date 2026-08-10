@@ -31,11 +31,12 @@ export async function POST(request: Request) {
   try {
     await d1.batch(preview.topics.map((topic) => d1.prepare(`
       INSERT INTO hot_topics
-        (platform, topic_name, keyword, heat_value, ranking, trend, category,
+        (platform, topic_type, source, topic_name, keyword, heat_value, ranking, trend, category,
          related_degree, ai_suggestion, status, source_url, source_record_id,
          collection_log_id, collect_time, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      VALUES (?, 'hot_rank', '抖音官方热榜', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       ON CONFLICT(platform, topic_name) DO UPDATE SET
+        topic_type = excluded.topic_type, source = excluded.source,
         keyword = excluded.keyword, heat_value = excluded.heat_value,
         ranking = excluded.ranking, trend = excluded.trend, category = excluded.category,
         related_degree = excluded.related_degree, ai_suggestion = excluded.ai_suggestion,

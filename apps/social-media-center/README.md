@@ -58,9 +58,11 @@ Excel 支持以下字段名：`标题`、`平台`、`发布时间`、`播放量`
 
 该能力已嵌入 `/collector` 的“数据导入”Tab。原 `/imports` 页面继续保留并复用同一个 `DataImportPanel`，用于兼容旧链接，不在左侧菜单重复展示。
 
-## 热点监测中心 V1.0
+## 热点监测中心 V2.0
 
 `hot_topics` 在原有字段上增加 `keyword`、`status` 与 `created_at`，保留 `collect_time` 作为最近采集或编辑时间，确保驾驶舱已有查询兼容。关联度由服务端规则引擎根据热点关键词、景区名称和 `social_posts` 历史标题/标签计算；选题推荐返回标题、内容方向、适合平台和拍摄建议。
+
+页面顶部按“全部热点、抖音热点、快手热点、微博热点”分类，`GET /api/hot-topics?platform=` 在服务端完成平台过滤；抖音进一步支持 `topicType=hot_rank|planting_rank|challenge_rank`，对应热点榜、种草榜和挑战榜。`hot_topics` 新增 `topic_type` 与 `source`，并建立 `(platform, topic_type, ranking)` 查询索引。全网、抖音、快手、微博分别输出互联网趋势分析、短视频内容机会、互动运营建议和品牌传播建议。
 
 抖音热点监测中心 V1.0 使用当前已登录 Chrome 环境读取抖音官方今日热榜。系统先通过 `GET /api/hot-topics/douyin/preview` 返回标准化预览（官方 TOP10 展示、Top50 机会分析），不会直接写库；只有用户在页面明确确认后才调用 `POST /api/hot-topics/douyin/confirm`，批量更新 `hot_topics` 并记录 `collection_logs`。`hot_topics` 新增 `ranking`、`source_url`、`source_record_id` 与 `collection_log_id`，首次采集无历史快照时趋势标记为 `new`，不生成虚假涨跌。当前阶段仅支持抖音。
 

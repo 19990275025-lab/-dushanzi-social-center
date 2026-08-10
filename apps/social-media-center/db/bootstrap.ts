@@ -181,6 +181,8 @@ const schemaStatements = [
   `CREATE TABLE IF NOT EXISTS hot_topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),
+    topic_type TEXT NOT NULL DEFAULT 'hot_rank' CHECK (topic_type IN ('hot_rank','planting_rank','challenge_rank')),
+    source TEXT NOT NULL DEFAULT 'system',
     topic_name TEXT NOT NULL,
     keyword TEXT NOT NULL,
     heat_value REAL NOT NULL DEFAULT 0,
@@ -437,12 +439,20 @@ async function initialize() {
   if (!topicColumnNames.has("raw_payload")) {
     await d1.prepare("ALTER TABLE hot_topics ADD COLUMN raw_payload TEXT").run();
   }
+  if (!topicColumnNames.has("topic_type")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN topic_type TEXT NOT NULL DEFAULT 'hot_rank'").run();
+  }
+  if (!topicColumnNames.has("source")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN source TEXT NOT NULL DEFAULT 'system'").run();
+  }
   await d1.batch([
     d1.prepare("UPDATE hot_topics SET keyword = topic_name WHERE keyword IS NULL OR trim(keyword) = ''"),
     d1.prepare("UPDATE hot_topics SET created_at = COALESCE(collect_time, CURRENT_TIMESTAMP) WHERE created_at IS NULL"),
+    d1.prepare("UPDATE hot_topics SET source = COALESCE(NULLIF(source_agent, ''), NULLIF(source_url, ''), source) WHERE source = 'system'"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_status_heat ON hot_topics(status, heat_value DESC)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_ranking ON hot_topics(platform, ranking)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_type_ranking ON hot_topics(platform, topic_type, ranking)"),
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_source_record ON hot_topics(platform, source_record_id) WHERE source_record_id IS NOT NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_source_agent_collect_time ON hot_topics(source_agent, collect_time DESC)"),
   ]);
