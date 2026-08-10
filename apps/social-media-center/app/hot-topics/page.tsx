@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 import { platformLabel } from "@/lib/format";
 
 type AgentHotTopic = {
@@ -103,7 +104,12 @@ function topicTrend() {
   return "首次采集";
 }
 
+function topicDate(value: string | null) {
+  return value?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
+}
+
 export default function HotTopicsPage() {
+  const range = useGlobalDateRange({ defaultPreset: "today", scope: "hot-topics" });
   const [topics, setTopics] = useState<AgentHotTopic[]>([]);
   const [activePlatform, setActivePlatform] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -133,11 +139,16 @@ export default function HotTopicsPage() {
     return () => window.clearTimeout(timer);
   }, [loadTopics]);
 
-  const filteredTopics = useMemo(() => topics
+  const topicsInRange = useMemo(() => topics.filter((topic) => {
+    const date = topicDate(topic.publish_time);
+    return date !== null && date >= range.from && date <= range.to;
+  }), [topics, range.from, range.to]);
+
+  const filteredTopics = useMemo(() => topicsInRange
     .filter((topic) => activePlatform === "all"
       || (activePlatform === "other" ? !primaryPlatforms.has(topic.platform) : topic.platform === activePlatform))
     .sort((a, b) => a.rank - b.rank || b.id - a.id)
-    .slice(0, 20), [topics, activePlatform]);
+    .slice(0, 20), [topicsInRange, activePlatform]);
 
   const recommendations = useMemo(() => filteredTopics
     .map(parseAnalysis)
@@ -251,7 +262,7 @@ export default function HotTopicsPage() {
       <section className="panel workbuddy-top20-panel">
         <div className="panel-heading">
           <div><span className="section-kicker">WORKBUDDY TOP 20</span><h2>{currentLabel} TOP20</h2></div>
-          <div className="hot-source-meta"><strong>WorkBuddy热点监测Agent</strong><span>当前显示 {filteredTopics.length} / 共 {topics.length} 条</span></div>
+          <div className="hot-source-meta"><strong>WorkBuddy热点监测Agent</strong><span>{range.from} — {range.to} · 当前显示 {filteredTopics.length} / 周期内 {topicsInRange.length} 条</span></div>
         </div>
         {loading ? <div className="loading-panel"><span className="loading-dot" />正在读取 WorkBuddy 热点数据…</div> : <div className="table-wrap">
           <table className="workbuddy-top20-table">
@@ -266,7 +277,7 @@ export default function HotTopicsPage() {
                 <td className="collection-time-cell">{topic.publish_time || "WorkBuddy当日批次"}</td>
                 <td><button className="analysis-action" onClick={() => void analyzeTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : topic.ai_relevance_score === null ? "AI分析" : `${Math.round(topic.ai_relevance_score)}分 · 查看`}</button></td>
               </tr>)}
-              {!filteredTopics.length && <tr><td className="empty-cell" colSpan={7}>当前平台暂无 WorkBuddy 热点数据。</td></tr>}
+              {!filteredTopics.length && <tr><td className="empty-cell" colSpan={7}>当前日期范围及平台暂无 WorkBuddy 热点数据。</td></tr>}
             </tbody>
           </table>
         </div>}

@@ -3,24 +3,38 @@
 import { useEffect, useState } from "react";
 import { chinaToday, datePresetLabels, dateRangeQuery, isoDate, rangeForMonth, rangeForPreset, resolveDateRange, type DatePreset, type DateRange } from "@/lib/date-range";
 
-const storageKey = "social-center-date-range-v1";
-const rangeEvent = "social-center-date-range-change";
-const defaultRange = rangeForPreset("yesterday");
+const baseStorageKey = "social-center-date-range-v1";
+const baseRangeEvent = "social-center-date-range-change";
 
-function readRange() {
+type DateFilterOptions = {
+  defaultPreset?: Exclude<DatePreset, "custom">;
+  scope?: string;
+};
+
+function channelFor(scope: string) {
+  return {
+    storageKey: scope === "global" ? baseStorageKey : `${baseStorageKey}-${scope}`,
+    rangeEvent: scope === "global" ? baseRangeEvent : `${baseRangeEvent}-${scope}`,
+  };
+}
+
+function readRange(defaultPreset: Exclude<DatePreset, "custom">, scope: string) {
+  const defaultRange = rangeForPreset(defaultPreset);
   if (typeof window === "undefined") return defaultRange;
   const urlRange = resolveDateRange(new URLSearchParams(window.location.search));
   if (window.location.search.includes("preset=")) return urlRange;
+  const { storageKey } = channelFor(scope);
   try {
     const saved = window.localStorage.getItem(storageKey);
     if (saved) return resolveDateRange(new URLSearchParams(saved));
   } catch {
     // Private browsing may disable local storage; the URL remains the source of truth.
   }
-  return urlRange;
+  return defaultRange;
 }
 
-function publishRange(range: DateRange) {
+function publishRange(range: DateRange, scope: string) {
+  const { storageKey, rangeEvent } = channelFor(scope);
   const query = dateRangeQuery(range);
   const url = new URL(window.location.href);
   url.searchParams.set("preset", range.preset);
@@ -35,13 +49,14 @@ function publishRange(range: DateRange) {
   window.dispatchEvent(new CustomEvent(rangeEvent, { detail: range }));
 }
 
-export function useGlobalDateRange() {
-  const [range, setRange] = useState<DateRange>(readRange);
+export function useGlobalDateRange({ defaultPreset = "yesterday", scope = "global" }: DateFilterOptions = {}) {
+  const { rangeEvent } = channelFor(scope);
+  const [range, setRange] = useState<DateRange>(() => readRange(defaultPreset, scope));
 
   useEffect(() => {
     const sync = (event: Event) => {
       const detail = event instanceof CustomEvent ? event.detail as DateRange : null;
-      setRange(detail ?? readRange());
+      setRange(detail ?? readRange(defaultPreset, scope));
     };
     window.addEventListener(rangeEvent, sync);
     window.addEventListener("popstate", sync);
@@ -49,13 +64,13 @@ export function useGlobalDateRange() {
       window.removeEventListener(rangeEvent, sync);
       window.removeEventListener("popstate", sync);
     };
-  }, []);
+  }, [defaultPreset, rangeEvent, scope]);
 
   return range;
 }
 
-export function GlobalDateFilter() {
-  const range = useGlobalDateRange();
+export function GlobalDateFilter({ defaultPreset = "yesterday", scope = "global" }: DateFilterOptions = {}) {
+  const range = useGlobalDateRange({ defaultPreset, scope });
   const [openPicker, setOpenPicker] = useState<"month" | "custom" | null>(null);
 
   useEffect(() => {
@@ -73,7 +88,7 @@ export function GlobalDateFilter() {
       return;
     }
     setOpenPicker(null);
-    publishRange(rangeForPreset(preset));
+    publishRange(rangeForPreset(preset), scope);
   }
 
   return (
@@ -84,8 +99,8 @@ export function GlobalDateFilter() {
           <button aria-expanded={preset === "month" || preset === "custom" ? openPicker === preset : undefined} className={range.preset === preset || openPicker === preset ? "active" : ""} key={preset} onClick={() => selectPreset(preset)}>{datePresetLabels[preset]}</button>
         ))}
       </div>
-      {openPicker === "month" && <MonthPicker range={range} onClose={() => setOpenPicker(null)} onSelect={(nextRange) => { publishRange(nextRange); setOpenPicker(null); }} />}
-      {openPicker === "custom" && <CustomDateRange key={`${range.from}-${range.to}`} range={range} onClose={() => setOpenPicker(null)} onApply={(nextRange) => { publishRange(nextRange); setOpenPicker(null); }} />}
+      {openPicker === "month" && <MonthPicker range={range} onClose={() => setOpenPicker(null)} onSelect={(nextRange) => { publishRange(nextRange, scope); setOpenPicker(null); }} />}
+      {openPicker === "custom" && <CustomDateRange key={`${range.from}-${range.to}`} range={range} onClose={() => setOpenPicker(null)} onApply={(nextRange) => { publishRange(nextRange, scope); setOpenPicker(null); }} />}
     </section>
   );
 }

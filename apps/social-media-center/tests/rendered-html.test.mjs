@@ -274,8 +274,10 @@ test("external agents can import hot topics as JSON or Excel without collection 
 });
 
 test("hot topic center presents WorkBuddy TOP20 with unified platform filters", async () => {
-  const [page, api, agentApi, analysisApi, schema, migration] = await Promise.all([
+  const [page, shell, filter, api, agentApi, analysisApi, schema, migration] = await Promise.all([
     readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
+    readFile(new URL("components/AppShell.tsx", root), "utf8"),
+    readFile(new URL("components/GlobalDateFilter.tsx", root), "utf8"),
     readFile(new URL("app/api/hot-topics/route.ts", root), "utf8"),
     readFile(new URL("app/api/hot-topic-data/route.ts", root), "utf8"),
     readFile(new URL("app/api/hot-topic-data/analyze/route.ts", root), "utf8"),
@@ -287,6 +289,11 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
   }
   for (const removedCard of ["hot-module-tabs", "平台热点趋势", "内容热度分析"]) assert.doesNotMatch(page, new RegExp(removedCard));
   assert.match(page, /insight-platform-tabs/);
+  assert.match(shell, /isHotTopicsPage && <GlobalDateFilter defaultPreset="today" scope="hot-topics"/);
+  assert.match(page, /useGlobalDateRange\(\{ defaultPreset: "today", scope: "hot-topics" \}\)/);
+  assert.match(page, /date >= range\.from && date <= range\.to/);
+  assert.match(page, /topicsInRange/);
+  assert.match(filter, /scope === "global"/);
   assert.match(page, /WorkBuddy热点监测Agent/);
   assert.match(page, /slice\(0, 20\)/);
   for (const field of ["排名", "平台", "热点名称", "热度", "趋势", "采集时间"]) assert.match(page, new RegExp(field));

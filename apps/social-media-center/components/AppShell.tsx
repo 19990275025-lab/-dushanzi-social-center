@@ -21,6 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     () => "",
   );
   const dateFilterPages = ["/", "/insights/content", "/insights/fans", "/comment-insights", "/ai-analysis"];
+  const isHotTopicsPage = pathname === "/hot-topics";
 
   return (
     <div className="app-shell">
@@ -59,6 +60,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div><strong>新媒体运营中心</strong><small>AI 营销中台</small></div>
         </div>
         {dateFilterPages.includes(pathname) && <GlobalDateFilter />}
+        {isHotTopicsPage && <GlobalDateFilter defaultPreset="today" scope="hot-topics" />}
         {children}
       </main>
     </div>
