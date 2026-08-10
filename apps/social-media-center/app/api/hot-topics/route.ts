@@ -4,6 +4,8 @@ import { calculateRelevance, ruleBasedTopicEngine, type TopicForAnalysis } from 
 
 const platforms = new Set(["douyin", "kuaishou", "weibo", "web"]);
 const topicTypes = new Set(["hot_rank", "planting_rank", "challenge_rank"]);
+const dataSources = new Set(["douyin_hot_rank", "douyin_seed_rank", "douyin_challenge_rank", "douyin_content_hot"]);
+const officialDouyinSources = ["douyin_hot_rank", "douyin_seed_rank", "douyin_challenge_rank"] as const;
 const trends = new Set(["rising", "stable", "falling", "new"]);
 const statuses = new Set(["active", "paused", "archived"]);
 
@@ -16,6 +18,7 @@ type TopicRow = TopicForAnalysis & {
   created_at: string;
   source_agent: string | null;
   topic_type: string;
+  data_source: string | null;
   source: string;
   hot_score: number | null;
   recommended_topic: string | null;
@@ -42,6 +45,7 @@ function validatePayload(payload: Record<string, unknown>) {
   const aiSuggestion = String(payload.aiSuggestion ?? "").trim();
   const status = String(payload.status ?? "active").trim();
   const topicType = String(payload.topicType ?? "hot_rank").trim();
+  const dataSource = String(payload.dataSource ?? "").trim();
   const source = String(payload.source ?? "手工录入").trim();
 
   if (!platforms.has(platform)) return { error: "请选择有效平台" } as const;
@@ -50,16 +54,21 @@ function validatePayload(payload: Record<string, unknown>) {
   if (!Number.isFinite(heatValue) || heatValue < 0) return { error: "热度必须是非负数" } as const;
   if (!trends.has(trend) || !statuses.has(status)) return { error: "趋势或状态无效" } as const;
   if (!topicTypes.has(topicType)) return { error: "请选择有效榜单类型" } as const;
+  if (platform === "douyin" && !dataSources.has(dataSource)) return { error: "请选择有效的抖音数据来源" } as const;
+  if (dataSource && !dataSources.has(dataSource)) return { error: "数据来源类型无效" } as const;
   if (!source || source.length > 255) return { error: "数据来源不能为空且不能超过 255 字" } as const;
   if (category.length > 128 || aiSuggestion.length > 2000) return { error: "分类或 AI 建议内容过长" } as const;
-  return { value: { platform, topicName, keyword, heatValue, trend, category, aiSuggestion, status, topicType, source } } as const;
+  const resolvedTopicType = dataSource === "douyin_seed_rank" ? "planting_rank"
+    : dataSource === "douyin_challenge_rank" ? "challenge_rank"
+      : dataSource ? "hot_rank" : topicType;
+  return { value: { platform, topicName, keyword, heatValue, trend, category, aiSuggestion, status, topicType: resolvedTopicType, dataSource: dataSource || null, source } } as const;
 }
 
 const platformAnalysisContent = {
-  all: { title: "互联网趋势分析", summary: "综合观察抖音、快手、微博与全网热点，优先选择可自然连接新疆旅行、峡谷风景和游客体验的跨平台趋势。", focus: "跨平台热度、传播周期、景区关联度" },
-  douyin: { title: "短视频内容机会", summary: "重点关注前三秒画面冲击力、挑战参与门槛和可收藏的新疆旅行信息，快速把热点转化为短视频选题。", focus: "短视频结构、种草表达、挑战参与" },
-  kuaishou: { title: "互动运营建议", summary: "优先选择适合真实游客互动、直播连麦和评论接龙的话题，强化账号与用户之间的持续关系。", focus: "评论互动、直播承接、用户关系" },
-  weibo: { title: "品牌传播建议", summary: "围绕新疆文旅事件、权威媒体话题和地域文化建立传播叙事，提升独山子大峡谷的品牌声量。", focus: "热点借势、品牌话题、媒体传播" },
+  all: { title: "平台热点跟进判断", summary: "综合官方榜单热度、传播周期与景区关联度，判断热点是否值得跟进，并避免将搜索内容热度当作平台趋势。", focus: "官方来源、传播周期、景区关联度" },
+  douyin: { title: "抖音热点跟进判断", summary: "仅分析已标记为抖音热点榜、种草榜或挑战榜的数据，判断能否自然转化为景区短视频选题。", focus: "官方榜单、跟进时效、内容适配" },
+  kuaishou: { title: "快手热点跟进判断", summary: "结合快手平台热点与景区真实体验，判断是否适合通过互动、直播或游客关系内容跟进。", focus: "平台热点、互动承接、用户关系" },
+  weibo: { title: "微博热点跟进判断", summary: "结合微博热搜的公共传播价值与品牌风险，判断是否适合形成独山子大峡谷品牌话题。", focus: "热搜来源、品牌关联、传播风险" },
 } as const;
 
 function databaseError(error: unknown) {
@@ -75,14 +84,22 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const requestedPlatform = params.get("platform") ?? "all";
   const selectedPlatform = requestedPlatform === "all" || platforms.has(requestedPlatform) ? requestedPlatform : "all";
-  const requestedTopicType = params.get("topicType") ?? "all";
-  const selectedTopicType = selectedPlatform === "douyin" && topicTypes.has(requestedTopicType) ? requestedTopicType : "all";
+  const viewMode = params.get("view") === "content" ? "content" : "platform";
+  const requestedDataSource = params.get("dataSource") ?? "all";
+  const selectedDataSource = selectedPlatform === "douyin" && officialDouyinSources.includes(requestedDataSource as typeof officialDouyinSources[number]) ? requestedDataSource : "all";
   const conditions = ["platform IN ('douyin', 'kuaishou', 'weibo', 'web')"];
   const bindings: string[] = [];
   if (selectedPlatform !== "all") { conditions.push("platform = ?"); bindings.push(selectedPlatform); }
-  if (selectedTopicType !== "all") { conditions.push("topic_type = ?"); bindings.push(selectedTopicType); }
+  if (viewMode === "content") {
+    conditions.push("data_source = 'douyin_content_hot'");
+  } else if (selectedPlatform === "douyin") {
+    if (selectedDataSource === "all") conditions.push("data_source IN ('douyin_hot_rank','douyin_seed_rank','douyin_challenge_rank')");
+    else { conditions.push("data_source = ?"); bindings.push(selectedDataSource); }
+  } else if (selectedPlatform === "all") {
+    conditions.push("((platform = 'douyin' AND data_source IN ('douyin_hot_rank','douyin_seed_rank','douyin_challenge_rank')) OR platform IN ('kuaishou','weibo','web'))");
+  }
   const topicStatement = d1.prepare(`
-      SELECT id, platform, topic_type, source, topic_name, keyword, heat_value, trend, category,
+      SELECT id, platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category,
         ranking, related_degree, ai_suggestion, status, source_agent, hot_score,
         recommended_topic, video_direction, publish_time_suggestion,
         collect_time, created_at
@@ -101,6 +118,13 @@ export async function GET(request: Request) {
     ? activeTopics.filter((topic) => topic.ranking !== null)
     : activeTopics;
   const postTitles = posts.map((post) => post.title);
+  const contentKeywords = [...new Set(currentTopics.map((topic) => topic.keyword).filter(Boolean))].slice(0, 12);
+  const contentViral = [...currentTopics]
+    .sort((a, b) => (b.related_degree ?? 0) - (a.related_degree ?? 0) || b.heat_value - a.heat_value)
+    .slice(0, 6);
+  const analysis = viewMode === "content"
+    ? { title: "视频制作方向", summary: "根据热门视频、搜索热词与爆款内容，输出可落地的画面结构、标题表达和互动设计，不将内容热度冒充平台官方榜单。", focus: "前三秒、拍摄方式、标题和评论反馈", mode: "video_direction" }
+    : { ...(platformAnalysisContent[selectedPlatform as keyof typeof platformAnalysisContent] ?? platformAnalysisContent.all), mode: "follow_up" };
 
   return Response.json({
     topics,
@@ -114,8 +138,14 @@ export async function GET(request: Request) {
     recommendationEngine: ruleBasedTopicEngine.name,
     futureAiEndpoint: "/api/v1/social/ai/topic-recommendations",
     selectedPlatform,
-    selectedTopicType,
-    platformAnalysis: platformAnalysisContent[selectedPlatform as keyof typeof platformAnalysisContent] ?? platformAnalysisContent.all,
+    selectedDataSource,
+    viewMode,
+    platformAnalysis: analysis,
+    contentHeat: {
+      popularVideos: [...currentTopics].sort((a, b) => b.heat_value - a.heat_value).slice(0, 10),
+      searchKeywords: contentKeywords,
+      viralContent: contentViral,
+    },
     updatedAt: new Date().toISOString(),
   });
 }
@@ -132,12 +162,12 @@ export async function POST(request: Request) {
   try {
     const topic = await getD1().prepare(`
       INSERT INTO hot_topics
-        (platform, topic_type, source, topic_name, keyword, heat_value, trend, category, related_degree,
+        (platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category, related_degree,
           ai_suggestion, status, collect_time, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING id, platform, topic_type, source, topic_name, keyword, heat_value, trend, category,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING id, platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category,
         related_degree, ai_suggestion, status, collect_time, created_at
-    `).bind(value.platform, value.topicType, value.source, value.topicName, value.keyword, value.heatValue, value.trend,
+    `).bind(value.platform, value.topicType, value.dataSource, value.source, value.topicName, value.keyword, value.heatValue, value.trend,
       value.category || null, relatedDegree, value.aiSuggestion || null, value.status).first();
     return Response.json({ topic }, { status: 201 });
   } catch (error) {
@@ -159,13 +189,13 @@ export async function PATCH(request: Request) {
 
   try {
     const topic = await getD1().prepare(`
-      UPDATE hot_topics SET platform = ?, topic_type = ?, source = ?, topic_name = ?, keyword = ?, heat_value = ?,
+      UPDATE hot_topics SET platform = ?, topic_type = ?, data_source = ?, source = ?, topic_name = ?, keyword = ?, heat_value = ?,
         trend = ?, category = ?, related_degree = ?, ai_suggestion = ?, status = ?,
         collect_time = CURRENT_TIMESTAMP
       WHERE id = ?
-      RETURNING id, platform, topic_type, source, topic_name, keyword, heat_value, trend, category,
+      RETURNING id, platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category,
         related_degree, ai_suggestion, status, collect_time, created_at
-    `).bind(value.platform, value.topicType, value.source, value.topicName, value.keyword, value.heatValue, value.trend,
+    `).bind(value.platform, value.topicType, value.dataSource, value.source, value.topicName, value.keyword, value.heatValue, value.trend,
       value.category || null, relatedDegree, value.aiSuggestion || null, value.status, id).first();
     if (!topic) return Response.json({ error: "热点不存在" }, { status: 404 });
     return Response.json({ topic });

@@ -8,6 +8,7 @@ type Topic = {
   ranking: number | null;
   platform: string;
   topic_type: string;
+  data_source: string | null;
   source: string;
   topic_name: string;
   keyword: string;
@@ -32,6 +33,7 @@ type DouyinPreview = {
   totalCount: number;
   successCount: number;
   failedCount: number;
+  sourceVerification: { dataSource: string; label: string; contentSearchData: boolean };
   top10: Array<Omit<Topic, "id" | "created_at"> & { ranking: number; trend_note: string }>;
   analysis: {
     top10Conclusion: string;
@@ -55,8 +57,10 @@ type HotTopicData = {
   recommendations: Recommendation[];
   recommendationEngine: string;
   selectedPlatform: string;
-  selectedTopicType: string;
-  platformAnalysis: { title: string; summary: string; focus: string };
+  selectedDataSource: string;
+  viewMode: "platform" | "content";
+  platformAnalysis: { title: string; summary: string; focus: string; mode: string };
+  contentHeat: { popularVideos: Topic[]; searchKeywords: string[]; viralContent: Topic[] };
   updatedAt: string;
 };
 
@@ -88,8 +92,9 @@ type AgentAiResult = {
 
 const emptyData: HotTopicData = {
   topics: [], ranking: [], relationAnalysis: [], recommendations: [],
-  recommendationEngine: "rules-v1", selectedPlatform: "all", selectedTopicType: "all",
-  platformAnalysis: { title: "互联网趋势分析", summary: "正在读取热点数据。", focus: "跨平台趋势" }, updatedAt: "",
+  recommendationEngine: "rules-v1", selectedPlatform: "all", selectedDataSource: "all", viewMode: "platform",
+  platformAnalysis: { title: "平台热点跟进判断", summary: "正在读取热点数据。", focus: "官方来源", mode: "follow_up" },
+  contentHeat: { popularVideos: [], searchKeywords: [], viralContent: [] }, updatedAt: "",
 };
 
 const trendNames: Record<string, string> = {
@@ -102,12 +107,13 @@ const platformTabs = [
   { value: "all", label: "全部热点" }, { value: "douyin", label: "抖音热点" },
   { value: "kuaishou", label: "快手热点" }, { value: "weibo", label: "微博热点" },
 ] as const;
-const topicTypeTabs = [
-  { value: "all", label: "全部榜单" }, { value: "hot_rank", label: "热点榜" },
-  { value: "planting_rank", label: "种草榜" }, { value: "challenge_rank", label: "挑战榜" },
+const dataSourceTabs = [
+  { value: "all", label: "全部官方榜单" }, { value: "douyin_hot_rank", label: "热点榜" },
+  { value: "douyin_seed_rank", label: "种草榜" }, { value: "douyin_challenge_rank", label: "挑战榜" },
 ] as const;
-const topicTypeNames: Record<string, string> = {
-  hot_rank: "热点榜", planting_rank: "种草榜", challenge_rank: "挑战榜",
+const dataSourceNames: Record<string, string> = {
+  douyin_hot_rank: "抖音热点榜", douyin_seed_rank: "抖音种草榜",
+  douyin_challenge_rank: "抖音挑战榜", douyin_content_hot: "抖音内容热度",
 };
 
 export default function HotTopicsPage() {
@@ -125,14 +131,15 @@ export default function HotTopicsPage() {
   const [agentAnalysis, setAgentAnalysis] = useState<{ topic: AgentHotTopic; ai: AgentAiResult } | null>(null);
   const [agentFile, setAgentFile] = useState<File | null>(null);
   const [importingAgent, setImportingAgent] = useState(false);
+  const [activeModule, setActiveModule] = useState<"platform" | "content">("platform");
   const [activePlatform, setActivePlatform] = useState("all");
-  const [activeTopicType, setActiveTopicType] = useState("all");
+  const [activeDataSource, setActiveDataSource] = useState("all");
 
   const loadTopics = useCallback(async () => {
     try {
       setLoading(true);
-      const query = new URLSearchParams({ platform: activePlatform });
-      if (activePlatform === "douyin" && activeTopicType !== "all") query.set("topicType", activeTopicType);
+      const query = new URLSearchParams({ platform: activePlatform, view: activeModule });
+      if (activeModule === "platform" && activePlatform === "douyin" && activeDataSource !== "all") query.set("dataSource", activeDataSource);
       const [response, agentResponse] = await Promise.all([
         fetch(`/api/hot-topics?${query}`), fetch(`/api/hot-topic-data?platform=${activePlatform}`),
       ]);
@@ -146,7 +153,7 @@ export default function HotTopicsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activePlatform, activeTopicType]);
+  }, [activeModule, activePlatform, activeDataSource]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadTopics(), 0);
@@ -174,7 +181,13 @@ export default function HotTopicsPage() {
 
   function selectPlatform(platform: string) {
     setActivePlatform(platform);
-    setActiveTopicType("all");
+    setActiveDataSource("all");
+    setAgentAnalysis(null);
+  }
+
+  function selectModule(module: "platform" | "content") {
+    setActiveModule(module);
+    setActiveDataSource("all");
     setAgentAnalysis(null);
   }
 
@@ -304,17 +317,28 @@ export default function HotTopicsPage() {
   return (
     <div className="page-stack hot-topic-page">
       <header className="page-heading compact-heading">
-        <div><p className="eyebrow">HOT TOPIC INTELLIGENCE</p><h1>新媒体热点监测中心</h1><p>接收外部 Agent 与抖音测试数据，评估景区关联度，并将趋势转化为可执行选题。</p></div>
-        <div className="hot-heading-actions"><button className="secondary-button" onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? "收起表单" : "＋ 手工新增"}</button><button className="primary-button" onClick={() => void collectPreview()} disabled={collecting}>{collecting ? "采集中…" : "采集今日热点"}</button></div>
+        <div><p className="eyebrow">HOT TOPIC INTELLIGENCE</p><h1>新媒体热点监测中心</h1><p>区分平台官方榜单与内容搜索热度，分别判断跟进价值和视频制作方向。</p></div>
+        <div className="hot-heading-actions"><button className="secondary-button" onClick={showForm ? () => setShowForm(false) : openCreate}>{showForm ? "收起表单" : "＋ 手工新增"}</button>{activeModule === "platform" && <button className="primary-button" onClick={() => void collectPreview()} disabled={collecting}>{collecting ? "测试中…" : "测试抖音官方榜单"}</button>}</div>
       </header>
+
+      <nav className="hot-module-tabs" aria-label="热点数据模块">
+        <button type="button" className={activeModule === "platform" ? "active" : ""} onClick={() => selectModule("platform")}><span>A</span><strong>平台热点趋势</strong><small>官方热点榜 · 热搜趋势</small></button>
+        <button type="button" className={activeModule === "content" ? "active" : ""} onClick={() => selectModule("content")}><span>B</span><strong>内容热度分析</strong><small>热门视频 · 搜索热词 · 爆款内容</small></button>
+      </nav>
 
       <nav className="hot-platform-tabs" aria-label="热点平台分类">
         {platformTabs.map((tab) => <button key={tab.value} type="button" className={activePlatform === tab.value ? "active" : ""} onClick={() => selectPlatform(tab.value)}>{tab.label}</button>)}
       </nav>
-      {activePlatform === "douyin" && <nav className="hot-type-tabs" aria-label="抖音热点榜单分类">
-        <span>抖音榜单</span>
-        {topicTypeTabs.map((tab) => <button key={tab.value} type="button" className={activeTopicType === tab.value ? "active" : ""} onClick={() => setActiveTopicType(tab.value)}>{tab.label}</button>)}
+      {activeModule === "platform" && activePlatform === "douyin" && <nav className="hot-type-tabs" aria-label="抖音官方榜单分类">
+        <span>仅显示官方榜单</span>
+        {dataSourceTabs.map((tab) => <button key={tab.value} type="button" className={activeDataSource === tab.value ? "active" : ""} onClick={() => setActiveDataSource(tab.value)}>{tab.label}</button>)}
       </nav>}
+
+      {activeModule === "content" && <section className="content-heat-overview" aria-label="内容热度类型">
+        <article><span>POPULAR VIDEO</span><strong>热门视频</strong><em>{data.contentHeat.popularVideos.length} 条高热内容</em></article>
+        <article><span>SEARCH KEYWORD</span><strong>搜索热词</strong><em>{data.contentHeat.searchKeywords.length} 个关键词</em></article>
+        <article><span>VIRAL CONTENT</span><strong>爆款内容</strong><em>{data.contentHeat.viralContent.length} 条重点样本</em></article>
+      </section>}
 
       <section className="panel platform-ai-brief">
         <div><span className="section-kicker">PLATFORM AI ANALYSIS</span><h2>{data.platformAnalysis.title}</h2></div>
@@ -323,7 +347,8 @@ export default function HotTopicsPage() {
       </section>
 
       {preview && <section className="panel hot-preview-panel">
-        <div className="panel-heading"><div><span className="section-kicker">PREVIEW ONLY</span><h2>抖音今日热点采集预览</h2></div><span className="preview-lock">未入库</span></div>
+        <div className="panel-heading"><div><span className="section-kicker">OFFICIAL SOURCE PREVIEW</span><h2>抖音官方热点榜测试预览</h2></div><span className="preview-lock">未入库</span></div>
+        <div className="preview-source-check"><strong>来源校验：{preview.sourceVerification.label}</strong><span>data_source = {preview.sourceVerification.dataSource}</span><em>{preview.sourceVerification.contentSearchData ? "内容热度" : "非搜索内容热度"}</em></div>
         <div className="preview-summary"><span>读取 <strong>{preview.totalCount}</strong> 条</span><span>成功 <strong>{preview.successCount}</strong> 条</span><span>失败 <strong>{preview.failedCount}</strong> 条</span><span>采集时间 <strong>{new Date(preview.collectedAt).toLocaleString("zh-CN")}</strong></span></div>
         <p className="preview-conclusion">{preview.analysis.top10Conclusion}</p>
         <div className="table-wrap"><table className="hot-preview-table"><thead><tr><th>排名</th><th>热点名称</th><th>热度</th><th>趋势</th><th>分类</th><th>关联度</th></tr></thead><tbody>{preview.top10.map((topic) => <tr key={topic.ranking}><td><strong>TOP {topic.ranking}</strong></td><td>{topic.topic_name}</td><td>{formatCompact(topic.heat_value)}</td><td><span className="trend-pill trend-new" title={topic.trend_note}>首次采集</span></td><td>{topic.category}</td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td></tr>)}</tbody></table></div>
@@ -331,14 +356,14 @@ export default function HotTopicsPage() {
         <div className="hot-preview-actions"><button className="secondary-button" onClick={() => setPreview(null)}>取消本次预览</button><button className="primary-button" onClick={() => void confirmPreview()} disabled={confirming}>{confirming ? "写入中…" : `人工确认并写入 ${preview.totalCount} 条`}</button></div>
       </section>}
 
-      <section className="panel agent-data-panel">
+      {activeModule === "content" && <section className="panel agent-data-panel">
         <div className="panel-heading"><div><span className="section-kicker">AI AGENT DATA CENTER</span><h2>AI Agent数据接入中心</h2></div><div className="agent-import-actions"><label className="agent-file-button">{agentFile ? agentFile.name : "选择WorkBuddy文件"}<input type="file" accept=".json,.xlsx,.xls" onChange={(event) => setAgentFile(event.target.files?.[0] ?? null)} /></label><button className="primary-button" onClick={() => void importAgentFile()} disabled={!agentFile || importingAgent}>{importingAgent ? "导入中…" : "导入数据"}</button><span className="agent-source-badge">WorkBuddy热点监测Agent · {agentTopics.length} 条</span></div></div>
         <p className="panel-intro">展示 WorkBuddy 生成并导入的热点数据；本系统仅负责接收、存储、分析和业务应用。</p>
         <div className="table-wrap"><table className="agent-hot-table"><thead><tr><th>平台</th><th>排名</th><th>热点标题</th><th>热度</th><th>关键词</th><th>来源</th><th>AI分析</th></tr></thead><tbody>
           {agentTopics.map((topic) => <tr key={topic.id}><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><strong>TOP {topic.rank}</strong></td><td><strong>{topic.topic_title}</strong><small>{topic.category || "未分类"} · {topic.publish_time || "时间未知"}</small></td><td className="agent-heat-value">{topic.heat_value}</td><td><span className="keyword-chip">{topic.keyword}</span></td><td className="agent-source-cell">{topic.source_agent}</td><td><button className="analysis-action" onClick={() => void analyzeAgentTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : topic.ai_relevance_score === null ? "AI分析" : `重新分析 · ${Math.round(topic.ai_relevance_score)}分`}</button></td></tr>)}
           {!agentTopics.length && <tr><td className="empty-cell" colSpan={7}>等待 WorkBuddy 最新 JSON 文件导入。</td></tr>}
         </tbody></table></div>
-      </section>
+      </section>}
 
       {agentAnalysis && <section className="panel agent-analysis-panel">
         <div className="panel-heading"><div><span className="section-kicker">AI OPPORTUNITY ANALYSIS</span><h2>{agentAnalysis.topic.topic_title}</h2></div><button className="secondary-button" onClick={() => setAgentAnalysis(null)}>关闭分析</button></div>
@@ -358,7 +383,7 @@ export default function HotTopicsPage() {
           <div className="panel-heading"><div><span className="section-kicker">{editing ? "EDIT TOPIC" : "NEW TOPIC"}</span><h2>{editing ? "编辑热点" : "新增热点"}</h2></div><span className="section-note">关联程度由关键词、景区名称和历史作品自动计算</span></div>
           <form className="hot-topic-form" onSubmit={saveTopic} key={editing?.id ?? "new"}>
             <label>平台<select name="platform" defaultValue={editing?.platform ?? (activePlatform === "all" ? "douyin" : activePlatform)} required><option value="douyin">抖音</option><option value="kuaishou">快手</option><option value="weibo">微博</option><option value="web">全网</option></select></label>
-            <label>榜单类型<select name="topicType" defaultValue={editing?.topic_type ?? "hot_rank"}><option value="hot_rank">热点榜</option><option value="planting_rank">种草榜</option><option value="challenge_rank">挑战榜</option></select></label>
+            <label>数据类型<select name="dataSource" defaultValue={editing?.data_source ?? (activeModule === "content" ? "douyin_content_hot" : activePlatform === "douyin" ? "douyin_hot_rank" : "")}><option value="">非抖音平台来源</option><option value="douyin_hot_rank">抖音热点榜</option><option value="douyin_seed_rank">抖音种草榜</option><option value="douyin_challenge_rank">抖音挑战榜</option><option value="douyin_content_hot">抖音热门内容</option></select></label>
             <label>数据来源<input name="source" defaultValue={editing?.source ?? "手工录入"} maxLength={255} required /></label>
             <label className="hot-name-field">热点名称<input name="topicName" defaultValue={editing?.topic_name ?? ""} placeholder="例如：新疆自驾避暑路线" maxLength={500} required /></label>
             <label>关键词<input name="keyword" defaultValue={editing?.keyword ?? ""} placeholder="例如：新疆旅游" maxLength={255} required /></label>
@@ -376,7 +401,7 @@ export default function HotTopicsPage() {
       {loading ? <div className="loading-panel"><span className="loading-dot" />正在读取热点数据库…</div> : <>
         <section className="hot-insight-grid">
           <article className="panel ranking-panel">
-            <div className="panel-heading"><div><span className="section-kicker">TODAY TOP 10</span><h2>今日热点 TOP10</h2></div><span className="section-note">优先按官方 ranking</span></div>
+            <div className="panel-heading"><div><span className="section-kicker">{activeModule === "platform" ? "OFFICIAL TREND" : "POPULAR VIDEO"}</span><h2>{activeModule === "platform" ? "平台热点 TOP10" : "热门视频"}</h2></div><span className="section-note">{activeModule === "platform" ? "仅使用平台榜单数据" : "来自内容热度数据"}</span></div>
             <ol className="hot-ranking-list">
               {data.ranking.map((topic, index) => {
                 const width = data.ranking[0]?.heat_value ? Math.max(8, topic.heat_value / data.ranking[0].heat_value * 100) : 8;
@@ -387,8 +412,8 @@ export default function HotTopicsPage() {
           </article>
 
           <article className="panel relation-panel">
-            <div className="panel-heading"><div><span className="section-kicker">SCENIC RELEVANCE</span><h2>景区关联分析</h2></div><span className="rule-badge">规则评分</span></div>
-            <p className="panel-intro">根据热点关键词、独山子大峡谷名称及历史作品标题/标签综合计算。</p>
+            <div className="panel-heading"><div><span className="section-kicker">{activeModule === "platform" ? "FOLLOW-UP CHECK" : "SEARCH KEYWORDS"}</span><h2>{activeModule === "platform" ? "是否适合跟进" : "搜索热词"}</h2></div><span className="rule-badge">规则评分</span></div>
+            <p className="panel-intro">{activeModule === "platform" ? "根据平台榜单热度、景区关联度与传播风险判断是否值得跟进。" : "从已有热门内容中提取关键词，识别游客关注方向。"}</p>
             <div className="relation-list">
               {data.relationAnalysis.map((topic) => <div className="relation-item" key={topic.id}><div><strong>{topic.keyword}</strong><small>{topic.topic_name}</small></div><div className="relation-meter"><span><i style={{ width: `${Math.round((topic.related_degree ?? 0) * 100)}%` }} /></span><strong>{Math.round((topic.related_degree ?? 0) * 100)}%</strong></div></div>)}
               {!data.relationAnalysis.length && <div className="empty-list">暂无可分析热点</div>}
@@ -397,8 +422,8 @@ export default function HotTopicsPage() {
         </section>
 
         <section className="panel recommendation-panel">
-          <div className="panel-heading light-heading"><div><span className="section-kicker">AI TOPIC IDEAS</span><h2>AI 选题推荐</h2></div><span className="ai-badge">RULES V1</span></div>
-          <p className="ai-intro">当前由可解释规则引擎结合热点数据与 social_posts 历史作品生成；服务端已预留大模型适配接口。</p>
+          <div className="panel-heading light-heading"><div><span className="section-kicker">AI {activeModule === "platform" ? "FOLLOW-UP" : "VIDEO DIRECTION"}</span><h2>{activeModule === "platform" ? "平台热点跟进建议" : "爆款内容与视频制作方向"}</h2></div><span className="ai-badge">RULES V1</span></div>
+          <p className="ai-intro">{activeModule === "platform" ? "判断官方热点是否适合独山子大峡谷跟进。" : "结合热门视频、搜索热词和历史作品，输出视频制作方向。"}</p>
           <div className="recommendation-grid">
             {data.recommendations.map((item) => <article key={`${item.sourceTopic}-${item.platform}`}><div className="recommendation-meta"><span className={`platform-tag tag-${item.platform}`}>{platformLabel(item.platform)}</span><em>关联 {item.relevance}%</em></div><h3>{item.title}</h3><p><strong>内容方向</strong>{item.direction}</p><p><strong>拍摄建议</strong>{item.shootingAdvice}</p><small>来源热点：{item.sourceTopic}</small></article>)}
             {!data.recommendations.length && <div className="empty-list">新增监测中热点后生成选题建议</div>}
@@ -406,9 +431,9 @@ export default function HotTopicsPage() {
         </section>
 
         <section className="panel data-panel hot-table-panel">
-          <div className="panel-heading"><div><span className="section-kicker">HOT TOPICS</span><h2>{platformTabs.find((tab) => tab.value === activePlatform)?.label ?? "热点列表"}</h2></div><span className="count-badge">{data.topics.length} 条</span></div>
-          <div className="table-wrap"><table className="hot-topic-table"><thead><tr><th>排名</th><th>平台</th><th>榜单</th><th>热点名称</th><th>来源</th><th>热度</th><th>趋势</th><th>热点评分</th><th>关联程度</th><th>推荐选题</th><th>状态</th><th>操作</th></tr></thead><tbody>
-            {data.topics.map((topic) => <tr key={topic.id}><td><strong>{topic.ranking ? `TOP ${topic.ranking}` : "—"}</strong></td><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><span className="topic-type-badge">{topicTypeNames[topic.topic_type] ?? "热点榜"}</span></td><td><strong>{topic.topic_name}</strong><small className="topic-category">{topic.category || "未分类"}</small></td><td className="agent-source-cell">{topic.source || topic.source_agent || "系统内置"}</td><td className="metric-cell"><strong>{formatCompact(topic.heat_value)}</strong></td><td><span className={`trend-pill trend-${topic.trend}`}>{trendNames[topic.trend]}</span></td><td><strong>{topic.hot_score === null ? "—" : Math.round(topic.hot_score)}</strong></td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td><td className="suggestion-cell"><strong>{topic.recommended_topic || topic.ai_suggestion || "—"}</strong>{topic.video_direction && <small>{topic.video_direction}</small>}{topic.publish_time_suggestion && <small>{topic.publish_time_suggestion}</small>}</td><td><span className={`topic-status status-${topic.status}`}>{statusNames[topic.status]}</span></td><td><div className="row-actions"><button onClick={() => openEdit(topic)}>编辑</button><button className="danger-link" onClick={() => void deleteTopic(topic)}>删除</button></div></td></tr>)}
+          <div className="panel-heading"><div><span className="section-kicker">{activeModule === "platform" ? "PLATFORM TREND DATA" : "CONTENT HEAT DATA"}</span><h2>{activeModule === "platform" ? "平台热点趋势数据" : "内容热度分析数据"}</h2></div><span className="count-badge">{data.topics.length} 条</span></div>
+          <div className="table-wrap"><table className="hot-topic-table"><thead><tr><th>排名</th><th>平台</th><th>数据来源类型</th><th>热点名称</th><th>来源</th><th>热度</th><th>趋势</th><th>热点评分</th><th>关联程度</th><th>{activeModule === "platform" ? "跟进建议" : "制作方向"}</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            {data.topics.map((topic) => <tr key={topic.id}><td><strong>{topic.ranking ? `TOP ${topic.ranking}` : "—"}</strong></td><td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td><td><span className={`topic-type-badge source-${topic.data_source ?? "platform"}`}>{dataSourceNames[topic.data_source ?? ""] ?? `${platformLabel(topic.platform)}平台热点`}</span></td><td><strong>{topic.topic_name}</strong><small className="topic-category">{topic.category || "未分类"}</small></td><td className="agent-source-cell">{topic.source || topic.source_agent || "系统内置"}</td><td className="metric-cell"><strong>{formatCompact(topic.heat_value)}</strong></td><td><span className={`trend-pill trend-${topic.trend}`}>{trendNames[topic.trend]}</span></td><td><strong>{topic.hot_score === null ? "—" : Math.round(topic.hot_score)}</strong></td><td><strong className="relevance-value">{Math.round((topic.related_degree ?? 0) * 100)}%</strong></td><td className="suggestion-cell"><strong>{topic.recommended_topic || topic.ai_suggestion || "—"}</strong>{topic.video_direction && <small>{topic.video_direction}</small>}{topic.publish_time_suggestion && <small>{topic.publish_time_suggestion}</small>}</td><td><span className={`topic-status status-${topic.status}`}>{statusNames[topic.status]}</span></td><td><div className="row-actions"><button onClick={() => openEdit(topic)}>编辑</button><button className="danger-link" onClick={() => void deleteTopic(topic)}>删除</button></div></td></tr>)}
             {!data.topics.length && <tr><td className="empty-cell" colSpan={12}>当前分类暂无热点数据。</td></tr>}
           </tbody></table></div>
         </section>

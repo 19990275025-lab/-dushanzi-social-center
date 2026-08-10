@@ -78,6 +78,7 @@ export function buildDouyinHotTopicPreview(historicalText = "") {
     });
     return {
       platform: "douyin",
+      data_source: "douyin_hot_rank",
       topic_name: topicName,
       keyword: topicName,
       heat_value: heatValue,
@@ -101,6 +102,7 @@ export function buildDouyinHotTopicPreview(historicalText = "") {
     previewOnly: true,
     confirmed: false,
     source: { platform: "douyin", name: "抖音官方热榜", url: DOUYIN_HOT_SOURCE_URL },
+    sourceVerification: { dataSource: "douyin_hot_rank", label: "抖音热点榜", contentSearchData: false },
     collectedAt: DOUYIN_HOT_COLLECTED_AT,
     totalCount: topics.length,
     successCount: topics.length,

@@ -182,6 +182,7 @@ const schemaStatements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),
     topic_type TEXT NOT NULL DEFAULT 'hot_rank' CHECK (topic_type IN ('hot_rank','planting_rank','challenge_rank')),
+    data_source TEXT,
     source TEXT NOT NULL DEFAULT 'system',
     topic_name TEXT NOT NULL,
     keyword TEXT NOT NULL,
@@ -445,14 +446,22 @@ async function initialize() {
   if (!topicColumnNames.has("source")) {
     await d1.prepare("ALTER TABLE hot_topics ADD COLUMN source TEXT NOT NULL DEFAULT 'system'").run();
   }
+  if (!topicColumnNames.has("data_source")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN data_source TEXT").run();
+  }
   await d1.batch([
     d1.prepare("UPDATE hot_topics SET keyword = topic_name WHERE keyword IS NULL OR trim(keyword) = ''"),
     d1.prepare("UPDATE hot_topics SET created_at = COALESCE(collect_time, CURRENT_TIMESTAMP) WHERE created_at IS NULL"),
     d1.prepare("UPDATE hot_topics SET source = COALESCE(NULLIF(source_agent, ''), NULLIF(source_url, ''), source) WHERE source = 'system'"),
+    d1.prepare("UPDATE hot_topics SET data_source = 'douyin_content_hot' WHERE platform = 'douyin' AND data_source IS NULL"),
+    d1.prepare("DROP INDEX IF EXISTS uq_hot_topics_platform_name"),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_platform_source_name ON hot_topics(platform, data_source, topic_name)"),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_non_douyin_name ON hot_topics(platform, topic_name) WHERE platform <> 'douyin'"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_status_heat ON hot_topics(status, heat_value DESC)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_ranking ON hot_topics(platform, ranking)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_type_ranking ON hot_topics(platform, topic_type, ranking)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_data_source_ranking ON hot_topics(platform, data_source, ranking)"),
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_source_record ON hot_topics(platform, source_record_id) WHERE source_record_id IS NOT NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_source_agent_collect_time ON hot_topics(source_agent, collect_time DESC)"),
   ]);

@@ -268,27 +268,35 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.doesNotMatch(localService, /playwright|douyin\.com|weibo\.com|kuaishou\.com/);
 });
 
-test("hot topic center filters platforms and Douyin ranking categories", async () => {
+test("hot topic center separates official platform trends from content heat", async () => {
   const [page, api, agentApi, schema, migration] = await Promise.all([
     readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
     readFile(new URL("app/api/hot-topics/route.ts", root), "utf8"),
     readFile(new URL("app/api/hot-topic-data/route.ts", root), "utf8"),
     readFile(new URL("db/schema.ts", root), "utf8"),
-    readFile(new URL("drizzle/0014_hot_topic_platform_categories.sql", root), "utf8"),
+    readFile(new URL("drizzle/0015_hot_topic_data_source.sql", root), "utf8"),
   ]);
-  for (const label of ["全部热点", "抖音热点", "快手热点", "微博热点", "热点榜", "种草榜", "挑战榜"]) {
+  for (const label of ["平台热点趋势", "内容热度分析", "热门视频", "搜索热词", "爆款内容", "热点榜", "种草榜", "挑战榜"]) {
     assert.match(page, new RegExp(label));
   }
   assert.match(api, /searchParams/);
   assert.match(api, /platform = \?/);
-  assert.match(api, /topic_type = \?/);
+  assert.match(api, /data_source = \?/);
+  for (const source of ["douyin_hot_rank", "douyin_seed_rank", "douyin_challenge_rank", "douyin_content_hot"]) {
+    assert.match(api, new RegExp(source));
+    assert.match(migration, new RegExp(source === "douyin_content_hot" ? source : "data_source"));
+  }
   assert.match(agentApi, /WHERE platform = \?/);
-  for (const label of ["互联网趋势分析", "短视频内容机会", "互动运营建议", "品牌传播建议"]) {
+  for (const label of ["是否适合跟进", "视频制作方向"]) {
+    assert.match(page, new RegExp(label));
+  }
+  for (const label of ["平台热点跟进判断", "抖音热点跟进判断", "快手热点跟进判断", "微博热点跟进判断"]) {
     assert.match(api, new RegExp(label));
   }
-  assert.match(schema, /topicType: text\("topic_type"\)/);
-  assert.match(schema, /source: text\("source"\)/);
-  assert.match(migration, /idx_hot_topics_platform_type_ranking/);
+  assert.match(schema, /dataSource: text\("data_source"\)/);
+  assert.match(migration, /UPDATE `hot_topics`[\s\S]*douyin_content_hot/);
+  assert.doesNotMatch(migration, /DELETE FROM `hot_topics`/);
+  assert.match(migration, /idx_hot_topics_platform_data_source_ranking/);
 });
 
 test("Douyin V2.1 preview is database-free and blocks confirmation below 80 percent", async () => {
