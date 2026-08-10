@@ -111,6 +111,7 @@ export default function HotTopicsPage() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<ParsedAnalysis | null>(null);
   const [agentFile, setAgentFile] = useState<File | null>(null);
   const [importingAgent, setImportingAgent] = useState(false);
+  const [replacingAgent, setReplacingAgent] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const loadTopics = useCallback(async () => {
@@ -201,6 +202,31 @@ export default function HotTopicsPage() {
     }
   }
 
+  async function replaceAgentFile() {
+    if (!agentFile || !agentFile.name.toLowerCase().endsWith(".json")) return;
+    if (!window.confirm("确认使用该核验文件替换当前 WorkBuddy 热点快照？写入失败时整批回滚。")) return;
+    setReplacingAgent(true);
+    setMessage(null);
+    try {
+      const raw = JSON.parse(await agentFile.text()) as unknown;
+      if (!Array.isArray(raw)) throw new Error("核验文件必须是 JSON 数组");
+      const response = await fetch("/api/hot-topic/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ replace_existing: true, data: raw }),
+      });
+      const result = await response.json() as { error?: string; successCount?: number };
+      if (!response.ok) throw new Error(result.error ?? "WorkBuddy热点快照替换失败");
+      setMessage({ type: "success", text: `WorkBuddy当前热点已替换为 ${result.successCount ?? 0} 条核验数据。` });
+      setAgentFile(null);
+      await loadTopics();
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "WorkBuddy热点快照替换失败" });
+    } finally {
+      setReplacingAgent(false);
+    }
+  }
+
   return (
     <div className="page-stack hot-topic-page">
       <header className="page-heading compact-heading">
@@ -212,6 +238,7 @@ export default function HotTopicsPage() {
         <div className="agent-import-actions">
           <label className="agent-file-button">{agentFile ? agentFile.name : "选择WorkBuddy文件"}<input type="file" accept=".json,.xlsx,.xls" onChange={(event) => setAgentFile(event.target.files?.[0] ?? null)} /></label>
           <button className="primary-button" onClick={() => void importAgentFile()} disabled={!agentFile || importingAgent}>{importingAgent ? "导入中…" : "导入数据"}</button>
+          <button className="secondary-button" onClick={() => void replaceAgentFile()} disabled={!agentFile?.name.toLowerCase().endsWith(".json") || replacingAgent}>{replacingAgent ? "替换中…" : "替换当前数据"}</button>
         </div>
       </header>
 

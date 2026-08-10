@@ -76,6 +76,8 @@ AI 热点分析综合当前 WorkBuddy 热点、独山子大峡谷景区资源与
 
 日常 Agent 调用保持增量更新语义不变。经过人工核验的 JSON 可显式传入 `replace_existing: true`，系统会在同一个 D1 批处理中替换 WorkBuddy 当前快照；任一写入失败时整批回滚，避免出现先清空后写入失败的中间状态。
 
+热点监测页面在选择 JSON 文件后提供“替换当前数据”操作，用于人工核验后的快照覆盖；普通“导入数据”仍保持原有增量导入方式，Excel 导入逻辑不变。
+
 AI Agent数据接入中心 V1.0 使用独立实体表 `HOT_TOPIC_DATA` 保存 WorkBuddy 热点。字段包括平台、排名、热点标题、原始热度、关键词、链接、发布时间、分类、来源 Agent，以及 AI 关联评分、分析和推荐。`source_agent` 由接收服务固定为“WorkBuddy热点监测Agent”，同来源、同平台、同标题和同发布时间的数据重复导入时更新原记录。
 
 本机导入服务 `scripts/import-workbuddy-hot-topics.mjs` 会读取 `~/Desktop/景区AI营销数据/hot_topics/` 中日期最新的 `hot_topic_YYYYMMDD.json`，校验后提交至 `POST /api/hot-topic/import`。运行 `pnpm import:workbuddy-hot-topics -- --dry-run` 可仅检查最新文件而不写库；正式导入可配置 `WORKBUDDY_API_BASE_URL`、`WORKBUDDY_AGENT_KEY`，私有站点机器调用还需 `WORKBUDDY_SITES_BEARER_TOKEN`。该服务不访问抖音、快手、微博或其他平台，不包含采集功能。

@@ -262,6 +262,8 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.match(page, /多平台热点监测与AI选题推荐中心/);
   assert.match(page, /AI分析/);
   assert.match(page, /选择WorkBuddy文件/);
+  assert.match(page, /替换当前数据/);
+  assert.match(page, /replace_existing: true/);
   assert.match(page, /\/api\/hot-topic\/import/);
   assert.match(analysisRoute, /analyzeWorkBuddyTopic/);
   assert.match(analysisRoute, /shortVideoTitle/);
