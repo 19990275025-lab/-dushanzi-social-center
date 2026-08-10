@@ -289,6 +289,11 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
   }
   for (const removedCard of ["hot-module-tabs", "平台热点趋势", "内容热度分析"]) assert.doesNotMatch(page, new RegExp(removedCard));
   assert.match(page, /insight-platform-tabs/);
+  for (const label of ["分析报告", "TOP20列表", "热点总数", "强烈推荐借势", "推荐直播主题", "今日运营建议"]) assert.match(page, new RegExp(label));
+  assert.match(page, /viewMode === "report"/);
+  assert.match(page, /reportTopics\.map/);
+  assert.match(page, /topic\.url.*target="_blank"/);
+  assert.match(page, /不展示模拟结果/);
   assert.match(shell, /isHotTopicsPage && <GlobalDateFilter defaultPreset="today" scope="hot-topics"/);
   assert.match(page, /useGlobalDateRange\(\{ defaultPreset: "today", scope: "hot-topics" \}\)/);
   assert.match(page, /date >= range\.from && date <= range\.to/);

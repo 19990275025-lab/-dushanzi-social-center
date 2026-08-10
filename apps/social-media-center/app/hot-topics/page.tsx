@@ -31,6 +31,7 @@ type AgentAiResult = {
 };
 
 type ParsedAnalysis = AgentAiResult & { topic: AgentHotTopic };
+type ViewMode = "report" | "ranking";
 
 const platformTabs = [
   { value: "all", label: "全部热点" },
@@ -112,6 +113,7 @@ export default function HotTopicsPage() {
   const range = useGlobalDateRange({ defaultPreset: "today", scope: "hot-topics" });
   const [topics, setTopics] = useState<AgentHotTopic[]>([]);
   const [activePlatform, setActivePlatform] = useState("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("report");
   const [loading, setLoading] = useState(true);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState<ParsedAnalysis | null>(null);
@@ -144,17 +146,31 @@ export default function HotTopicsPage() {
     return date !== null && date >= range.from && date <= range.to;
   }), [topics, range.from, range.to]);
 
-  const filteredTopics = useMemo(() => topicsInRange
+  const platformTopics = useMemo(() => topicsInRange
     .filter((topic) => activePlatform === "all"
       || (activePlatform === "other" ? !primaryPlatforms.has(topic.platform) : topic.platform === activePlatform))
-    .sort((a, b) => a.rank - b.rank || b.id - a.id)
-    .slice(0, 20), [topicsInRange, activePlatform]);
+    .sort((a, b) => a.rank - b.rank || b.id - a.id), [topicsInRange, activePlatform]);
+
+  const filteredTopics = useMemo(() => platformTopics.slice(0, 20), [platformTopics]);
+  const reportTopics = useMemo(() => platformTopics.slice(0, 50), [platformTopics]);
 
   const recommendations = useMemo(() => filteredTopics
     .map(parseAnalysis)
     .filter((item): item is ParsedAnalysis => item !== null)
     .sort((a, b) => b.relevanceScore - a.relevanceScore || a.topic.rank - b.topic.rank)
     .slice(0, 4), [filteredTopics]);
+
+  const reportAnalyses = useMemo(() => reportTopics
+    .map(parseAnalysis)
+    .filter((item): item is ParsedAnalysis => item !== null)
+    .sort((a, b) => b.relevanceScore - a.relevanceScore || a.topic.rank - b.topic.rank), [reportTopics]);
+
+  const reportStats = useMemo(() => ({
+    total: reportTopics.length,
+    platforms: new Set(reportTopics.map((topic) => topic.platform)).size,
+    strong: reportAnalyses.filter((item) => item.relevanceScore >= 80 && item.worthFollowing).length,
+    available: reportAnalyses.filter((item) => item.relevanceScore >= 60).length,
+  }), [reportAnalyses, reportTopics]);
 
   const advice = platformAdvice[activePlatform] ?? platformAdvice.other;
   const currentLabel = platformTabs.find((tab) => tab.value === activePlatform)?.label ?? "全部热点";
@@ -253,13 +269,19 @@ export default function HotTopicsPage() {
         </div>
       </header>
 
-      <nav className="insight-platform-tabs hot-unified-platform-tabs" aria-label="热点平台筛选">
-        {platformTabs.map((tab) => <button key={tab.value} type="button" className={activePlatform === tab.value ? "active" : ""} onClick={() => { setActivePlatform(tab.value); setSelectedAnalysis(null); }}>{tab.label}</button>)}
-      </nav>
+      <div className="hot-topic-view-toolbar">
+        <nav className="insight-platform-tabs hot-unified-platform-tabs" aria-label="热点平台筛选">
+          {platformTabs.map((tab) => <button key={tab.value} type="button" className={activePlatform === tab.value ? "active" : ""} onClick={() => { setActivePlatform(tab.value); setSelectedAnalysis(null); }}>{tab.label}</button>)}
+        </nav>
+        <div className="hot-view-switch" role="group" aria-label="热点展示方式">
+          <button className={viewMode === "report" ? "active" : ""} onClick={() => setViewMode("report")}>分析报告</button>
+          <button className={viewMode === "ranking" ? "active" : ""} onClick={() => setViewMode("ranking")}>TOP20列表</button>
+        </div>
+      </div>
 
       {message && <div className={`import-message ${message.type}`}><span>{message.type === "success" ? "✓" : "!"}</span>{message.text}</div>}
 
-      <section className="panel workbuddy-top20-panel">
+      {viewMode === "ranking" && <section className="panel workbuddy-top20-panel">
         <div className="panel-heading">
           <div><span className="section-kicker">WORKBUDDY TOP 20</span><h2>{currentLabel} TOP20</h2></div>
           <div className="hot-source-meta"><strong>WorkBuddy热点监测Agent</strong><span>{range.from} — {range.to} · 当前显示 {filteredTopics.length} / 周期内 {topicsInRange.length} 条</span></div>
@@ -282,9 +304,9 @@ export default function HotTopicsPage() {
           </table>
         </div>}
         <p className="hot-source-note">趋势在 WorkBuddy 尚未提供连续排名快照时显示“首次采集”；采集时间按 WorkBuddy 原始数据时间展示，不生成模拟涨跌。</p>
-      </section>
+      </section>}
 
-      <section className="panel hot-ai-recommendation-panel">
+      {viewMode === "ranking" && <section className="panel hot-ai-recommendation-panel">
         <div className="panel-heading light-heading">
           <div><span className="section-kicker">AI TOPIC OPPORTUNITY</span><h2>AI热点分析与选题推荐</h2></div>
           <span className="ai-badge">WORKBUDDY × RULES V1</span>
@@ -301,7 +323,51 @@ export default function HotTopicsPage() {
           </article>)}
           {!recommendations.length && <div className="empty-ai-recommendation">当前平台尚无已分析热点。可在 TOP20 列表点击“AI分析”生成真实建议。</div>}
         </div>
-      </section>
+      </section>}
+
+      {viewMode === "report" && <section className="hot-analysis-report" aria-label="独山子大峡谷旅游热点监测报告">
+        <header className="hot-report-header">
+          <div><span>WORKBUDDY DAILY INTELLIGENCE</span><h2>独山子大峡谷旅游热点监测报告</h2><p>{range.from === range.to ? range.from : `${range.from} — ${range.to}`} · {currentLabel} · 最多展示 TOP50</p></div>
+          <em>仅监测抖音 / 快手 / 微博及已接入平台</em>
+        </header>
+
+        <div className="hot-report-stats">
+          <article><strong>{reportStats.total}</strong><span>热点总数</span></article>
+          <article><strong>{reportStats.platforms}</strong><span>监测平台</span></article>
+          <article><strong>{reportStats.strong}</strong><span>强烈推荐借势</span></article>
+          <article><strong>{reportStats.available}</strong><span>可借势热点</span></article>
+        </div>
+
+        <div className="hot-report-card-list">
+          {reportTopics.map((topic) => {
+            const analysis = parseAnalysis(topic);
+            const score = analysis?.relevanceScore ?? null;
+            const decisionClass = score === null ? "pending" : analysis?.worthFollowing && score >= 80 ? "high" : score >= 60 ? "mid" : "low";
+            const decision = score === null ? "待AI分析" : analysis?.worthFollowing && score >= 80 ? "适合借势" : score >= 60 ? "谨慎借势" : "不建议借势";
+            return <article className="hot-report-card" key={topic.id}>
+              <div className="hot-report-card-head"><span className="hot-report-rank">#{topic.rank}</span><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span><strong>{topic.heat_value}</strong></div>
+              <h3>{topic.topic_title}</h3>
+              <div className="hot-report-meta"><span>关键词：{topic.keyword || "待补充"}</span><span>{topic.publish_time || "WorkBuddy当日批次"}</span><span>{topic.category || "其他热点"}</span></div>
+              {topic.url && <a className="hot-report-source" href={topic.url} target="_blank" rel="noreferrer">查看热点来源 ↗</a>}
+              <div className="hot-report-ai">
+                <div className="hot-report-decision"><span className={`decision-${decisionClass}`}>{decision}</span>{score === null ? <button onClick={() => void analyzeTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : "开始AI分析"}</button> : <strong>关联度：{score}/100</strong>}</div>
+                {analysis ? <div className="hot-report-ai-detail"><p><b>热点判断</b>{analysis.analysis}</p><p><b>推荐拍摄方向</b>{analysis.shootingDirection}</p><p><b>推荐短视频标题</b>{analysis.shortVideoTitle}</p><p><b>推荐直播主题</b>{analysis.liveTheme}</p></div> : <p className="hot-report-awaiting">点击“开始AI分析”后生成关联度、借势判断与内容建议，不展示模拟结果。</p>}
+              </div>
+            </article>;
+          })}
+          {!reportTopics.length && <div className="empty-ai-recommendation">当前日期范围及平台暂无 WorkBuddy 热点数据。</div>}
+        </div>
+
+        <section className="hot-daily-advice">
+          <div><span>DAILY ACTION PLAN</span><h3>今日运营建议</h3><p>按关联度与跟进价值，从当前筛选范围的真实 AI 分析结果生成。</p></div>
+          <ol>
+            {reportAnalyses.filter((item) => item.relevanceScore >= 60).slice(0, 6).map((item, index) => <li key={item.topic.id}><span>{String(index + 1).padStart(2, "0")}</span><p><strong>{item.shortVideoTitle}</strong>{item.shootingDirection}</p></li>)}
+            {!reportAnalyses.some((item) => item.relevanceScore >= 60) && <li className="hot-advice-empty">当前范围暂无达到可借势标准的已分析热点。</li>}
+          </ol>
+        </section>
+
+        <footer className="hot-report-footer">数据来源：WorkBuddy热点监测Agent · 抖音 / 快手 / 微博 · 仅供内部运营参考</footer>
+      </section>}
 
       {selectedAnalysis && <section className="panel agent-analysis-panel">
         <div className="panel-heading"><div><span className="section-kicker">AI ANALYSIS DETAIL</span><h2>{selectedAnalysis.topic.topic_title}</h2></div><button className="secondary-button" onClick={() => setSelectedAnalysis(null)}>关闭详情</button></div>
