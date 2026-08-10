@@ -1,4 +1,5 @@
 export const datePresetLabels = {
+  today: "今日",
   yesterday: "昨日",
   week: "近一周",
   month: "自然月",
@@ -51,7 +52,10 @@ export function rangeForPreset(preset: Exclude<DatePreset, "custom">, now = new 
   let to = yesterday.toISOString().slice(0, 10);
   let from = to;
 
-  if (preset === "week") {
+  if (preset === "today") {
+    from = todayUtc.toISOString().slice(0, 10);
+    to = from;
+  } else if (preset === "week") {
     const start = new Date(todayUtc);
     start.setUTCDate(start.getUTCDate() - 6);
     from = start.toISOString().slice(0, 10);

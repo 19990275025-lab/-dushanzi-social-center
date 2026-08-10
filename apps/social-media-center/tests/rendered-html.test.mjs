@@ -106,9 +106,10 @@ test("data collection center combines automatic collection and imports without r
   assert.doesNotMatch(shell, /label: "智能采集中心"/);
 });
 
-test("global date filter resolves yesterday, week, month and custom ranges", async () => {
+test("global date filter resolves today, yesterday, week, month and custom ranges", async () => {
   const { rangeForMonth, rangeForPreset, resolveDateRange } = await import(new URL("../lib/date-range.ts", import.meta.url));
   const now = new Date("2026-08-08T04:00:00.000Z");
+  assert.deepEqual(rangeForPreset("today", now), { preset: "today", from: "2026-08-08", to: "2026-08-08", label: "今日" });
   assert.deepEqual(rangeForPreset("yesterday", now), { preset: "yesterday", from: "2026-08-07", to: "2026-08-07", label: "昨日" });
   assert.deepEqual(rangeForPreset("week", now), { preset: "week", from: "2026-08-02", to: "2026-08-08", label: "近一周" });
   assert.deepEqual(rangeForPreset("month", now), { preset: "month", from: "2026-08-01", to: "2026-08-08", label: "2026年8月" });
@@ -140,7 +141,7 @@ test("global date filter is wired to every requested dashboard and API", async (
   assert.match(filter, /dual-calendar/);
   assert.match(filter, /CalendarMonth/);
   assert.doesNotMatch(filter, /type="date"/);
-  for (const label of ["昨日", "近一周", "自然月", "自定义"]) assert.match(dateRange, new RegExp(label));
+  for (const label of ["今日", "昨日", "近一周", "自然月", "自定义"]) assert.match(dateRange, new RegExp(label));
   for (const page of [dashboardPage, contentPage, commentPage, aiPage]) assert.match(page, /dateRangeQuery\(range\)/);
   assert.match(fanPage, /dateRangeQuery\(activeTrendRange\)/);
   assert.match(fanPage, /MonthPicker/);
