@@ -62,7 +62,7 @@ test("content monitoring and fan analysis are independent navigation modules", a
   assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });
 
-test("content and fan insights switch platform themes without changing the app background", async () => {
+test("content monitoring is Douyin-first while fan insights retain platform themes", async () => {
   const [content, fans, styles] = await Promise.all([
     readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
     readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
@@ -72,12 +72,12 @@ test("content and fan insights switch platform themes without changing the app b
     assert.match(source, /platform-themed-page/);
     assert.match(source, /current-platform-badge/);
     assert.match(source, /当前平台/);
-    assert.match(source, /theme-\$\{/);
   }
-  assert.match(content, /`\$\{currentPlatformLabel\}内容监测`/);
-  assert.match(content, /content-platform-grid/);
-  assert.match(content, /content-platform-card/);
-  assert.match(content, /三平台汇总/);
+  assert.match(content, /抖音内容监测中心/);
+  assert.match(content, /theme-douyin/);
+  assert.match(content, /当前平台：抖音/);
+  assert.doesNotMatch(content, /platformOptions|setPlatform|快手|微博/);
+  assert.match(fans, /theme-\$\{/);
   assert.match(fans, /`\$\{currentPlatformLabel\}粉丝分析`/);
   assert.match(fans, /platform: "all"/);
   for (const theme of ["theme-douyin", "theme-kuaishou", "theme-weibo"]) assert.match(styles, new RegExp(theme));
@@ -89,6 +89,35 @@ test("content and fan insights switch platform themes without changing the app b
   assert.doesNotMatch(content, /wechat_channels|视频号/);
   assert.doesNotMatch(fans, /wechat_channels|视频号/);
   assert.doesNotMatch(styles, /platform-themed-page\.theme-wechat_channels/);
+});
+
+test("content monitoring V1.0 uses real Douyin posts, comments and hot-topic feedback", async () => {
+  const [page, api, engine, styles] = await Promise.all([
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/content-monitoring/route.ts", root), "utf8"),
+    readFile(new URL("lib/content-monitoring.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  for (const label of ["今日发布", "播放量", "点赞", "评论", "收藏", "分享", "互动率", "作品排行榜 TOP10", "爆款分析", "爆款原因", "内容结构", "标题特点", "拍摄方式", "低效作品诊断", "播放低原因", "优化建议", "热点关联", "推荐是否有效"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /\/api\/content-monitoring/);
+  assert.match(page, /social_posts、social_comments、hot_topic_feedback/);
+  assert.match(api, /FROM social_posts/);
+  assert.match(api, /platform = 'douyin'/);
+  assert.match(api, /FROM social_comments/);
+  assert.match(api, /FROM hot_topic_feedback/);
+  assert.match(api, /JOIN hot_topics/);
+  assert.match(api, /COALESCE\(f\.related_post_id, f\.social_post_id\)/);
+  assert.match(api, /ruleBasedContentEngine/);
+  assert.match(engine, /buildBreakoutAnalysis/);
+  assert.match(engine, /buildLowEfficiencyDiagnosis/);
+  assert.match(engine, /post\.likes \+ post\.comments \+ post\.favorites \+ post\.shares/);
+  assert.match(styles, /content-monitor-kpis/);
+  assert.match(styles, /breakout-analysis-grid/);
+  assert.match(styles, /low-efficiency-list/);
+  assert.match(styles, /content-hot-link-table/);
+  assert.doesNotMatch(styles.slice(styles.indexOf("\/\* 抖音内容监测中心 V1\.0 \*\/")), /linear-gradient/);
 });
 
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {
@@ -403,9 +432,8 @@ test("content monitoring competitor posts schema supports future collection", as
   assert.match(bootstrap, /PRAGMA optimize/);
 });
 
-test("viral content comparison uses a category library without fixed scenic accounts", async () => {
-  const [page, api, migration, postgresMigration, schema, bootstrap] = await Promise.all([
-    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+test("viral content library remains available without fixed scenic accounts", async () => {
+  const [api, migration, postgresMigration, schema, bootstrap] = await Promise.all([
     readFile(new URL("app/api/insights/content/route.ts", root), "utf8"),
     readFile(new URL("drizzle/0009_viral_video_library.sql", root), "utf8"),
     readProjectMigration("007_create_viral_video_library.sql"),
@@ -414,7 +442,7 @@ test("viral content comparison uses a category library without fixed scenic acco
   ]);
   for (const source of [api, migration, postgresMigration, schema, bootstrap]) assert.match(source, /viral_videos/);
   for (const label of ["旅游类爆款", "景区类爆款", "新疆旅游爆款", "自然风景爆款"]) assert.match(api, new RegExp(label));
-  for (const label of ["视频结构", "标题方式", "前三秒内容", "拍摄方式", "互动方式", "评论反馈", "爆款原因", "可复制元素", "适合独山子大峡谷的内容建议"]) assert.match(page, new RegExp(label));
+  for (const field of ["video_structure", "title_pattern", "first_three_seconds", "shooting_method", "interaction_method", "comment_feedback", "breakout_reason", "replicable_elements", "dushanzi_suggestion"]) assert.match(api, new RegExp(field));
   assert.doesNotMatch(api, /那拉提景区|喀纳斯景区|天山天池|赛里木湖/);
   assert.match(migration, /source_record_id/);
   assert.match(migration, /raw_payload/);
