@@ -16,6 +16,8 @@ export type HotTopicRecord = {
   heat_value: number;
   trend: "up" | "down" | "new" | "stable";
   category: string | null;
+  source_url: string | null;
+  raw_payload: Record<string, unknown>;
   collect_time: string;
 };
 
@@ -269,6 +271,10 @@ function normalizeHotTopic(record: UnknownRecord, envelope: CollectionEnvelope, 
     heat_value: metricValue(pick(record, ["heat_value", "heatValue", "heat", "热度"]), "heat_value", errors),
     trend: trend ?? "new",
     category,
+    source_url: typeof pick(record, ["source_url", "url", "链接"]) === "string"
+      ? String(pick(record, ["source_url", "url", "链接"])).trim().slice(0, 2000) || null
+      : null,
+    raw_payload: record,
     collect_time: isoDate(pick(record, ["collect_time", "collectTime", "collected_at", "采集时间"]) ?? envelope.collectedAt, "collect_time", errors),
   };
 }

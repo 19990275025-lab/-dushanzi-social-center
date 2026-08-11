@@ -7,6 +7,7 @@ import {
   buildWorkBuddyV2Records,
   groupWorkBuddyV2Batches,
 } from "../lib/workbuddy-v2-adapter.ts";
+import { parseWorkBuddyReportAnalyses, WORKBUDDY_REPORT_SOURCE } from "../lib/workbuddy-report-analysis.ts";
 
 const sourceDirectory = process.env.WORKBUDDY_HOT_TOPIC_DIR
   || join(homedir(), "Desktop", "景区AI营销数据", "hot_topics");
@@ -28,6 +29,17 @@ const filePath = join(sourceDirectory, latestFile);
 const fileInfo = await stat(filePath);
 const raw = JSON.parse(await readFile(filePath, "utf8"));
 if (!Array.isArray(raw)) throw new Error(`${latestFile}顶层必须是数组`);
+const dateDigits = latestFile.match(/(\d{4})(\d{2})(\d{2})/)?.slice(1);
+const collectionDate = dateDigits ? dateDigits.join("-") : null;
+const reportFile = collectionDate ? `独山子大峡谷旅游热点监测报告_${collectionDate}.html` : null;
+let reportAnalyses = [];
+if (reportFile) {
+  try {
+    reportAnalyses = parseWorkBuddyReportAnalyses(await readFile(join(sourceDirectory, reportFile), "utf8"));
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
 
 const collectedAt = fileInfo.mtime.toISOString();
 const converted = buildWorkBuddyV2Records(raw, collectedAt, limit);
@@ -41,6 +53,8 @@ if (converted.errors.length) {
     requestedCount: converted.requestedCount,
     mappedCount: converted.records.length,
     batches: groupWorkBuddyV2Batches(converted.records, collectedAt),
+    reportFile,
+    reportAnalysisCount: reportAnalyses.length,
     previewOnly: true,
   }, null, 2));
 } else {
@@ -111,6 +125,22 @@ if (converted.errors.length) {
     });
   }
 
+  let analysisImport = null;
+  if (confirm && reportAnalyses.length) {
+    analysisImport = await requestJson("/api/hot-topic-analysis/import", {
+      method: "POST",
+      body: JSON.stringify({
+        source_agent: WORKBUDDY_V2_SOURCE,
+        collection_date: collectionDate,
+        analysis_source: WORKBUDDY_REPORT_SOURCE,
+        analyses: reportAnalyses,
+      }),
+    });
+    if (analysisImport.unmatchedCount) {
+      throw new Error(`报告分析有${analysisImport.unmatchedCount}条未匹配热点数据`);
+    }
+  }
+
   let visibleCount = 0;
   if (confirm) {
     const dashboard = await requestJson("/api/hot-topics?platform=all");
@@ -125,7 +155,10 @@ if (converted.errors.length) {
     successCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.writtenCount ?? 0), 0),
     insertedCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.insertedCount ?? 0), 0),
     updatedCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.updatedCount ?? 0), 0),
-    aiRecommendedCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.aiRecommendedCount ?? 0), 0),
+    aiRecommendedCount: analysisImport?.recommendedCount ?? 0,
+    reportFile,
+    reportAnalysisCount: reportAnalyses.length,
+    analysisImport,
     failedCount: batches.reduce((sum, batch) => sum + batch.previewErrors, 0),
     visibleInHotTopicCenter: visibleCount,
     confirmed: confirm,

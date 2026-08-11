@@ -230,6 +230,24 @@ const schemaStatements = [
     ON hot_topics(platform, collect_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topics_related_degree
     ON hot_topics(related_degree DESC)`,
+  `CREATE TABLE IF NOT EXISTS hot_topic_analysis (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hot_topic_id INTEGER NOT NULL REFERENCES hot_topics(id) ON DELETE CASCADE,
+    relevance_score REAL NOT NULL CHECK (relevance_score >= 0 AND relevance_score <= 100),
+    recommend_follow INTEGER NOT NULL DEFAULT 0 CHECK (recommend_follow IN (0, 1)),
+    recommendation_reason TEXT NOT NULL,
+    recommended_title TEXT NOT NULL,
+    shooting_direction TEXT NOT NULL,
+    live_theme TEXT NOT NULL,
+    analysis_source TEXT NOT NULL DEFAULT 'WorkBuddy热点监测报告',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topic_analysis_topic_source
+    ON hot_topic_analysis(hot_topic_id, analysis_source)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_analysis_topic_id
+    ON hot_topic_analysis(hot_topic_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_analysis_recommend_score
+    ON hot_topic_analysis(recommend_follow, relevance_score DESC)`,
   `CREATE TABLE IF NOT EXISTS HOT_TOPIC_DATA (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),

@@ -35,10 +35,22 @@ export async function POST(request: Request) {
     heatValue: row.heat_value, keyword: row.keyword, url: row.url,
     publishTime: row.publish_time, category: row.category, sourceAgent: "WorkBuddy热点监测Agent",
   }, historicalContext);
-  await d1.prepare(`UPDATE hot_topics SET hot_score = ?, related_degree = ?, ai_suggestion = ?,
-      video_direction = ?, recommended_topic = ?, publish_time_suggestion = ? WHERE id = ?`)
-    .bind(ai.relevanceScore, ai.relevanceScore / 100,
-      JSON.stringify({ worthFollowing: ai.worthFollowing, worthFollowingLabel: ai.worthFollowingLabel, analysis: ai.analysis }),
-      ai.shootingDirection, ai.shortVideoTitle, ai.liveTheme, id).run();
+  await d1.prepare(`
+    INSERT INTO hot_topic_analysis
+      (hot_topic_id, relevance_score, recommend_follow, recommendation_reason,
+       recommended_title, shooting_direction, live_theme, analysis_source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, '系统规则分析V1.0')
+    ON CONFLICT(hot_topic_id, analysis_source) DO UPDATE SET
+      relevance_score = excluded.relevance_score,
+      recommend_follow = excluded.recommend_follow,
+      recommendation_reason = excluded.recommendation_reason,
+      recommended_title = excluded.recommended_title,
+      shooting_direction = excluded.shooting_direction,
+      live_theme = excluded.live_theme,
+      created_at = CURRENT_TIMESTAMP
+  `).bind(
+    id, ai.relevanceScore, ai.worthFollowing ? 1 : 0, ai.analysis,
+    ai.shortVideoTitle, ai.shootingDirection, ai.liveTheme,
+  ).run();
   return Response.json({ id, ai });
 }

@@ -339,6 +339,29 @@ export const hotTopics = sqliteTable(
   ],
 );
 
+export const hotTopicAnalysis = sqliteTable(
+  "hot_topic_analysis",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    hotTopicId: integer("hot_topic_id").notNull().references(() => hotTopics.id, {
+      onDelete: "cascade",
+    }),
+    relevanceScore: real("relevance_score").notNull(),
+    recommendFollow: integer("recommend_follow", { mode: "boolean" }).notNull().default(false),
+    recommendationReason: text("recommendation_reason").notNull(),
+    recommendedTitle: text("recommended_title").notNull(),
+    shootingDirection: text("shooting_direction").notNull(),
+    liveTheme: text("live_theme").notNull(),
+    analysisSource: text("analysis_source").notNull().default("WorkBuddy热点监测报告"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_hot_topic_analysis_topic_source").on(table.hotTopicId, table.analysisSource),
+    index("idx_hot_topic_analysis_topic_id").on(table.hotTopicId),
+    index("idx_hot_topic_analysis_recommend_score").on(table.recommendFollow, table.relevanceScore),
+  ],
+);
+
 export const hotTopicData = sqliteTable(
   "HOT_TOPIC_DATA",
   {

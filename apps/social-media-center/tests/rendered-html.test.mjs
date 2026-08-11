@@ -306,11 +306,13 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
   for (const output of ["关联度", "是否推荐跟进|worthFollowingLabel", "推荐短视频标题|shortVideoTitle", "推荐拍摄方向|shootingDirection"]) assert.match(page, new RegExp(output));
   for (const suggestion of ["抖音短视频内容建议", "快手互动和直播建议", "微博品牌传播建议"]) assert.match(page, new RegExp(suggestion));
   assert.match(agentApi, /FROM hot_topics/);
+  assert.match(agentApi, /LEFT JOIN hot_topic_analysis/);
   assert.match(agentApi, /collect_time/);
   assert.match(agentApi, /\+8 hours/);
   assert.match(agentApi, /ranking AS rank/);
   assert.match(analysisApi, /FROM hot_topics/);
-  assert.match(analysisApi, /UPDATE hot_topics/);
+  assert.match(analysisApi, /INSERT INTO hot_topic_analysis/);
+  assert.doesNotMatch(analysisApi, /UPDATE hot_topics/);
   assert.match(analysisApi, /FROM social_posts/);
   assert.match(api, /searchParams/);
   assert.match(api, /platform = \?/);
@@ -586,12 +588,15 @@ test("data collection V2.1 normalizes, previews and confirms three data types", 
   }
 });
 
-test("WorkBuddy V2.2 maps real source records through the standard preview and confirm API", async () => {
-  const [adapter, script, confirmRoute, importAnalysis] = await Promise.all([
+test("WorkBuddy report analysis is stored separately from raw hot topics", async () => {
+  const [adapter, reportParser, script, confirmRoute, analysisImport, schema, migration] = await Promise.all([
     import(new URL("../lib/workbuddy-v2-adapter.ts", import.meta.url)),
+    import(new URL("../lib/workbuddy-report-analysis.ts", import.meta.url)),
     readFile(new URL("scripts/import-workbuddy-v2.mjs", root), "utf8"),
     readFile(new URL("app/api/data-collection/v2/confirm/route.ts", root), "utf8"),
-    readFile(new URL("lib/hot-topic-import-analysis.ts", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-analysis/import/route.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0018_hot_topic_analysis.sql", root), "utf8"),
   ]);
   const sourceRows = Array.from({ length: 10 }, (_, index) => ({
     platform: index === 0 ? "微博/抖音" : index === 1 ? "快手/抖音" : "抖音",
@@ -600,6 +605,7 @@ test("WorkBuddy V2.2 maps real source records through the standard preview and c
     heat_value: index === 0 ? "🔥微博热搜TOP1/全网热议" : `🔥热度${900 - index * 10}万`,
     keyword: `新疆 热点${index + 1}`,
     category: "旅游",
+    url: `https://example.com/topic-${index + 1}`,
     source_agent: "WorkBuddy热点监测Agent",
   }));
   const converted = adapter.buildWorkBuddyV2Records(sourceRows, "2026-08-11T08:00:00+08:00", 10);
@@ -612,19 +618,36 @@ test("WorkBuddy V2.2 maps real source records through the standard preview and c
   assert.equal(converted.records[0].heat_value, 100);
   assert.equal(converted.records[0].keyword, "新疆 热点1");
   assert.equal(converted.records[0].category, "旅游");
+  assert.equal(converted.records[0].source_url, "https://example.com/topic-1");
+  assert.equal(converted.records[0].raw_payload.topic, "WorkBuddy测试热点1");
+  const parsedReport = reportParser.parseWorkBuddyReportAnalyses(`
+    <div class="card"><h3>WorkBuddy测试热点1</h3>
+    <span class="suit-high">✅ 适合借势</span><span>关联度：96/100</span>
+    <p><strong>📸 推荐拍摄方向：</strong>拍峡谷第一视角</p>
+    <p><strong>📱 推荐短视频标题：</strong>独库第一站</p>
+    <p><strong>🎥 推荐直播主题：</strong>峡谷云直播</p></div>`);
+  assert.equal(parsedReport.length, 1);
+  assert.equal(parsedReport[0].relevance_score, 96);
+  assert.equal(parsedReport[0].recommend_follow, true);
   assert.equal(adapter.groupWorkBuddyV2Batches(converted.records, "2026-08-11T08:00:00+08:00").length, 3);
   assert.match(script, /\/api\/data-collection\/v2\/receive/);
   assert.match(script, /\/api\/data-collection\/v2\/preview/);
   assert.match(script, /\/api\/data-collection\/v2\/confirm/);
+  assert.match(script, /\/api\/hot-topic-analysis\/import/);
   assert.match(script, /\/api\/hot-topics\?platform=all/);
   assert.match(script, /--overwrite-same-day/);
   assert.match(script, /duplicate_mode/);
   assert.match(confirmRoute, /douyin_hot_rank/);
   assert.match(confirmRoute, /collection_date/);
   assert.match(confirmRoute, /aiRecommendedCount/);
-  assert.match(confirmRoute, /analyzeImportedHotTopic/);
-  assert.match(importAnalysis, /analyzeWorkBuddyTopic/);
-  for (const source of [script, confirmRoute, importAnalysis]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
+  assert.match(confirmRoute, /raw_payload/);
+  assert.doesNotMatch(confirmRoute, /analyzeImportedHotTopic|analyzeWorkBuddyTopic/);
+  assert.match(analysisImport, /INSERT OR IGNORE INTO hot_topic_analysis/);
+  assert.match(analysisImport, /unmatchedTopics/);
+  assert.match(schema, /sqliteTable\(\s*"hot_topic_analysis"/);
+  assert.match(migration, /FOREIGN KEY \(`hot_topic_id`\) REFERENCES `hot_topics`/);
+  assert.doesNotMatch(migration, /DELETE FROM `hot_topics`/);
+  for (const source of [script, confirmRoute, analysisImport]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
 });
 
 test("production build artifacts exist", async () => {

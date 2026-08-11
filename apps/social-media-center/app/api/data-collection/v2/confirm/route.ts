@@ -9,7 +9,6 @@ import {
   parsePositiveId,
 } from "@/lib/data-collection-api-v2";
 import type { CommentRecord, ContentRecord, HotTopicRecord } from "@/lib/data-collection-v2";
-import { analyzeImportedHotTopic } from "@/lib/hot-topic-import-analysis";
 
 type LogRow = {
   id: number;
@@ -144,49 +143,26 @@ export async function POST(request: Request) {
     insertedCount = selectedRecords.length - updatedCount;
     successCount = selectedRecords.length;
 
-    const [posts, priorTopics] = await Promise.all([
-      d1.prepare("SELECT title, hashtags FROM social_posts ORDER BY publish_time DESC, id DESC LIMIT 300")
-        .all<{ title: string; hashtags: string | null }>(),
-      d1.prepare("SELECT topic_name, keyword, category FROM hot_topics ORDER BY collect_time DESC, id DESC LIMIT 500")
-        .all<{ topic_name: string; keyword: string; category: string | null }>(),
-    ]);
-    const historicalText = [
-      ...posts.results.map((post) => `${post.title} ${post.hashtags ?? ""}`),
-      ...priorTopics.results.map((topic) => `${topic.topic_name} ${topic.keyword} ${topic.category ?? ""}`),
-    ].join(" ");
-
     for (const record of selectedRecords) {
-      const ai = analyzeImportedHotTopic(record, historicalText);
-      if (ai?.worthFollowing) aiRecommendedCount += 1;
       statements.push(d1.prepare(`
         INSERT INTO hot_topics
           (platform, source, topic_type, data_source, topic_name, keyword, ranking,
-           heat_value, trend, category, related_degree, ai_suggestion, status,
-           source_agent, hot_score, recommended_topic, video_direction, publish_time_suggestion,
+           heat_value, trend, category, status, source_url, raw_payload, source_agent,
            collection_log_id, collect_time, collection_date, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(platform, data_source, topic_name, collection_date) DO UPDATE SET
           source = excluded.source, topic_type = excluded.topic_type,
           keyword = excluded.keyword, category = excluded.category,
           ranking = excluded.ranking, heat_value = excluded.heat_value,
-          trend = excluded.trend, related_degree = excluded.related_degree,
-          ai_suggestion = excluded.ai_suggestion, source_agent = excluded.source_agent,
-          hot_score = excluded.hot_score, recommended_topic = excluded.recommended_topic,
-          video_direction = excluded.video_direction,
-          publish_time_suggestion = excluded.publish_time_suggestion,
+          trend = excluded.trend, source_url = excluded.source_url,
+          raw_payload = excluded.raw_payload, source_agent = excluded.source_agent,
           collection_log_id = excluded.collection_log_id,
           collect_time = excluded.collect_time, status = 'active'
       `).bind(
         record.platform, record.source, record.topic_type, topicDataSource(record),
         record.topic_name, record.keyword, record.ranking, record.heat_value,
         record.trend, record.category,
-        ai ? ai.relevanceScore / 100 : null,
-        ai ? JSON.stringify({ worthFollowing: ai.worthFollowing, worthFollowingLabel: ai.worthFollowingLabel, analysis: ai.analysis }) : null,
-        record.source,
-        ai?.relevanceScore ?? null,
-        ai?.shortVideoTitle ?? null,
-        ai?.shootingDirection ?? null,
-        ai?.liveTheme ?? null,
+        record.source_url, JSON.stringify(record.raw_payload), record.source,
         id, record.collect_time, collectionDate(record.collect_time),
       ));
     }

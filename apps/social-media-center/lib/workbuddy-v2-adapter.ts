@@ -13,6 +13,8 @@ export type WorkBuddyV2Record = {
   heat_value: number;
   trend: "new";
   category: string | null;
+  source_url: string | null;
+  raw_payload: WorkBuddyRawTopic;
   collect_time: string;
 };
 
@@ -119,6 +121,8 @@ export function buildWorkBuddyV2Records(rawTopics: unknown[], collectedAt: strin
       heat_value: heat as number,
       trend: "new",
       category: category.slice(0, 128) || null,
+      source_url: String(value(topic, ["url", "source_url", "链接"]) ?? "").trim().slice(0, 2000) || null,
+      raw_payload: topic,
       collect_time: collectedAt,
     });
   }

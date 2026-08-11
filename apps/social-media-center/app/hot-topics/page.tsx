@@ -20,6 +20,7 @@ type AgentHotTopic = {
   ai_relevance_score: number | null;
   ai_analysis: string | null;
   ai_recommendation: string | null;
+  analysis_source: string | null;
 };
 
 type AgentAiResult = {
@@ -170,6 +171,7 @@ export default function HotTopicsPage() {
     strong: reportAnalyses.filter((item) => item.relevanceScore >= 80 && item.worthFollowing).length,
     available: reportAnalyses.filter((item) => item.relevanceScore >= 60).length,
   }), [reportAnalyses, reportTopics]);
+  const usesWorkBuddyReport = useMemo(() => reportTopics.some((topic) => topic.analysis_source === "WorkBuddy热点监测报告"), [reportTopics]);
 
   const advice = platformAdvice[activePlatform] ?? platformAdvice.other;
   const currentLabel = platformTabs.find((tab) => tab.value === activePlatform)?.label ?? "全部热点";
@@ -308,7 +310,7 @@ export default function HotTopicsPage() {
       {viewMode === "ranking" && <section className="panel hot-ai-recommendation-panel">
         <div className="panel-heading light-heading">
           <div><span className="section-kicker">AI TOPIC OPPORTUNITY</span><h2>AI热点分析与选题推荐</h2></div>
-          <span className="ai-badge">WORKBUDDY × RULES V1</span>
+          <span className="ai-badge">{usesWorkBuddyReport ? "WORKBUDDY REPORT" : "WORKBUDDY × RULES V1"}</span>
         </div>
         <p className="ai-intro">综合当前平台热点、独山子大峡谷景区资源与历史作品数据，判断关联度和跟进价值。</p>
         <div className="hot-ai-card-grid">
@@ -365,7 +367,7 @@ export default function HotTopicsPage() {
           </ol>
         </section>
 
-        <footer className="hot-report-footer">数据来源：WorkBuddy热点监测Agent · 抖音 / 快手 / 微博 · 仅供内部运营参考</footer>
+        <footer className="hot-report-footer">热点来源：WorkBuddy热点监测Agent · 分析来源：{usesWorkBuddyReport ? "WorkBuddy热点监测报告" : "系统规则分析"} · 仅供内部运营参考</footer>
       </section>}
 
       {selectedAnalysis && <section className="panel agent-analysis-panel">
