@@ -54,13 +54,27 @@ export async function POST(request: Request) {
     `中段：${row.shooting_direction}`,
     "结尾：补充路线、项目或游玩提示，并用问题引导游客评论和收藏。",
   ].join("\n");
+  const contentDirection = topicContentDirection(row.category, row.platform);
+  const recommendedContent = {
+    shortVideoTitle: row.recommended_title,
+    contentDirection,
+    scriptDirection,
+    liveTheme: row.live_theme,
+  };
+  const feedback = await getD1().prepare(`
+    INSERT INTO hot_topic_feedback (hot_topic_id, recommended_content)
+    VALUES (?, ?)
+    RETURNING id
+  `).bind(row.id, JSON.stringify(recommendedContent)).first<{ id: number }>();
+  if (!feedback) return Response.json({ error: "热点选题复盘记录创建失败" }, { status: 500 });
   return Response.json({
     id: row.id,
+    feedbackId: feedback.id,
     topicName: row.topic_name,
     recommendationLevel: score.level,
     tourismConversionScore: score.tourismConversion,
     shortVideoTitle: row.recommended_title,
-    contentDirection: topicContentDirection(row.category, row.platform),
+    contentDirection,
     scriptDirection,
     liveTheme: row.live_theme,
   });

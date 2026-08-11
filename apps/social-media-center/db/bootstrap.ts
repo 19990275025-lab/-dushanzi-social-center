@@ -248,6 +248,28 @@ const schemaStatements = [
     ON hot_topic_analysis(hot_topic_id)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topic_analysis_recommend_score
     ON hot_topic_analysis(recommend_follow, relevance_score DESC)`,
+  `CREATE TABLE IF NOT EXISTS hot_topic_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hot_topic_id INTEGER NOT NULL REFERENCES hot_topics(id) ON DELETE CASCADE,
+    recommended_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    recommended_content TEXT NOT NULL,
+    social_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL,
+    views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+    likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
+    comments INTEGER NOT NULL DEFAULT 0 CHECK (comments >= 0),
+    favorites INTEGER NOT NULL DEFAULT 0 CHECK (favorites >= 0),
+    shares INTEGER NOT NULL DEFAULT 0 CHECK (shares >= 0),
+    is_effective INTEGER CHECK (is_effective IN (0, 1)),
+    evaluated_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_topic_recommended
+    ON hot_topic_feedback(hot_topic_id, recommended_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_social_post
+    ON hot_topic_feedback(social_post_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_effective
+    ON hot_topic_feedback(is_effective)`,
   `CREATE TABLE IF NOT EXISTS HOT_TOPIC_DATA (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),

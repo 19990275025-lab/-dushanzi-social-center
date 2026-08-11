@@ -362,6 +362,42 @@ export const hotTopicAnalysis = sqliteTable(
   ],
 );
 
+export const hotTopicFeedback = sqliteTable(
+  "hot_topic_feedback",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    hotTopicId: integer("hot_topic_id").notNull().references(() => hotTopics.id, {
+      onDelete: "cascade",
+    }),
+    recommendedAt: text("recommended_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    recommendedContent: text("recommended_content", { mode: "json" })
+      .$type<{
+        shortVideoTitle: string;
+        contentDirection: string;
+        scriptDirection: string;
+        liveTheme: string;
+      }>()
+      .notNull(),
+    socialPostId: integer("social_post_id").references(() => socialPosts.id, {
+      onDelete: "set null",
+    }),
+    views: integer("views").notNull().default(0),
+    likes: integer("likes").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
+    favorites: integer("favorites").notNull().default(0),
+    shares: integer("shares").notNull().default(0),
+    isEffective: integer("is_effective", { mode: "boolean" }),
+    evaluatedAt: text("evaluated_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("idx_hot_topic_feedback_topic_recommended").on(table.hotTopicId, table.recommendedAt),
+    index("idx_hot_topic_feedback_social_post").on(table.socialPostId),
+    index("idx_hot_topic_feedback_effective").on(table.isEffective),
+  ],
+);
+
 export const hotTopicData = sqliteTable(
   "HOT_TOPIC_DATA",
   {

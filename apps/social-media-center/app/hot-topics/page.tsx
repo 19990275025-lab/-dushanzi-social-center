@@ -38,9 +38,10 @@ type AgentAiResult = {
 };
 
 type ParsedAnalysis = AgentAiResult & { topic: AgentHotTopic };
-type ViewMode = "report" | "ranking";
+type ViewMode = "report" | "ranking" | "review";
 type GeneratedPlan = {
   id: number;
+  feedbackId: number;
   topicName: string;
   recommendationLevel: "A" | "B" | "C";
   tourismConversionScore: number;
@@ -48,6 +49,60 @@ type GeneratedPlan = {
   contentDirection: string;
   scriptDirection: string;
   liveTheme: string;
+};
+
+type FeedbackSummary = {
+  recommendationCount: number;
+  linkedCount: number;
+  evaluatedCount: number;
+  successCount: number;
+  successRate: number;
+  linkRate: number;
+};
+
+type FeedbackRecord = {
+  id: number;
+  hot_topic_id: number;
+  topic_name: string;
+  platform: string;
+  category: string | null;
+  recommended_at: string;
+  recommended_content: Record<string, string>;
+  social_post_id: number | null;
+  post_title: string | null;
+  publish_time: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+  favorites: number;
+  shares: number;
+  engagement_rate: number;
+  is_effective: boolean | null;
+};
+
+type FeedbackPost = {
+  id: number;
+  platform: string;
+  title: string;
+  publish_time: string;
+};
+
+type FeedbackType = {
+  type: string;
+  evaluatedCount: number;
+  successCount: number;
+  successRate: number;
+  averageViews: number;
+};
+
+type FeedbackData = {
+  summary: FeedbackSummary;
+  records: FeedbackRecord[];
+  posts: FeedbackPost[];
+  highValueTypes: FeedbackType[];
+  lowValueTypes: FeedbackType[];
+  modelSuggestions: string[];
+  effectivenessRule: string;
 };
 
 const platformTabs = [
@@ -140,6 +195,11 @@ export default function HotTopicsPage() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<ParsedAnalysis | null>(null);
   const [generatingId, setGeneratingId] = useState<number | null>(null);
   const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackData | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [linkingFeedbackId, setLinkingFeedbackId] = useState<number | null>(null);
+  const [refreshingFeedback, setRefreshingFeedback] = useState(false);
+  const [selectedPostIds, setSelectedPostIds] = useState<Record<number, string>>({});
   const [agentFile, setAgentFile] = useState<File | null>(null);
   const [importingAgent, setImportingAgent] = useState(false);
   const [replacingAgent, setReplacingAgent] = useState(false);
@@ -160,10 +220,30 @@ export default function HotTopicsPage() {
     }
   }, [range.from, range.to]);
 
+  const loadFeedback = useCallback(async () => {
+    try {
+      setFeedbackLoading(true);
+      const response = await fetch("/api/hot-topic-feedback", { cache: "no-store" });
+      const result = await response.json() as FeedbackData & { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "热点复盘数据读取失败");
+      setFeedback(result);
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "热点复盘数据读取失败" });
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => void loadTopics(), 0);
     return () => window.clearTimeout(timer);
   }, [loadTopics]);
+
+  useEffect(() => {
+    if (viewMode !== "review") return;
+    const timer = window.setTimeout(() => void loadFeedback(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadFeedback, viewMode]);
 
   const topicsInRange = useMemo(() => topics.filter((topic) => {
     const date = topic.collection_date;
@@ -254,10 +334,53 @@ export default function HotTopicsPage() {
       const result = await response.json() as GeneratedPlan & { error?: string };
       if (!response.ok) throw new Error(result.error ?? "热点选题生成失败");
       setGeneratedPlan(result);
+      setMessage({ type: "success", text: `选题已生成，并建立复盘任务 #${result.feedbackId}。发布后请在“效果复盘”关联对应作品。` });
+      if (viewMode === "review") await loadFeedback();
     } catch (error) {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "热点选题生成失败" });
     } finally {
       setGeneratingId(null);
+    }
+  }
+
+  async function linkPublishedPost(record: FeedbackRecord) {
+    const postId = Number(selectedPostIds[record.id]);
+    if (!Number.isInteger(postId) || postId <= 0) {
+      setMessage({ type: "error", text: "请先选择对应的已发布作品。" });
+      return;
+    }
+    setLinkingFeedbackId(record.id);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/hot-topic-feedback", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ feedbackId: record.id, postId }),
+      });
+      const result = await response.json() as { error?: string; effective?: boolean };
+      if (!response.ok) throw new Error(result.error ?? "关联发布作品失败");
+      setMessage({ type: "success", text: `作品已关联，本次推荐判定为${result.effective ? "有效" : "暂未达标"}。` });
+      await loadFeedback();
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "关联发布作品失败" });
+    } finally {
+      setLinkingFeedbackId(null);
+    }
+  }
+
+  async function refreshFeedbackMetrics() {
+    setRefreshingFeedback(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/hot-topic-feedback", { method: "PUT" });
+      const result = await response.json() as { error?: string; refreshedCount?: number };
+      if (!response.ok) throw new Error(result.error ?? "作品数据刷新失败");
+      setMessage({ type: "success", text: `已从 social_posts 刷新 ${result.refreshedCount ?? 0} 条复盘记录。` });
+      await loadFeedback();
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "作品数据刷新失败" });
+    } finally {
+      setRefreshingFeedback(false);
     }
   }
 
@@ -328,6 +451,7 @@ export default function HotTopicsPage() {
         <div className="hot-view-switch" role="group" aria-label="热点展示方式">
           <button className={viewMode === "report" ? "active" : ""} onClick={() => setViewMode("report")}>分析报告</button>
           <button className={viewMode === "ranking" ? "active" : ""} onClick={() => setViewMode("ranking")}>TOP20列表</button>
+          <button className={viewMode === "review" ? "active" : ""} onClick={() => setViewMode("review")}>效果复盘</button>
         </div>
       </div>
 
@@ -340,7 +464,7 @@ export default function HotTopicsPage() {
 
       {message && <div className={`import-message ${message.type}`}><span>{message.type === "success" ? "✓" : "!"}</span>{message.text}</div>}
 
-      <section className="panel hot-action-top5-panel">
+      {viewMode !== "review" && <section className="panel hot-action-top5-panel">
         <div className="panel-heading light-heading">
           <div><span className="section-kicker">TODAY&apos;S ACTION TOP 5</span><h2>今日推荐热点 TOP5</h2></div>
           <small>旅游转化价值 = 热度20% + 关联度35% + 内容适配25% + 商业价值20%</small>
@@ -361,11 +485,11 @@ export default function HotTopicsPage() {
           })}
           {!actionTop5.length && <div className="hot-top5-empty">当前筛选范围暂无 A 级推荐热点。</div>}
         </div>
-      </section>
+      </section>}
 
       {generatedPlan && <section className="panel hot-generated-plan-panel">
         <div className="panel-heading"><div><span className="section-kicker">AI ACTION PLAN</span><h2>{generatedPlan.topicName}</h2></div><button className="secondary-button" onClick={() => setGeneratedPlan(null)}>关闭选题</button></div>
-        <div className="hot-generated-summary"><span className={`hot-level-badge level-${generatedPlan.recommendationLevel.toLowerCase()}`}>{generatedPlan.recommendationLevel}级</span><strong>旅游转化价值 {generatedPlan.tourismConversionScore}分</strong></div>
+        <div className="hot-generated-summary"><span className={`hot-level-badge level-${generatedPlan.recommendationLevel.toLowerCase()}`}>{generatedPlan.recommendationLevel}级</span><strong>旅游转化价值 {generatedPlan.tourismConversionScore}分</strong><em>复盘任务 #{generatedPlan.feedbackId}</em></div>
         <div className="agent-analysis-grid"><article><span>短视频标题</span><p>{generatedPlan.shortVideoTitle}</p></article><article><span>内容方向</span><p>{generatedPlan.contentDirection}</p></article><article><span>拍摄脚本方向</span><p className="generated-script-text">{generatedPlan.scriptDirection}</p></article><article><span>直播主题</span><p>{generatedPlan.liveTheme}</p></article></div>
       </section>}
 
@@ -459,16 +583,52 @@ export default function HotTopicsPage() {
         <footer className="hot-report-footer">热点来源：WorkBuddy热点监测Agent · 分析来源：{usesWorkBuddyReport ? "WorkBuddy热点监测报告" : "系统规则分析"} · 仅供内部运营参考</footer>
       </section>}
 
+      {viewMode === "review" && <section className="hot-feedback-dashboard" aria-label="热点推荐效果复盘">
+        <header className="hot-feedback-header">
+          <div><span>HOT TOPIC PERFORMANCE LOOP</span><h2>热点推荐效果复盘</h2><p>生成选题 → 关联发布作品 → 读取 social_posts → 评估推荐效果</p></div>
+          <button className="primary-button" onClick={() => void refreshFeedbackMetrics()} disabled={refreshingFeedback}>{refreshingFeedback ? "刷新中…" : "刷新作品数据"}</button>
+        </header>
+        {feedbackLoading || !feedback ? <div className="loading-panel"><span className="loading-dot" />正在计算热点推荐效果…</div> : <>
+          <div className="hot-feedback-kpis">
+            <article><span>推荐记录</span><strong>{feedback.summary.recommendationCount}</strong><small>已生成选题</small></article>
+            <article><span>已关联作品</span><strong>{feedback.summary.linkedCount}</strong><small>关联率 {feedback.summary.linkRate}%</small></article>
+            <article><span>有效推荐</span><strong>{feedback.summary.successCount}</strong><small>共评估 {feedback.summary.evaluatedCount} 条</small></article>
+            <article className="primary-kpi"><span>热点推荐成功率</span><strong>{feedback.summary.successRate}%</strong><small>待评估不计入失败</small></article>
+          </div>
+          <p className="hot-feedback-rule"><b>有效标准</b>{feedback.effectivenessRule}</p>
+
+          <div className="hot-feedback-value-grid">
+            <article><div><span>HIGH VALUE</span><h3>高价值热点类型</h3></div><ul>{feedback.highValueTypes.map((item) => <li key={item.type}><strong>{item.type}</strong><span>成功率 {item.successRate}% · 平均播放 {item.averageViews.toLocaleString()}</span></li>)}{!feedback.highValueTypes.length && <li className="pending-value">关联作品并形成评估样本后自动识别。</li>}</ul></article>
+            <article><div><span>LOW VALUE</span><h3>低价值热点类型</h3></div><ul>{feedback.lowValueTypes.map((item) => <li key={item.type}><strong>{item.type}</strong><span>成功率 {item.successRate}% · 已评估 {item.evaluatedCount} 条</span></li>)}{!feedback.lowValueTypes.length && <li className="pending-value">当前样本不足，暂不判定低价值类型。</li>}</ul></article>
+            <article className="model-suggestion-card"><div><span>MODEL LEARNING</span><h3>AI模型优化建议</h3></div><ol>{feedback.modelSuggestions.map((item, index) => <li key={item}><span>{String(index + 1).padStart(2, "0")}</span><p>{item}</p></li>)}</ol></article>
+          </div>
+
+          <section className="panel hot-feedback-list-panel">
+            <div className="panel-heading light-heading"><div><span className="section-kicker">RECOMMENDATION FEEDBACK</span><h2>选题与发布作品关联</h2></div><small>指标来自 social_posts；点击刷新可同步作品最新数据。</small></div>
+            <div className="table-wrap"><table className="hot-feedback-table">
+              <thead><tr><th>推荐时间</th><th>热点 / 推荐内容</th><th>关联发布作品</th><th>作品表现</th><th>评估结果</th></tr></thead>
+              <tbody>{feedback.records.map((record) => <tr key={record.id}>
+                <td><strong>#{record.id}</strong><small>{record.recommended_at}</small></td>
+                <td><span className={`platform-tag tag-${record.platform}`}>{platformLabel(record.platform)}</span><strong>{record.topic_name}</strong><small>{record.recommended_content.shortVideoTitle ?? "已生成选题"}</small></td>
+                <td>{record.social_post_id ? <div className="linked-post"><strong>{record.post_title}</strong><small>{record.publish_time}</small></div> : <div className="feedback-link-control"><select value={selectedPostIds[record.id] ?? ""} onChange={(event) => setSelectedPostIds((current) => ({ ...current, [record.id]: event.target.value }))}><option value="">选择同平台作品</option>{feedback.posts.filter((post) => post.platform === record.platform).map((post) => <option key={post.id} value={post.id}>{post.publish_time.slice(0, 10)} · {post.title}</option>)}</select><button onClick={() => void linkPublishedPost(record)} disabled={linkingFeedbackId === record.id}>{linkingFeedbackId === record.id ? "关联中…" : "关联作品"}</button></div>}</td>
+                <td><div className="feedback-metrics"><span>播放 <b>{record.views.toLocaleString()}</b></span><span>点赞 <b>{record.likes.toLocaleString()}</b></span><span>评论 <b>{record.comments.toLocaleString()}</b></span><span>收藏 <b>{record.favorites.toLocaleString()}</b></span><span>分享 <b>{record.shares.toLocaleString()}</b></span><span>互动率 <b>{record.engagement_rate}%</b></span></div></td>
+                <td><span className={`feedback-result ${record.is_effective === null ? "pending" : record.is_effective ? "effective" : "ineffective"}`}>{record.is_effective === null ? "待评估" : record.is_effective ? "推荐有效" : "暂未达标"}</span></td>
+              </tr>)}{!feedback.records.length && <tr><td colSpan={5} className="empty-cell">尚无复盘记录。点击热点“生成选题”后，系统会自动创建复盘任务。</td></tr>}</tbody>
+            </table></div>
+          </section>
+        </>}
+      </section>}
+
       {selectedAnalysis && <section className="panel agent-analysis-panel">
         <div className="panel-heading"><div><span className="section-kicker">AI ANALYSIS DETAIL</span><h2>{selectedAnalysis.topic.topic_title}</h2></div><button className="secondary-button" onClick={() => setSelectedAnalysis(null)}>关闭详情</button></div>
         <div className="agent-analysis-score"><strong>{selectedAnalysis.relevanceScore}</strong><span>与独山子大峡谷关联度</span><em className={selectedAnalysis.worthFollowing ? "follow-yes" : "follow-no"}>{selectedAnalysis.worthFollowingLabel}</em></div>
         <div className="agent-analysis-grid"><article><span>关联分析</span><p>{selectedAnalysis.analysis}</p></article><article><span>推荐拍摄方向</span><p>{selectedAnalysis.shootingDirection}</p></article><article><span>推荐短视频标题</span><p>{selectedAnalysis.shortVideoTitle}</p></article><article><span>推荐直播主题</span><p>{selectedAnalysis.liveTheme}</p></article></div>
       </section>}
 
-      <section className="panel platform-difference-panel">
+      {viewMode !== "review" && <section className="panel platform-difference-panel">
         <div><span className="section-kicker">{advice.eyebrow}</span><h2>{advice.title}</h2><p>{advice.summary}</p></div>
         <ol>{advice.actions.map((action, index) => <li key={action}><span>{String(index + 1).padStart(2, "0")}</span><strong>{action}</strong></li>)}</ol>
-      </section>
+      </section>}
     </div>
   );
 }
