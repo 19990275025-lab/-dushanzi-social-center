@@ -21,6 +21,10 @@ type AgentHotTopic = {
   ai_analysis: string | null;
   ai_recommendation: string | null;
   analysis_source: string | null;
+  recommendation_level: "A" | "B" | "C";
+  tourism_conversion_score: number;
+  conversion_components: { heat: number; relevance: number; contentFit: number; commercial: number };
+  content_direction: string;
 };
 
 type AgentAiResult = {
@@ -35,6 +39,16 @@ type AgentAiResult = {
 
 type ParsedAnalysis = AgentAiResult & { topic: AgentHotTopic };
 type ViewMode = "report" | "ranking";
+type GeneratedPlan = {
+  id: number;
+  topicName: string;
+  recommendationLevel: "A" | "B" | "C";
+  tourismConversionScore: number;
+  shortVideoTitle: string;
+  contentDirection: string;
+  scriptDirection: string;
+  liveTheme: string;
+};
 
 const platformTabs = [
   { value: "all", label: "全部热点" },
@@ -45,6 +59,13 @@ const platformTabs = [
 ] as const;
 
 const primaryPlatforms = new Set(["douyin", "kuaishou", "weibo"]);
+const levelTabs = [
+  { value: "all", label: "全部" },
+  { value: "A", label: "A级 · 强烈推荐" },
+  { value: "B", label: "B级 · 谨慎跟进" },
+  { value: "C", label: "C级 · 不建议跟进" },
+] as const;
+const levelOrder = { A: 0, B: 1, C: 2 } as const;
 
 const platformAdvice: Record<string, { eyebrow: string; title: string; summary: string; actions: string[] }> = {
   all: {
@@ -112,10 +133,13 @@ export default function HotTopicsPage() {
   const range = useGlobalDateRange({ defaultPreset: "today", scope: "hot-topics" });
   const [topics, setTopics] = useState<AgentHotTopic[]>([]);
   const [activePlatform, setActivePlatform] = useState("all");
+  const [activeLevel, setActiveLevel] = useState<"all" | "A" | "B" | "C">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("report");
   const [loading, setLoading] = useState(true);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const [selectedAnalysis, setSelectedAnalysis] = useState<ParsedAnalysis | null>(null);
+  const [generatingId, setGeneratingId] = useState<number | null>(null);
+  const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null);
   const [agentFile, setAgentFile] = useState<File | null>(null);
   const [importingAgent, setImportingAgent] = useState(false);
   const [replacingAgent, setReplacingAgent] = useState(false);
@@ -146,13 +170,21 @@ export default function HotTopicsPage() {
     return date !== null && date >= range.from && date <= range.to;
   }), [topics, range.from, range.to]);
 
-  const platformTopics = useMemo(() => topicsInRange
+  const platformScopedTopics = useMemo(() => topicsInRange
     .filter((topic) => activePlatform === "all"
-      || (activePlatform === "other" ? !primaryPlatforms.has(topic.platform) : topic.platform === activePlatform))
-    .sort((a, b) => a.rank - b.rank || b.id - a.id), [topicsInRange, activePlatform]);
+      || (activePlatform === "other" ? !primaryPlatforms.has(topic.platform) : topic.platform === activePlatform)), [topicsInRange, activePlatform]);
+
+  const platformTopics = useMemo(() => platformScopedTopics
+    .filter((topic) => activeLevel === "all" || topic.recommendation_level === activeLevel)
+    .sort((a, b) => levelOrder[a.recommendation_level] - levelOrder[b.recommendation_level]
+      || b.tourism_conversion_score - a.tourism_conversion_score || a.rank - b.rank || b.id - a.id), [platformScopedTopics, activeLevel]);
 
   const filteredTopics = useMemo(() => platformTopics.slice(0, 20), [platformTopics]);
   const reportTopics = useMemo(() => platformTopics.slice(0, 50), [platformTopics]);
+  const actionTop5 = useMemo(() => platformScopedTopics
+    .filter((topic) => topic.recommendation_level === "A")
+    .sort((a, b) => b.tourism_conversion_score - a.tourism_conversion_score || a.rank - b.rank)
+    .slice(0, 5), [platformScopedTopics]);
 
   const recommendations = useMemo(() => filteredTopics
     .map(parseAnalysis)
@@ -207,6 +239,25 @@ export default function HotTopicsPage() {
       setMessage({ type: "error", text: error instanceof Error ? error.message : "AI热点分析失败" });
     } finally {
       setAnalyzingId(null);
+    }
+  }
+
+  async function generateTopicPlan(topic: AgentHotTopic) {
+    setGeneratingId(topic.id);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/hot-topic-data/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: topic.id }),
+      });
+      const result = await response.json() as GeneratedPlan & { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "热点选题生成失败");
+      setGeneratedPlan(result);
+    } catch (error) {
+      setMessage({ type: "error", text: error instanceof Error ? error.message : "热点选题生成失败" });
+    } finally {
+      setGeneratingId(null);
     }
   }
 
@@ -280,7 +331,43 @@ export default function HotTopicsPage() {
         </div>
       </div>
 
+      <div className="hot-level-toolbar">
+        <div><strong>行动推荐等级</strong><span>默认按 A → B → C 及旅游转化价值排序</span></div>
+        <nav className="hot-level-tabs" aria-label="热点推荐等级筛选">
+          {levelTabs.map((tab) => <button key={tab.value} className={activeLevel === tab.value ? "active" : ""} onClick={() => setActiveLevel(tab.value)}>{tab.label}</button>)}
+        </nav>
+      </div>
+
       {message && <div className={`import-message ${message.type}`}><span>{message.type === "success" ? "✓" : "!"}</span>{message.text}</div>}
+
+      <section className="panel hot-action-top5-panel">
+        <div className="panel-heading light-heading">
+          <div><span className="section-kicker">TODAY&apos;S ACTION TOP 5</span><h2>今日推荐热点 TOP5</h2></div>
+          <small>旅游转化价值 = 热度20% + 关联度35% + 内容适配25% + 商业价值20%</small>
+        </div>
+        <div className="hot-action-top5-grid">
+          {actionTop5.map((topic, index) => {
+            const analysis = parseAnalysis(topic);
+            const recommendation = readObject(topic.ai_recommendation);
+            return <article key={topic.id}>
+              <div className="hot-top5-meta"><span>TOP {index + 1}</span><em className="level-a">A级 · 强烈推荐</em><strong>{topic.tourism_conversion_score}分</strong></div>
+              <h3>{topic.topic_title}</h3>
+              <p><b>推荐理由</b>{analysis?.analysis ?? "等待补充推荐理由。"}</p>
+              <p><b>推荐标题</b>{String(recommendation?.shortVideoTitle ?? `独山子大峡谷 × ${topic.keyword}`)}</p>
+              <p><b>内容方向</b>{topic.content_direction}</p>
+              <p><b>拍摄建议</b>{String(recommendation?.shootingDirection ?? "等待补充拍摄建议。")}</p>
+              <button onClick={() => void generateTopicPlan(topic)} disabled={generatingId === topic.id}>{generatingId === topic.id ? "生成中…" : "生成选题"}</button>
+            </article>;
+          })}
+          {!actionTop5.length && <div className="hot-top5-empty">当前筛选范围暂无 A 级推荐热点。</div>}
+        </div>
+      </section>
+
+      {generatedPlan && <section className="panel hot-generated-plan-panel">
+        <div className="panel-heading"><div><span className="section-kicker">AI ACTION PLAN</span><h2>{generatedPlan.topicName}</h2></div><button className="secondary-button" onClick={() => setGeneratedPlan(null)}>关闭选题</button></div>
+        <div className="hot-generated-summary"><span className={`hot-level-badge level-${generatedPlan.recommendationLevel.toLowerCase()}`}>{generatedPlan.recommendationLevel}级</span><strong>旅游转化价值 {generatedPlan.tourismConversionScore}分</strong></div>
+        <div className="agent-analysis-grid"><article><span>短视频标题</span><p>{generatedPlan.shortVideoTitle}</p></article><article><span>内容方向</span><p>{generatedPlan.contentDirection}</p></article><article><span>拍摄脚本方向</span><p className="generated-script-text">{generatedPlan.scriptDirection}</p></article><article><span>直播主题</span><p>{generatedPlan.liveTheme}</p></article></div>
+      </section>}
 
       {viewMode === "ranking" && <section className="panel workbuddy-top20-panel">
         <div className="panel-heading">
@@ -289,18 +376,20 @@ export default function HotTopicsPage() {
         </div>
         {loading ? <div className="loading-panel"><span className="loading-dot" />正在读取 WorkBuddy 热点数据…</div> : <div className="table-wrap">
           <table className="workbuddy-top20-table">
-            <thead><tr><th>排名</th><th>平台</th><th>热点名称</th><th>热度</th><th>趋势</th><th>采集时间</th><th>AI分析</th></tr></thead>
+            <thead><tr><th>排名</th><th>等级</th><th>平台</th><th>热点名称</th><th>热度</th><th>转化评分</th><th>趋势</th><th>采集时间</th><th>操作</th></tr></thead>
             <tbody>
               {filteredTopics.map((topic) => <tr key={topic.id}>
                 <td><strong className={topic.rank <= 3 ? "top-rank-number" : ""}>TOP {topic.rank}</strong></td>
+                <td><span className={`hot-level-badge level-${topic.recommendation_level.toLowerCase()}`}>{topic.recommendation_level}级</span></td>
                 <td><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span></td>
                 <td className="hot-topic-name-cell"><strong>{topic.topic_title}</strong><small>{topic.keyword}{topic.category ? ` · ${topic.category}` : ""}</small></td>
                 <td className="agent-heat-value">{topic.heat_value}</td>
+                <td><strong className="conversion-score">{topic.tourism_conversion_score}</strong></td>
                 <td><span className="trend-pill trend-new">{topicTrend()}</span></td>
                 <td className="collection-time-cell">{topic.publish_time || "WorkBuddy当日批次"}</td>
-                <td><button className="analysis-action" onClick={() => void analyzeTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : topic.ai_relevance_score === null ? "AI分析" : `${Math.round(topic.ai_relevance_score)}分 · 查看`}</button></td>
+                <td><div className="hot-row-actions"><button className="analysis-action" onClick={() => void analyzeTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : topic.ai_relevance_score === null ? "AI分析" : `${Math.round(topic.ai_relevance_score)}分 · 查看`}</button><button className="topic-generate-button" onClick={() => void generateTopicPlan(topic)} disabled={generatingId === topic.id}>{generatingId === topic.id ? "生成中…" : "生成选题"}</button></div></td>
               </tr>)}
-              {!filteredTopics.length && <tr><td className="empty-cell" colSpan={7}>当前日期范围及平台暂无 WorkBuddy 热点数据。</td></tr>}
+              {!filteredTopics.length && <tr><td className="empty-cell" colSpan={9}>当前日期范围、平台及等级暂无 WorkBuddy 热点数据。</td></tr>}
             </tbody>
           </table>
         </div>}
@@ -346,12 +435,12 @@ export default function HotTopicsPage() {
             const decisionClass = score === null ? "pending" : analysis?.worthFollowingLabel === "适合借势" ? "high" : analysis?.worthFollowingLabel === "谨慎借势" ? "mid" : "low";
             const decision = score === null ? "待AI分析" : analysis?.worthFollowingLabel ?? "不建议借势";
             return <article className="hot-report-card" key={topic.id}>
-              <div className="hot-report-card-head"><span className="hot-report-rank">#{topic.rank}</span><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span><strong>{topic.heat_value}</strong></div>
+              <div className="hot-report-card-head"><span className="hot-report-rank">#{topic.rank}</span><span className={`hot-level-badge level-${topic.recommendation_level.toLowerCase()}`}>{topic.recommendation_level}级</span><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span><strong>热度 {topic.heat_value} · 转化 {topic.tourism_conversion_score}</strong></div>
               <h3>{topic.topic_title}</h3>
               <div className="hot-report-meta"><span>关键词：{topic.keyword || "待补充"}</span><span>{topic.publish_time || "WorkBuddy当日批次"}</span><span>{topic.category || "其他热点"}</span></div>
               {topic.url && <a className="hot-report-source" href={topic.url} target="_blank" rel="noreferrer">查看热点来源 ↗</a>}
               <div className="hot-report-ai">
-                <div className="hot-report-decision"><span className={`decision-${decisionClass}`}>{decision}</span>{score === null ? <button onClick={() => void analyzeTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : "开始AI分析"}</button> : <strong>关联度：{score}/100</strong>}</div>
+                <div className="hot-report-decision"><span className={`decision-${decisionClass}`}>{decision}</span><div className="hot-report-action-buttons">{score === null ? <button onClick={() => void analyzeTopic(topic)} disabled={analyzingId === topic.id}>{analyzingId === topic.id ? "分析中…" : "开始AI分析"}</button> : <strong>关联度：{score}/100</strong>}<button onClick={() => void generateTopicPlan(topic)} disabled={generatingId === topic.id}>{generatingId === topic.id ? "生成中…" : "生成选题"}</button></div></div>
                 {analysis ? <div className="hot-report-ai-detail"><p><b>热点判断</b>{analysis.analysis}</p><p><b>推荐拍摄方向</b>{analysis.shootingDirection}</p><p><b>推荐短视频标题</b>{analysis.shortVideoTitle}</p><p><b>推荐直播主题</b>{analysis.liveTheme}</p></div> : <p className="hot-report-awaiting">点击“开始AI分析”后生成关联度、借势判断与内容建议，不展示模拟结果。</p>}
               </div>
             </article>;

@@ -650,6 +650,44 @@ test("WorkBuddy report analysis is stored separately from raw hot topics", async
   for (const source of [script, confirmRoute, analysisImport]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
 });
 
+test("hot topic V2.5 adds action levels, TOP5, conversion scoring and topic generation without schema changes", async () => {
+  const [scoreModel, page, api, generator, styles] = await Promise.all([
+    import(new URL("../lib/hot-topic-action-score.ts", import.meta.url)),
+    readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-data/route.ts", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-data/generate/route.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  const base = {
+    heatValue: 95,
+    topicName: "新疆自驾攻略",
+    keyword: "新疆 自驾 攻略",
+    category: "交通自驾",
+    recommendedTitle: "独库第一站",
+    shootingDirection: "拍摄峡谷第一视角",
+    liveTheme: "独库云直播",
+  };
+  assert.equal(scoreModel.calculateHotTopicActionScore({ ...base, relevanceScore: 90, recommendFollow: true, recommendationReason: "高度相关" }).level, "A");
+  assert.equal(scoreModel.calculateHotTopicActionScore({ ...base, relevanceScore: 68, recommendFollow: false, recommendationReason: "具备借势价值，谨慎转化" }).level, "B");
+  assert.equal(scoreModel.calculateHotTopicActionScore({ ...base, relevanceScore: 35, recommendFollow: false, recommendationReason: "不建议直接跟进" }).level, "C");
+  for (const label of ["A级 · 强烈推荐", "B级 · 谨慎跟进", "C级 · 不建议跟进", "今日推荐热点 TOP5", "旅游转化价值", "生成选题", "拍摄脚本方向"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /levelOrder\[a\.recommendation_level\]/);
+  assert.match(page, /activeLevel === "all"/);
+  assert.match(page, /\/api\/hot-topic-data\/generate/);
+  for (const field of ["recommendation_level", "tourism_conversion_score", "conversion_components", "content_direction"]) assert.match(api, new RegExp(field));
+  assert.match(api, /calculateHotTopicActionScore/);
+  assert.match(generator, /JOIN hot_topic_analysis/);
+  assert.match(generator, /scriptDirection/);
+  assert.doesNotMatch(generator, /INSERT INTO|UPDATE hot_topics|ALTER TABLE/);
+  assert.match(styles, /hot-action-top5-grid/);
+  assert.match(styles, /hot-level-tabs/);
+  assert.match(styles, /level-a/);
+  assert.match(styles, /level-b/);
+  assert.match(styles, /level-c/);
+});
+
 test("production build artifacts exist", async () => {
   await access(new URL("dist/server/index.js", root));
   await access(new URL("dist/client", root));

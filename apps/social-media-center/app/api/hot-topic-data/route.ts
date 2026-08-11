@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { calculateHotTopicActionScore, topicContentDirection } from "@/lib/hot-topic-action-score";
 
 const platforms = new Set(["douyin", "kuaishou", "weibo", "web"]);
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -70,22 +71,42 @@ export async function GET(request: Request) {
     LIMIT 500
   `);
   const result = await (bindings.length ? statement.bind(...bindings) : statement).all<HotTopicRow>();
-  const topics = result.results.map((topic) => ({
-    ...topic,
-    rank: topic.rank ?? 999,
-    heat_value: String(topic.heat_value),
-    ai_analysis: topic.analysis_id === null ? topic.ai_analysis : JSON.stringify({
-      worthFollowing: Boolean(topic.recommend_follow),
-      worthFollowingLabel: topic.recommend_follow
-        ? "适合借势"
-        : topic.recommendation_reason?.includes("具备借势价值") ? "谨慎借势" : "不建议借势",
-      analysis: topic.recommendation_reason,
-    }),
-    ai_recommendation: topic.ai_relevance_score === null ? null : JSON.stringify({
-      shootingDirection: topic.video_direction ?? "等待补充拍摄方向。",
-      shortVideoTitle: topic.recommended_topic ?? `独山子大峡谷 × ${topic.keyword}`,
-      liveTheme: topic.publish_time_suggestion ?? "等待补充直播主题。",
-    }),
-  }));
+  const topics = result.results.map((topic) => {
+    const recommendationReason = topic.recommendation_reason;
+    const recommendFollow = Boolean(topic.recommend_follow);
+    const actionScore = calculateHotTopicActionScore({
+      heatValue: Number(topic.heat_value),
+      relevanceScore: Number(topic.ai_relevance_score ?? 0),
+      recommendFollow,
+      recommendationReason,
+      topicName: topic.topic_title,
+      keyword: topic.keyword,
+      category: topic.category,
+      recommendedTitle: topic.recommended_topic,
+      shootingDirection: topic.video_direction,
+      liveTheme: topic.publish_time_suggestion,
+    });
+    return {
+      ...topic,
+      rank: topic.rank ?? 999,
+      heat_value: String(topic.heat_value),
+      recommendation_level: actionScore.level,
+      tourism_conversion_score: actionScore.tourismConversion,
+      conversion_components: actionScore.components,
+      content_direction: topicContentDirection(topic.category, topic.platform),
+      ai_analysis: topic.analysis_id === null ? topic.ai_analysis : JSON.stringify({
+        worthFollowing: Boolean(topic.recommend_follow),
+        worthFollowingLabel: topic.recommend_follow
+          ? "适合借势"
+          : topic.recommendation_reason?.includes("具备借势价值") ? "谨慎借势" : "不建议借势",
+        analysis: topic.recommendation_reason,
+      }),
+      ai_recommendation: topic.ai_relevance_score === null ? null : JSON.stringify({
+        shootingDirection: topic.video_direction ?? "等待补充拍摄方向。",
+        shortVideoTitle: topic.recommended_topic ?? `独山子大峡谷 × ${topic.keyword}`,
+        liveTheme: topic.publish_time_suggestion ?? "等待补充直播主题。",
+      }),
+    };
+  });
   return Response.json({ topics, sourceAgent: "WorkBuddy热点监测Agent" });
 }
