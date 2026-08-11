@@ -408,6 +408,36 @@ export const hotTopicFeedback = sqliteTable(
   ],
 );
 
+export const hotTopicArchive = sqliteTable(
+  "hot_topic_archive",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    archiveDate: text("archive_date").notNull(),
+    hotTopicId: integer("hot_topic_id").notNull().references(() => hotTopics.id, {
+      onDelete: "restrict",
+    }),
+    topicName: text("topic_name").notNull(),
+    platform: text("platform").notNull(),
+    topicType: text("topic_type").notNull().default("hot_rank"),
+    heatValue: real("heat_value").notNull().default(0),
+    aiScore: real("ai_score"),
+    recommendationLevel: text("recommendation_level").notNull().default("C"),
+    recommendedTitle: text("recommended_title"),
+    contentDirection: text("content_direction"),
+    relatedPostId: integer("related_post_id").references(() => socialPosts.id, {
+      onDelete: "set null",
+    }),
+    effectScore: real("effect_score"),
+    generatedAt: text("generated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_hot_topic_archive_date_topic").on(table.archiveDate, table.hotTopicId),
+    index("idx_hot_topic_archive_date_platform").on(table.archiveDate, table.platform),
+    index("idx_hot_topic_archive_type_date").on(table.topicType, table.archiveDate),
+    index("idx_hot_topic_archive_level_score").on(table.recommendationLevel, table.effectScore),
+  ],
+);
+
 export const hotTopicData = sqliteTable(
   "HOT_TOPIC_DATA",
   {

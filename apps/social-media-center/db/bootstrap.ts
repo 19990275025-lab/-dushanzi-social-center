@@ -281,6 +281,30 @@ const schemaStatements = [
     ON hot_topic_feedback(effect_score DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_effective
     ON hot_topic_feedback(is_effective)`,
+  `CREATE TABLE IF NOT EXISTS hot_topic_archive (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    archive_date TEXT NOT NULL,
+    hot_topic_id INTEGER NOT NULL REFERENCES hot_topics(id) ON DELETE RESTRICT,
+    topic_name TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    topic_type TEXT NOT NULL DEFAULT 'hot_rank',
+    heat_value REAL NOT NULL DEFAULT 0,
+    ai_score REAL,
+    recommendation_level TEXT NOT NULL DEFAULT 'C' CHECK (recommendation_level IN ('A','B','C')),
+    recommended_title TEXT,
+    content_direction TEXT,
+    related_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL,
+    effect_score REAL,
+    generated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topic_archive_date_topic
+    ON hot_topic_archive(archive_date, hot_topic_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_archive_date_platform
+    ON hot_topic_archive(archive_date, platform)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_archive_type_date
+    ON hot_topic_archive(topic_type, archive_date)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_archive_level_score
+    ON hot_topic_archive(recommendation_level, effect_score DESC)`,
   `CREATE TABLE IF NOT EXISTS HOT_TOPIC_DATA (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),

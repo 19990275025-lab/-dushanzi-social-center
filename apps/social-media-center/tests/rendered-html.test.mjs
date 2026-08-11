@@ -21,6 +21,7 @@ for (const [path, heading] of [
   ["app/tasks/page.tsx", "任务管理"],
   ["app/imports/page.tsx", "新媒体智能数据导入中心"],
   ["app/hot-topics/page.tsx", "多平台热点监测与AI选题推荐中心"],
+  ["app/hot-topic-archive/page.tsx", "热点档案库"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
   ["app/collector/page.tsx", "新媒体数据采集中心"],
   ["app/comment-insights/page.tsx", "游客评论洞察中心"],
@@ -57,7 +58,7 @@ test("content monitoring and fan analysis are independent navigation modules", a
   assert.match(source, /href="\/insights\/fans"/);
   assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "02"/);
   assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "03"/);
-  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "08"/);
+  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "09"/);
   assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });
 
@@ -736,6 +737,48 @@ test("hot topic V3.0 persists recommendation feedback and reviews linked social_
   assert.match(styles, /feedback-result\.success/);
   assert.match(styles, /feedback-result\.general/);
   assert.match(styles, /feedback-result\.failure/);
+});
+
+test("hot topic archive V4.0 snapshots daily assets and exports Excel without altering source tables", async () => {
+  const [schema, bootstrap, migration, helper, api, download, page, shell, worker, vite, styles] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0021_hot_topic_archive.sql", root), "utf8"),
+    readFile(new URL("lib/hot-topic-archive.ts", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-archive/route.ts", root), "utf8"),
+    readFile(new URL("app/api/hot-topic-archive/download/route.ts", root), "utf8"),
+    readFile(new URL("app/hot-topic-archive/page.tsx", root), "utf8"),
+    readFile(new URL("components/AppShell.tsx", root), "utf8"),
+    readFile(new URL("worker/index.ts", root), "utf8"),
+    readFile(new URL("vite.config.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  for (const source of [schema, bootstrap, migration]) {
+    assert.match(source, /hot_topic_archive/);
+    for (const field of ["archive_date", "topic_name", "platform", "heat_value", "ai_score", "recommendation_level", "recommended_title", "content_direction", "related_post_id", "effect_score"]) {
+      assert.match(source, new RegExp(field));
+    }
+  }
+  assert.doesNotMatch(migration, /ALTER TABLE [`"]?(?:hot_topics|hot_topic_analysis|hot_topic_feedback)/);
+  assert.match(helper, /FROM hot_topics h/);
+  assert.match(helper, /LEFT JOIN hot_topic_analysis/);
+  assert.match(helper, /LEFT JOIN hot_topic_feedback/);
+  assert.match(helper, /ON CONFLICT\(archive_date, hot_topic_id\) DO UPDATE/);
+  for (const sheet of ["报告总览", "原始热点", "AI分析", "推荐建议", "效果复盘"]) assert.match(helper, new RegExp(sheet));
+  assert.match(helper, /XLSX\.write/);
+  assert.match(helper, /_新媒体热点分析报告\.xlsx/);
+  assert.match(helper, /uploads\.put/);
+  assert.match(api, /archive_date = \?/);
+  assert.match(api, /topicType/);
+  assert.match(download, /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
+  assert.match(download, /content-disposition/);
+  for (const label of ["热点历史查询", "生成当日报告", "下载Excel", "日期", "平台", "热点类型"]) assert.match(page, new RegExp(label));
+  assert.match(shell, /href: "\/hot-topic-archive", label: "热点档案库", code: "06"/);
+  assert.match(worker, /async scheduled/);
+  assert.match(worker, /generateAndStoreDailyArchive/);
+  assert.match(vite, /30 0 \* \* \*/);
+  assert.match(styles, /archive-kpi-grid/);
+  assert.match(styles, /archive-table/);
 });
 
 test("production build artifacts exist", async () => {

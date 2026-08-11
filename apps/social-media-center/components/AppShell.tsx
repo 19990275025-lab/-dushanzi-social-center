@@ -9,9 +9,10 @@ const navItems = [
   { href: "/insights/fans", label: "粉丝分析中心", code: "03" },
   { href: "/collector", label: "数据采集中心", code: "04" },
   { href: "/hot-topics", label: "热点监测中心", code: "05" },
-  { href: "/ai-analysis", label: "AI内容分析中心", code: "06" },
-  { href: "/comment-insights", label: "游客评论洞察中心", code: "07" },
-  { href: "/tasks", label: "任务管理中心", code: "08" },
+  { href: "/hot-topic-archive", label: "热点档案库", code: "06" },
+  { href: "/ai-analysis", label: "AI内容分析中心", code: "07" },
+  { href: "/comment-insights", label: "游客评论洞察中心", code: "08" },
+  { href: "/tasks", label: "任务管理中心", code: "09" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
