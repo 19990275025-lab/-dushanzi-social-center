@@ -296,7 +296,8 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
   assert.match(page, /不展示模拟结果/);
   assert.match(shell, /isHotTopicsPage && <GlobalDateFilter defaultPreset="today" scope="hot-topics"/);
   assert.match(page, /useGlobalDateRange\(\{ defaultPreset: "today", scope: "hot-topics" \}\)/);
-  assert.match(page, /date >= range\.from && date <= range\.to/);
+  assert.match(page, /topic\.collection_date/);
+  assert.match(page, /from: range\.from, to: range\.to/);
   assert.match(page, /topicsInRange/);
   assert.match(filter, /scope === "global"/);
   assert.match(page, /WorkBuddy热点监测Agent/);
@@ -304,7 +305,12 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
   for (const field of ["排名", "平台", "热点名称", "热度", "趋势", "采集时间"]) assert.match(page, new RegExp(field));
   for (const output of ["关联度", "是否推荐跟进|worthFollowingLabel", "推荐短视频标题|shortVideoTitle", "推荐拍摄方向|shootingDirection"]) assert.match(page, new RegExp(output));
   for (const suggestion of ["抖音短视频内容建议", "快手互动和直播建议", "微博品牌传播建议"]) assert.match(page, new RegExp(suggestion));
-  assert.match(analysisApi, /FROM HOT_TOPIC_DATA/);
+  assert.match(agentApi, /FROM hot_topics/);
+  assert.match(agentApi, /collect_time/);
+  assert.match(agentApi, /\+8 hours/);
+  assert.match(agentApi, /ranking AS rank/);
+  assert.match(analysisApi, /FROM hot_topics/);
+  assert.match(analysisApi, /UPDATE hot_topics/);
   assert.match(analysisApi, /FROM social_posts/);
   assert.match(api, /searchParams/);
   assert.match(api, /platform = \?/);
@@ -313,7 +319,7 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
     assert.match(api, new RegExp(source));
     assert.match(migration, new RegExp(source === "douyin_content_hot" ? source : "data_source"));
   }
-  assert.match(agentApi, /WHERE platform = \?/);
+  assert.match(agentApi, /platform = \?/);
   for (const label of ["平台热点跟进判断", "抖音热点跟进判断", "快手热点跟进判断", "微博热点跟进判断"]) {
     assert.match(api, new RegExp(label));
   }

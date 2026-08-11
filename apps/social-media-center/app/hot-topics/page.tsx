@@ -13,6 +13,8 @@ type AgentHotTopic = {
   keyword: string;
   url: string | null;
   publish_time: string | null;
+  collect_time: string;
+  collection_date: string;
   category: string | null;
   source_agent: string;
   ai_relevance_score: number | null;
@@ -105,10 +107,6 @@ function topicTrend() {
   return "首次采集";
 }
 
-function topicDate(value: string | null) {
-  return value?.match(/\d{4}-\d{2}-\d{2}/)?.[0] ?? null;
-}
-
 export default function HotTopicsPage() {
   const range = useGlobalDateRange({ defaultPreset: "today", scope: "hot-topics" });
   const [topics, setTopics] = useState<AgentHotTopic[]>([]);
@@ -125,7 +123,8 @@ export default function HotTopicsPage() {
   const loadTopics = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/hot-topic-data?platform=all", { cache: "no-store" });
+      const query = new URLSearchParams({ platform: "all", from: range.from, to: range.to });
+      const response = await fetch(`/api/hot-topic-data?${query.toString()}`, { cache: "no-store" });
       const result = await response.json() as { topics?: AgentHotTopic[]; error?: string };
       if (!response.ok) throw new Error(result.error ?? "WorkBuddy热点数据读取失败");
       setTopics(result.topics ?? []);
@@ -134,7 +133,7 @@ export default function HotTopicsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [range.from, range.to]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadTopics(), 0);
@@ -142,7 +141,7 @@ export default function HotTopicsPage() {
   }, [loadTopics]);
 
   const topicsInRange = useMemo(() => topics.filter((topic) => {
-    const date = topicDate(topic.publish_time);
+    const date = topic.collection_date;
     return date !== null && date >= range.from && date <= range.to;
   }), [topics, range.from, range.to]);
 
