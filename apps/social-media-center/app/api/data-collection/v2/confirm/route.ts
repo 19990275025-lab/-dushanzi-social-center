@@ -32,6 +32,13 @@ function commentKey(record: CommentRecord) {
   return `${record.post_id}|${record.username}|${record.comment_text}|${record.comment_time}`;
 }
 
+function topicDataSource(record: HotTopicRecord) {
+  if (record.platform !== "douyin") return record.source;
+  if (record.topic_type === "planting_rank") return "douyin_seed_rank";
+  if (record.topic_type === "challenge_rank") return "douyin_challenge_rank";
+  return "douyin_hot_rank";
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: collectionApiHeaders() });
 }
@@ -101,7 +108,7 @@ export async function POST(request: Request) {
           trend = excluded.trend, collection_log_id = excluded.collection_log_id,
           collect_time = excluded.collect_time, status = 'active'
       `).bind(
-        record.platform, record.source, record.topic_type, record.source,
+        record.platform, record.source, record.topic_type, topicDataSource(record),
         record.topic_name, record.topic_name, record.ranking, record.heat_value,
         record.trend, id, record.collect_time,
       ));

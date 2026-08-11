@@ -12,7 +12,8 @@
     "test": "vinext build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "import:workbuddy-hot-topics": "node scripts/import-workbuddy-hot-topics.mjs"
+    "import:workbuddy-hot-topics": "node scripts/import-workbuddy-hot-topics.mjs",
+    "import:workbuddy-v2": "node scripts/import-workbuddy-v2.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

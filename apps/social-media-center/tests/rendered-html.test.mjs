@@ -580,6 +580,36 @@ test("data collection V2.1 normalizes, previews and confirms three data types", 
   }
 });
 
+test("WorkBuddy V2.2 maps real source records through the standard preview and confirm API", async () => {
+  const [adapter, script, confirmRoute] = await Promise.all([
+    import(new URL("../lib/workbuddy-v2-adapter.ts", import.meta.url)),
+    readFile(new URL("scripts/import-workbuddy-v2.mjs", root), "utf8"),
+    readFile(new URL("app/api/data-collection/v2/confirm/route.ts", root), "utf8"),
+  ]);
+  const sourceRows = Array.from({ length: 10 }, (_, index) => ({
+    platform: index === 0 ? "微博/抖音" : index === 1 ? "快手/抖音" : "抖音",
+    rank: index + 1,
+    topic: `WorkBuddy测试热点${index + 1}`,
+    heat_value: index === 0 ? "🔥微博热搜TOP1/全网热议" : `🔥热度${900 - index * 10}万`,
+    source_agent: "WorkBuddy热点监测Agent",
+  }));
+  const converted = adapter.buildWorkBuddyV2Records(sourceRows, "2026-08-11T08:00:00+08:00", 10);
+  assert.equal(converted.requestedCount, 10);
+  assert.equal(converted.records.length, 10);
+  assert.deepEqual(converted.errors, []);
+  assert.equal(converted.records[0].platform, "weibo");
+  assert.equal(converted.records[1].platform, "kuaishou");
+  assert.equal(converted.records[2].platform, "douyin");
+  assert.equal(converted.records[0].heat_value, 100);
+  assert.equal(adapter.groupWorkBuddyV2Batches(converted.records, "2026-08-11T08:00:00+08:00").length, 3);
+  assert.match(script, /\/api\/data-collection\/v2\/receive/);
+  assert.match(script, /\/api\/data-collection\/v2\/preview/);
+  assert.match(script, /\/api\/data-collection\/v2\/confirm/);
+  assert.match(script, /\/api\/hot-topics\?platform=all/);
+  assert.match(confirmRoute, /douyin_hot_rank/);
+  for (const source of [script, confirmRoute]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
+});
+
 test("production build artifacts exist", async () => {
   await access(new URL("dist/server/index.js", root));
   await access(new URL("dist/client", root));
