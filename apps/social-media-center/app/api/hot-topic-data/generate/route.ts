@@ -62,10 +62,10 @@ export async function POST(request: Request) {
     liveTheme: row.live_theme,
   };
   const feedback = await getD1().prepare(`
-    INSERT INTO hot_topic_feedback (hot_topic_id, recommended_content)
-    VALUES (?, ?)
+    INSERT INTO hot_topic_feedback (hot_topic_id, recommended_content, platform)
+    VALUES (?, ?, ?)
     RETURNING id
-  `).bind(row.id, JSON.stringify(recommendedContent)).first<{ id: number }>();
+  `).bind(row.id, JSON.stringify(recommendedContent), row.platform).first<{ id: number }>();
   if (!feedback) return Response.json({ error: "热点选题复盘记录创建失败" }, { status: 500 });
   return Response.json({
     id: row.id,

@@ -254,11 +254,16 @@ const schemaStatements = [
     recommended_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     recommended_content TEXT NOT NULL,
     social_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL,
+    related_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL,
+    platform TEXT NOT NULL,
+    publish_time TEXT,
     views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
     likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
     comments INTEGER NOT NULL DEFAULT 0 CHECK (comments >= 0),
     favorites INTEGER NOT NULL DEFAULT 0 CHECK (favorites >= 0),
     shares INTEGER NOT NULL DEFAULT 0 CHECK (shares >= 0),
+    effect_score REAL CHECK (effect_score >= 0 AND effect_score <= 100),
+    ai_summary TEXT,
     is_effective INTEGER CHECK (is_effective IN (0, 1)),
     evaluated_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -268,6 +273,12 @@ const schemaStatements = [
     ON hot_topic_feedback(hot_topic_id, recommended_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_social_post
     ON hot_topic_feedback(social_post_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_related_post
+    ON hot_topic_feedback(related_post_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_platform_publish
+    ON hot_topic_feedback(platform, publish_time DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_effect_score
+    ON hot_topic_feedback(effect_score DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_effective
     ON hot_topic_feedback(is_effective)`,
   `CREATE TABLE IF NOT EXISTS HOT_TOPIC_DATA (
@@ -535,6 +546,34 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_data_source_ranking ON hot_topics(platform, data_source, ranking)"),
     d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_source_record ON hot_topics(platform, source_record_id) WHERE source_record_id IS NOT NULL"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_source_agent_collect_time ON hot_topics(source_agent, collect_time DESC)"),
+  ]);
+
+  const feedbackColumns = await d1
+    .prepare("PRAGMA table_info(hot_topic_feedback)")
+    .all<{ name: string }>();
+  const feedbackColumnNames = new Set(feedbackColumns.results.map((column) => column.name));
+  if (!feedbackColumnNames.has("related_post_id")) {
+    await d1.prepare("ALTER TABLE hot_topic_feedback ADD COLUMN related_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL").run();
+  }
+  if (!feedbackColumnNames.has("platform")) {
+    await d1.prepare("ALTER TABLE hot_topic_feedback ADD COLUMN platform TEXT").run();
+  }
+  if (!feedbackColumnNames.has("publish_time")) {
+    await d1.prepare("ALTER TABLE hot_topic_feedback ADD COLUMN publish_time TEXT").run();
+  }
+  if (!feedbackColumnNames.has("effect_score")) {
+    await d1.prepare("ALTER TABLE hot_topic_feedback ADD COLUMN effect_score REAL").run();
+  }
+  if (!feedbackColumnNames.has("ai_summary")) {
+    await d1.prepare("ALTER TABLE hot_topic_feedback ADD COLUMN ai_summary TEXT").run();
+  }
+  await d1.batch([
+    d1.prepare("UPDATE hot_topic_feedback SET related_post_id = social_post_id WHERE related_post_id IS NULL AND social_post_id IS NOT NULL"),
+    d1.prepare("UPDATE hot_topic_feedback SET platform = (SELECT platform FROM hot_topics WHERE hot_topics.id = hot_topic_feedback.hot_topic_id) WHERE platform IS NULL OR trim(platform) = ''"),
+    d1.prepare("UPDATE hot_topic_feedback SET publish_time = (SELECT publish_time FROM social_posts WHERE social_posts.id = hot_topic_feedback.related_post_id) WHERE publish_time IS NULL AND related_post_id IS NOT NULL"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_related_post ON hot_topic_feedback(related_post_id)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_platform_publish ON hot_topic_feedback(platform, publish_time DESC)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_effect_score ON hot_topic_feedback(effect_score DESC)"),
   ]);
 
   await d1.prepare("PRAGMA optimize").run();

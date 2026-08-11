@@ -399,6 +399,11 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
 .feedback-result.pending { background: #eef1f0; color: #687570; }
 .feedback-result.effective { background: #ddf4e9; color: #116d4e; }
 .feedback-result.ineffective { background: #fae8e6; color: #994841; }
+.feedback-result.success { background: #ddf4e9; color: #116d4e; }
+.feedback-result.general { background: #fff0cd; color: #8a6115; }
+.feedback-result.failure { background: #fae8e6; color: #994841; }
+.feedback-effect-score { color: #17835f; display: block; font-size: 18px; margin-bottom: 7px; white-space: nowrap; }
+.feedback-ai-summary { color: #5e7069; font-size: 9px; line-height: 1.7; max-width: 300px; min-width: 230px; white-space: normal; }
 .hot-analysis-report { background: #eef5f2; border: 1px solid #dbe7e2; border-radius: 18px; box-shadow: 0 20px 50px rgba(15,47,37,.09); margin-bottom: 16px; overflow: hidden; padding: 24px; }
 .hot-report-header { align-items: flex-end; border-bottom: 1px solid #d6e3de; display: flex; gap: 24px; justify-content: space-between; padding: 3px 2px 21px; }
 .hot-report-header span, .hot-daily-advice > div > span { color: #16805e; font: 800 10px ui-monospace, monospace; letter-spacing: .16em; }

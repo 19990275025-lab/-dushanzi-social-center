@@ -381,11 +381,18 @@ export const hotTopicFeedback = sqliteTable(
     socialPostId: integer("social_post_id").references(() => socialPosts.id, {
       onDelete: "set null",
     }),
+    relatedPostId: integer("related_post_id").references(() => socialPosts.id, {
+      onDelete: "set null",
+    }),
+    platform: text("platform").notNull(),
+    publishTime: text("publish_time"),
     views: integer("views").notNull().default(0),
     likes: integer("likes").notNull().default(0),
     comments: integer("comments").notNull().default(0),
     favorites: integer("favorites").notNull().default(0),
     shares: integer("shares").notNull().default(0),
+    effectScore: real("effect_score"),
+    aiSummary: text("ai_summary"),
     isEffective: integer("is_effective", { mode: "boolean" }),
     evaluatedAt: text("evaluated_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -394,6 +401,9 @@ export const hotTopicFeedback = sqliteTable(
   (table) => [
     index("idx_hot_topic_feedback_topic_recommended").on(table.hotTopicId, table.recommendedAt),
     index("idx_hot_topic_feedback_social_post").on(table.socialPostId),
+    index("idx_hot_topic_feedback_related_post").on(table.relatedPostId),
+    index("idx_hot_topic_feedback_platform_publish").on(table.platform, table.publishTime),
+    index("idx_hot_topic_feedback_effect_score").on(table.effectScore),
     index("idx_hot_topic_feedback_effective").on(table.isEffective),
   ],
 );

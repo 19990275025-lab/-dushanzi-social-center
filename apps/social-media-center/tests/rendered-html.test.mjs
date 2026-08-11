@@ -689,10 +689,11 @@ test("hot topic V2.5 adds action levels, TOP5, conversion scoring and topic gene
 });
 
 test("hot topic V3.0 persists recommendation feedback and reviews linked social_posts", async () => {
-  const [schema, bootstrap, migration, page, feedbackApi, generator, styles] = await Promise.all([
+  const [schema, bootstrap, migration, reviewMigration, page, feedbackApi, generator, styles] = await Promise.all([
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("db/bootstrap.ts", root), "utf8"),
     readFile(new URL("drizzle/0019_hot_topic_feedback.sql", root), "utf8"),
+    readFile(new URL("drizzle/0020_hot_topic_feedback_review.sql", root), "utf8"),
     readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
     readFile(new URL("app/api/hot-topic-feedback/route.ts", root), "utf8"),
     readFile(new URL("app/api/hot-topic-data/generate/route.ts", root), "utf8"),
@@ -707,21 +708,34 @@ test("hot topic V3.0 persists recommendation feedback and reviews linked social_
   assert.match(migration, /REFERENCES `hot_topics`/);
   assert.match(migration, /REFERENCES `social_posts`/);
   assert.doesNotMatch(migration, /ALTER TABLE `hot_topics`|UPDATE `hot_topics`|DELETE FROM `hot_topics`/);
+  for (const field of ["related_post_id", "platform", "publish_time", "effect_score", "ai_summary"]) {
+    assert.match(schema, new RegExp(field));
+    assert.match(bootstrap, new RegExp(field));
+    assert.match(reviewMigration, new RegExp(field));
+  }
+  assert.doesNotMatch(reviewMigration, /ALTER TABLE `hot_topics`|DELETE FROM `hot_topics`/);
   assert.match(generator, /INSERT INTO hot_topic_feedback/);
   assert.match(generator, /feedbackId/);
   assert.doesNotMatch(generator, /UPDATE hot_topics|ALTER TABLE hot_topics/);
-  for (const label of ["效果复盘", "热点推荐成功率", "高价值热点类型", "低价值热点类型", "AI模型优化建议", "关联发布作品", "刷新作品数据"]) {
+  for (const label of ["热点效果复盘", "热点推荐成功率", "高价值热点类型", "低价值热点类型", "AI模型优化建议", "对应作品", "效果评分", "AI总结", "刷新作品数据"]) {
     assert.match(page, new RegExp(label));
   }
   assert.match(feedbackApi, /FROM hot_topic_feedback/);
   assert.match(feedbackApi, /JOIN social_posts/);
   assert.match(feedbackApi, /EFFECTIVE_ENGAGEMENT_RATE = 0\.03/);
   assert.match(feedbackApi, /AVG\(views\)/);
+  assert.match(feedbackApi, /calculateEffectReview/);
+  assert.match(feedbackApi, /score >= 70 \? "成功" : score >= 45 \? "一般" : "失败"/);
+  assert.match(feedbackApi, /related_post_id/);
+  assert.match(feedbackApi, /ai_summary/);
   assert.match(feedbackApi, /export async function PATCH/);
   assert.match(feedbackApi, /export async function PUT/);
   assert.match(styles, /hot-feedback-kpis/);
   assert.match(styles, /hot-feedback-value-grid/);
   assert.match(styles, /feedback-result\.effective/);
+  assert.match(styles, /feedback-result\.success/);
+  assert.match(styles, /feedback-result\.general/);
+  assert.match(styles, /feedback-result\.failure/);
 });
 
 test("production build artifacts exist", async () => {
