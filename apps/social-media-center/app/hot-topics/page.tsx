@@ -168,8 +168,8 @@ export default function HotTopicsPage() {
   const reportStats = useMemo(() => ({
     total: reportTopics.length,
     platforms: new Set(reportTopics.map((topic) => topic.platform)).size,
-    strong: reportAnalyses.filter((item) => item.relevanceScore >= 80 && item.worthFollowing).length,
-    available: reportAnalyses.filter((item) => item.relevanceScore >= 60).length,
+    strong: reportAnalyses.filter((item) => item.worthFollowingLabel === "适合借势").length,
+    available: reportAnalyses.filter((item) => item.worthFollowingLabel !== "不建议借势").length,
   }), [reportAnalyses, reportTopics]);
   const usesWorkBuddyReport = useMemo(() => reportTopics.some((topic) => topic.analysis_source === "WorkBuddy热点监测报告"), [reportTopics]);
 
@@ -343,8 +343,8 @@ export default function HotTopicsPage() {
           {reportTopics.map((topic) => {
             const analysis = parseAnalysis(topic);
             const score = analysis?.relevanceScore ?? null;
-            const decisionClass = score === null ? "pending" : analysis?.worthFollowing && score >= 80 ? "high" : score >= 60 ? "mid" : "low";
-            const decision = score === null ? "待AI分析" : analysis?.worthFollowing && score >= 80 ? "适合借势" : score >= 60 ? "谨慎借势" : "不建议借势";
+            const decisionClass = score === null ? "pending" : analysis?.worthFollowingLabel === "适合借势" ? "high" : analysis?.worthFollowingLabel === "谨慎借势" ? "mid" : "low";
+            const decision = score === null ? "待AI分析" : analysis?.worthFollowingLabel ?? "不建议借势";
             return <article className="hot-report-card" key={topic.id}>
               <div className="hot-report-card-head"><span className="hot-report-rank">#{topic.rank}</span><span className={`platform-tag tag-${topic.platform}`}>{platformLabel(topic.platform)}</span><strong>{topic.heat_value}</strong></div>
               <h3>{topic.topic_title}</h3>
@@ -362,8 +362,8 @@ export default function HotTopicsPage() {
         <section className="hot-daily-advice">
           <div><span>DAILY ACTION PLAN</span><h3>今日运营建议</h3><p>按关联度与跟进价值，从当前筛选范围的真实 AI 分析结果生成。</p></div>
           <ol>
-            {reportAnalyses.filter((item) => item.relevanceScore >= 60).slice(0, 6).map((item, index) => <li key={item.topic.id}><span>{String(index + 1).padStart(2, "0")}</span><p><strong>{item.shortVideoTitle}</strong>{item.shootingDirection}</p></li>)}
-            {!reportAnalyses.some((item) => item.relevanceScore >= 60) && <li className="hot-advice-empty">当前范围暂无达到可借势标准的已分析热点。</li>}
+            {reportAnalyses.filter((item) => item.worthFollowingLabel !== "不建议借势").slice(0, 6).map((item, index) => <li key={item.topic.id}><span>{String(index + 1).padStart(2, "0")}</span><p><strong>{item.shortVideoTitle}</strong>{item.shootingDirection}</p></li>)}
+            {!reportAnalyses.some((item) => item.worthFollowingLabel !== "不建议借势") && <li className="hot-advice-empty">当前范围暂无达到可借势标准的已分析热点。</li>}
           </ol>
         </section>
 

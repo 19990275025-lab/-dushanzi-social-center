@@ -76,7 +76,9 @@ export async function GET(request: Request) {
     heat_value: String(topic.heat_value),
     ai_analysis: topic.analysis_id === null ? topic.ai_analysis : JSON.stringify({
       worthFollowing: Boolean(topic.recommend_follow),
-      worthFollowingLabel: topic.recommend_follow ? "建议跟进" : "暂不直接跟进",
+      worthFollowingLabel: topic.recommend_follow
+        ? "适合借势"
+        : topic.recommendation_reason?.includes("具备借势价值") ? "谨慎借势" : "不建议借势",
       analysis: topic.recommendation_reason,
     }),
     ai_recommendation: topic.ai_relevance_score === null ? null : JSON.stringify({
