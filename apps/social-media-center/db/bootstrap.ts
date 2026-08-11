@@ -55,6 +55,24 @@ const schemaStatements = [
     ON collection_logs(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_collection_logs_platform_status
     ON collection_logs(platform, status)`,
+  `CREATE TABLE IF NOT EXISTS collection_staging_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    collection_log_id INTEGER NOT NULL REFERENCES collection_logs(id) ON DELETE CASCADE,
+    record_index INTEGER NOT NULL CHECK (record_index >= 0),
+    data_type TEXT NOT NULL CHECK (data_type IN ('hot_topic','content','comment')),
+    platform TEXT,
+    source TEXT NOT NULL,
+    normalized_payload TEXT,
+    raw_payload TEXT NOT NULL,
+    validation_status TEXT NOT NULL DEFAULT 'valid' CHECK (validation_status IN ('valid','invalid')),
+    validation_errors TEXT NOT NULL DEFAULT '[]',
+    confirmed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_staging_log_index
+    ON collection_staging_records(collection_log_id, record_index)`,
+  `CREATE INDEX IF NOT EXISTS idx_collection_staging_log_status
+    ON collection_staging_records(collection_log_id, validation_status)`,
   `CREATE TABLE IF NOT EXISTS social_fans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -104,6 +122,7 @@ const schemaStatements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    source TEXT NOT NULL DEFAULT 'system',
     title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     publish_time TEXT NOT NULL,
@@ -160,6 +179,7 @@ const schemaStatements = [
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    source TEXT NOT NULL DEFAULT 'system',
     username TEXT NOT NULL,
     comment_text TEXT NOT NULL,
     comment_time TEXT NOT NULL,
@@ -357,6 +377,9 @@ async function initialize() {
   if (!postColumns.results.some((column) => column.name === "traffic_sources")) {
     await d1.prepare("ALTER TABLE social_posts ADD COLUMN traffic_sources TEXT NOT NULL DEFAULT '[]'").run();
   }
+  if (!postColumns.results.some((column) => column.name === "source")) {
+    await d1.prepare("ALTER TABLE social_posts ADD COLUMN source TEXT NOT NULL DEFAULT 'system'").run();
+  }
   await d1
     .prepare(
       "CREATE INDEX IF NOT EXISTS idx_social_posts_import_log_id ON social_posts(import_log_id)",
@@ -384,6 +407,9 @@ async function initialize() {
   }
   if (!commentColumns.results.some((column) => column.name === "ai_analysis")) {
     await d1.prepare("ALTER TABLE social_comments ADD COLUMN ai_analysis TEXT").run();
+  }
+  if (!commentColumns.results.some((column) => column.name === "source")) {
+    await d1.prepare("ALTER TABLE social_comments ADD COLUMN source TEXT NOT NULL DEFAULT 'system'").run();
   }
   await d1
     .prepare("CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id ON social_comments(collection_log_id)")

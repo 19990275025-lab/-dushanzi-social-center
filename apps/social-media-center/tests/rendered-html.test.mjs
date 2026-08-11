@@ -514,6 +514,72 @@ test("Douyin V3 confirms the July preview and preserves incomplete real fields",
   assert.equal(payload.posts.filter((post) => post.videoUrl === "").length, 9);
 });
 
+test("data collection V2.1 normalizes, previews and confirms three data types", async () => {
+  const [normalizer, receive, preview, confirm, logs, collectionRoute, schema, bootstrap, migration] = await Promise.all([
+    import(new URL("../lib/data-collection-v2.ts", import.meta.url)),
+    readFile(new URL("app/api/data-collection/v2/receive/route.ts", root), "utf8"),
+    readFile(new URL("app/api/data-collection/v2/preview/route.ts", root), "utf8"),
+    readFile(new URL("app/api/data-collection/v2/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/data-collection/v2/logs/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/route.ts", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0016_data_collection_standardization_v2_1.sql", root), "utf8"),
+  ]);
+
+  const parsed = normalizer.parseCollectionEnvelope({
+    data_type: "content",
+    source: "接口测试",
+    platform: "抖音",
+    account_id: 1,
+    records: [{
+      作品标题: "峡谷测试视频",
+      发布时间: "2026-08-11 08:30:00",
+      播放量: "1.2万",
+      点赞量: "800",
+      评论量: 30,
+      收藏量: 20,
+      分享量: 10,
+    }],
+  });
+  assert.deepEqual(parsed.errors, []);
+  const [content] = normalizer.normalizeCollectionRecords(parsed.envelope);
+  assert.equal(content.normalized.platform, "douyin");
+  assert.equal(content.normalized.source, "接口测试");
+  assert.equal(content.normalized.views, 12000);
+  assert.equal(content.normalized.account_id, 1);
+  assert.deepEqual(content.errors, []);
+
+  const invalid = normalizer.parseCollectionEnvelope({
+    data_type: "comment",
+    source: "接口测试",
+    platform: "douyin",
+    records: [{ username: "游客", comment_text: "怎么去？", comment_time: "bad-date" }],
+  });
+  const [comment] = normalizer.normalizeCollectionRecords(invalid.envelope);
+  assert.match(comment.errors.join(" "), /comment_time不是有效日期时间/);
+
+  for (const source of [schema, bootstrap, migration]) {
+    assert.match(source, /collection_staging_records/);
+    assert.match(source, /normalized_payload/);
+    assert.match(source, /validation_errors/);
+  }
+  assert.match(schema, /source: text\("source"\).*default\("system"\)/);
+  assert.match(receive, /pending_confirmation/);
+  assert.match(receive, /databaseWritten: false/);
+  assert.match(preview, /collection_staging_records/);
+  assert.match(confirm, /INSERT INTO hot_topics/);
+  assert.match(confirm, /INSERT INTO social_posts/);
+  assert.match(confirm, /INSERT INTO social_comments/);
+  assert.match(confirm, /confirmed !== true/);
+  assert.match(confirm, /d1\.batch/);
+  assert.match(logs, /FROM collection_logs/);
+  assert.match(collectionRoute, /DELETE FROM hot_topics WHERE collection_log_id/);
+  for (const route of [receive, preview, confirm, logs]) {
+    assert.doesNotMatch(route, /playwright|MediaCrawler|Agent-Reach|WorkBuddy|crawler\/start/);
+  }
+});
+
 test("production build artifacts exist", async () => {
   await access(new URL("dist/server/index.js", root));
   await access(new URL("dist/client", root));

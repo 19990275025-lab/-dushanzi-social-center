@@ -117,7 +117,9 @@ export async function DELETE(request: Request) {
       ]
     : [log.entity_type === "comment"
         ? d1.prepare("DELETE FROM social_comments WHERE collection_log_id = ?").bind(id)
-        : d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id)];
+        : log.entity_type === "hot_topic"
+          ? d1.prepare("DELETE FROM hot_topics WHERE collection_log_id = ?").bind(id)
+          : d1.prepare("DELETE FROM social_posts WHERE collection_log_id = ?").bind(id)];
   await d1.batch([
     ...deleteRows,
     ...(isUnifiedDouyinBatch ? [d1.prepare(`

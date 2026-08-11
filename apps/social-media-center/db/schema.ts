@@ -68,6 +68,30 @@ export const collectionLogs = sqliteTable(
   ],
 );
 
+export const collectionStagingRecords = sqliteTable(
+  "collection_staging_records",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    collectionLogId: integer("collection_log_id")
+      .notNull()
+      .references(() => collectionLogs.id, { onDelete: "cascade" }),
+    recordIndex: integer("record_index").notNull(),
+    dataType: text("data_type").notNull(),
+    platform: text("platform"),
+    source: text("source").notNull(),
+    normalizedPayload: text("normalized_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+    validationStatus: text("validation_status").notNull().default("valid"),
+    validationErrors: text("validation_errors", { mode: "json" }).$type<string[]>().notNull().default([]),
+    confirmedAt: text("confirmed_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_collection_staging_log_index").on(table.collectionLogId, table.recordIndex),
+    index("idx_collection_staging_log_status").on(table.collectionLogId, table.validationStatus),
+  ],
+);
+
 export const socialFans = sqliteTable(
   "social_fans",
   {
@@ -150,6 +174,7 @@ export const socialPosts = sqliteTable(
       .notNull()
       .references(() => socialAccounts.id, { onDelete: "restrict", onUpdate: "cascade" }),
     platform: text("platform").notNull(),
+    source: text("source").notNull().default("system"),
     title: text("title").notNull(),
     contentType: text("content_type").notNull(),
     publishTime: text("publish_time").notNull(),
@@ -238,6 +263,7 @@ export const socialComments = sqliteTable(
       .notNull()
       .references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
     platform: text("platform").notNull(),
+    source: text("source").notNull().default("system"),
     username: text("username").notNull(),
     commentText: text("comment_text").notNull(),
     commentTime: text("comment_time").notNull(),
