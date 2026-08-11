@@ -8,9 +8,11 @@ export type WorkBuddyV2Record = {
   source: typeof WORKBUDDY_V2_SOURCE;
   topic_type: "hot_rank" | "planting_rank" | "challenge_rank";
   topic_name: string;
+  keyword: string;
   ranking: number;
   heat_value: number;
   trend: "new";
+  category: string | null;
   collect_time: string;
 };
 
@@ -94,6 +96,8 @@ export function buildWorkBuddyV2Records(rawTopics: unknown[], collectedAt: strin
     const title = String(value(topic, ["topic", "topic_title", "topicName", "热点标题", "热点名称"]) ?? "").trim();
     const ranking = Number(value(topic, ["rank", "ranking", "排名"]));
     const rawHeat = String(value(topic, ["heat_value", "heatValue", "热度"]) ?? "").trim();
+    const keyword = String(value(topic, ["keyword", "关键词"]) ?? title).trim();
+    const category = String(value(topic, ["category", "分类"]) ?? "").trim();
     const heat = normalizeWorkBuddyHeat(rawHeat);
     const reasons: string[] = [];
     if (sourceAgent !== WORKBUDDY_V2_SOURCE) reasons.push("数据来源不是WorkBuddy热点监测Agent");
@@ -110,9 +114,11 @@ export function buildWorkBuddyV2Records(rawTopics: unknown[], collectedAt: strin
       source: WORKBUDDY_V2_SOURCE,
       topic_type: topicType(rawHeat, title),
       topic_name: title.slice(0, 500),
+      keyword: keyword.slice(0, 500),
       ranking,
       heat_value: heat as number,
       trend: "new",
+      category: category.slice(0, 128) || null,
       collect_time: collectedAt,
     });
   }

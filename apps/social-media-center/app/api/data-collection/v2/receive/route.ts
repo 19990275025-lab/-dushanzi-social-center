@@ -11,7 +11,16 @@ import {
   normalizeCollectionRecords,
   parseCollectionEnvelope,
 } from "@/lib/data-collection-v2";
-import type { CommentRecord, ContentRecord } from "@/lib/data-collection-v2";
+import type { CommentRecord, ContentRecord, HotTopicRecord } from "@/lib/data-collection-v2";
+
+function collectionDate(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
 
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: collectionApiHeaders() });
@@ -27,7 +36,7 @@ export async function GET(request: Request) {
     dataTypes: ["hot_topic", "content", "comment"],
     platforms: ["douyin", "kuaishou", "weibo"],
     standardFields: {
-      hot_topic: ["platform", "source", "topic_type", "topic_name", "ranking", "heat_value", "trend", "collect_time"],
+      hot_topic: ["platform", "source", "topic_type", "topic_name", "ranking", "heat_value", "trend", "keyword", "collect_time"],
       content: ["platform", "source", "title", "publish_time", "views", "likes", "comments", "favorites", "shares"],
       comment: ["platform", "source", "username", "comment_text", "comment_time"],
     },
@@ -102,6 +111,21 @@ export async function POST(request: Request) {
     }
   }
 
+  let sameDayExistingCount = 0;
+  let sameDayDates: string[] = [];
+  if (envelope.dataType === "hot_topic") {
+    sameDayDates = [...new Set(results
+      .filter((result) => !result.errors.length && result.normalized)
+      .map((result) => collectionDate((result.normalized as HotTopicRecord).collect_time)))];
+    for (const date of sameDayDates) {
+      const existing = await d1.prepare(`
+        SELECT count(*) AS count FROM hot_topics
+        WHERE platform = ? AND source = ? AND collection_date = ?
+      `).bind(platform, envelope.source, date).first<{ count: number }>();
+      sameDayExistingCount += Number(existing?.count ?? 0);
+    }
+  }
+
   const invalidCount = results.filter((result) => result.errors.length).length;
   const status = invalidCount ? "validation_failed" : "pending_confirmation";
   const errorSummary = invalidCount
@@ -170,5 +194,8 @@ export async function POST(request: Request) {
     previewUrl: `/api/data-collection/v2/preview?id=${logId}`,
     confirmUrl: `/api/data-collection/v2/confirm?id=${logId}`,
     databaseWritten: false,
+    sameDayDates,
+    sameDayExistingCount,
+    requiresDuplicateDecision: sameDayExistingCount > 0,
   }, { status: 201 });
 }

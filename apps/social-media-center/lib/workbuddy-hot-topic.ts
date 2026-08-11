@@ -76,6 +76,10 @@ export function parseWorkBuddyExcel(buffer: ArrayBuffer) {
 function heatSignal(raw: string) {
   const flames = (raw.match(/🔥/g) ?? []).length;
   let score = flames * 14;
+  const normalizedScore = Number(raw.trim());
+  if (Number.isFinite(normalizedScore) && normalizedScore >= 0 && normalizedScore <= 100) {
+    score = Math.max(score, normalizedScore);
+  }
   const numeric = raw.replace(/,/g, "").match(/([\d.]+)\s*(亿|千万|万)/);
   if (numeric) {
     const amount = Number(numeric[1]) * (numeric[2] === "亿" ? 100_000_000 : numeric[2] === "千万" ? 10_000_000 : 10_000);
@@ -114,4 +118,3 @@ export function analyzeWorkBuddyTopic(topic: WorkBuddyHotTopic, historicalText: 
     liveTheme: `独山子大峡谷云游直播：${keyword}与暑期游玩答疑`,
   };
 }
-

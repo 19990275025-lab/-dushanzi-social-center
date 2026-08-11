@@ -39,13 +39,13 @@ export async function GET(request: Request) {
     bindings.push(platform);
   }
   if (hasDateRange) {
-    conditions.push("date(datetime(COALESCE(collect_time, created_at), '+8 hours')) BETWEEN ? AND ?");
+    conditions.push("COALESCE(collection_date, date(datetime(COALESCE(collect_time, created_at), '+8 hours'))) BETWEEN ? AND ?");
     bindings.push(from as string, to as string);
   }
   const statement = getD1().prepare(`
     SELECT id, platform, ranking AS rank, topic_name AS topic_title, heat_value, keyword,
       source_url AS url, collect_time AS publish_time, collect_time,
-      date(datetime(COALESCE(collect_time, created_at), '+8 hours')) AS collection_date,
+      COALESCE(collection_date, date(datetime(COALESCE(collect_time, created_at), '+8 hours'))) AS collection_date,
       category, COALESCE(NULLIF(source_agent, ''), NULLIF(source, ''), 'WorkBuddy热点监测Agent') AS source_agent,
       hot_score AS ai_relevance_score, ai_suggestion AS ai_analysis,
       recommended_topic, video_direction, publish_time_suggestion

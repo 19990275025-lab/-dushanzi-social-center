@@ -587,16 +587,19 @@ test("data collection V2.1 normalizes, previews and confirms three data types", 
 });
 
 test("WorkBuddy V2.2 maps real source records through the standard preview and confirm API", async () => {
-  const [adapter, script, confirmRoute] = await Promise.all([
+  const [adapter, script, confirmRoute, importAnalysis] = await Promise.all([
     import(new URL("../lib/workbuddy-v2-adapter.ts", import.meta.url)),
     readFile(new URL("scripts/import-workbuddy-v2.mjs", root), "utf8"),
     readFile(new URL("app/api/data-collection/v2/confirm/route.ts", root), "utf8"),
+    readFile(new URL("lib/hot-topic-import-analysis.ts", root), "utf8"),
   ]);
   const sourceRows = Array.from({ length: 10 }, (_, index) => ({
     platform: index === 0 ? "微博/抖音" : index === 1 ? "快手/抖音" : "抖音",
     rank: index + 1,
     topic: `WorkBuddy测试热点${index + 1}`,
     heat_value: index === 0 ? "🔥微博热搜TOP1/全网热议" : `🔥热度${900 - index * 10}万`,
+    keyword: `新疆 热点${index + 1}`,
+    category: "旅游",
     source_agent: "WorkBuddy热点监测Agent",
   }));
   const converted = adapter.buildWorkBuddyV2Records(sourceRows, "2026-08-11T08:00:00+08:00", 10);
@@ -607,13 +610,21 @@ test("WorkBuddy V2.2 maps real source records through the standard preview and c
   assert.equal(converted.records[1].platform, "kuaishou");
   assert.equal(converted.records[2].platform, "douyin");
   assert.equal(converted.records[0].heat_value, 100);
+  assert.equal(converted.records[0].keyword, "新疆 热点1");
+  assert.equal(converted.records[0].category, "旅游");
   assert.equal(adapter.groupWorkBuddyV2Batches(converted.records, "2026-08-11T08:00:00+08:00").length, 3);
   assert.match(script, /\/api\/data-collection\/v2\/receive/);
   assert.match(script, /\/api\/data-collection\/v2\/preview/);
   assert.match(script, /\/api\/data-collection\/v2\/confirm/);
   assert.match(script, /\/api\/hot-topics\?platform=all/);
+  assert.match(script, /--overwrite-same-day/);
+  assert.match(script, /duplicate_mode/);
   assert.match(confirmRoute, /douyin_hot_rank/);
-  for (const source of [script, confirmRoute]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
+  assert.match(confirmRoute, /collection_date/);
+  assert.match(confirmRoute, /aiRecommendedCount/);
+  assert.match(confirmRoute, /analyzeImportedHotTopic/);
+  assert.match(importAnalysis, /analyzeWorkBuddyTopic/);
+  for (const source of [script, confirmRoute, importAnalysis]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
 });
 
 test("production build artifacts exist", async () => {

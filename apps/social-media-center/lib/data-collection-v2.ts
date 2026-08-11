@@ -11,9 +11,11 @@ export type HotTopicRecord = {
   source: string;
   topic_type: "hot_rank" | "planting_rank" | "challenge_rank";
   topic_name: string;
+  keyword: string;
   ranking: number;
   heat_value: number;
   trend: "up" | "down" | "new" | "stable";
+  category: string | null;
   collect_time: string;
 };
 
@@ -251,15 +253,22 @@ function normalizeHotTopic(record: UnknownRecord, envelope: CollectionEnvelope, 
   const rawTrend = pick(record, ["trend", "趋势"]);
   const trend = rawTrend === undefined ? "new" : trendAliases[String(rawTrend).trim().toLowerCase()];
   if (!trend) errors.push("trend仅支持up、down、new或stable");
+  const topicName = textValue(pick(record, ["topic_name", "topicName", "topic", "title", "热点名称", "热点标题"]), "topic_name", errors);
+  const rawKeyword = pick(record, ["keyword", "关键词"]);
+  const keyword = rawKeyword === undefined ? topicName : textValue(rawKeyword, "keyword", errors, 500);
+  const rawCategory = pick(record, ["category", "分类"]);
+  const category = rawCategory === undefined ? null : textValue(rawCategory, "category", errors, 128);
 
   return {
     platform: platform ?? "douyin",
     source,
     topic_type: topicType ?? "hot_rank",
-    topic_name: textValue(pick(record, ["topic_name", "topicName", "topic", "title", "热点名称", "热点标题"]), "topic_name", errors),
+    topic_name: topicName,
+    keyword,
     ranking: requiredPositiveInteger(pick(record, ["ranking", "rank", "排名"]), "ranking", errors),
     heat_value: metricValue(pick(record, ["heat_value", "heatValue", "heat", "热度"]), "heat_value", errors),
     trend: trend ?? "new",
+    category,
     collect_time: isoDate(pick(record, ["collect_time", "collectTime", "collected_at", "采集时间"]) ?? envelope.collectedAt, "collect_time", errors),
   };
 }

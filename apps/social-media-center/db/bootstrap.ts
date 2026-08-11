@@ -223,10 +223,9 @@ const schemaStatements = [
     raw_payload TEXT,
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     collect_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    collection_date TEXT NOT NULL DEFAULT (date(datetime(CURRENT_TIMESTAMP, '+8 hours'))),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_platform_name
-    ON hot_topics(platform, topic_name)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_collect_time
     ON hot_topics(platform, collect_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_hot_topics_related_degree
@@ -475,14 +474,20 @@ async function initialize() {
   if (!topicColumnNames.has("data_source")) {
     await d1.prepare("ALTER TABLE hot_topics ADD COLUMN data_source TEXT").run();
   }
+  if (!topicColumnNames.has("collection_date")) {
+    await d1.prepare("ALTER TABLE hot_topics ADD COLUMN collection_date TEXT").run();
+  }
   await d1.batch([
     d1.prepare("UPDATE hot_topics SET keyword = topic_name WHERE keyword IS NULL OR trim(keyword) = ''"),
     d1.prepare("UPDATE hot_topics SET created_at = COALESCE(collect_time, CURRENT_TIMESTAMP) WHERE created_at IS NULL"),
     d1.prepare("UPDATE hot_topics SET source = COALESCE(NULLIF(source_agent, ''), NULLIF(source_url, ''), source) WHERE source = 'system'"),
     d1.prepare("UPDATE hot_topics SET data_source = 'douyin_content_hot' WHERE platform = 'douyin' AND data_source IS NULL"),
+    d1.prepare("UPDATE hot_topics SET collection_date = date(datetime(COALESCE(collect_time, created_at), '+8 hours')) WHERE collection_date IS NULL OR trim(collection_date) = ''"),
     d1.prepare("DROP INDEX IF EXISTS uq_hot_topics_platform_name"),
-    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_platform_source_name ON hot_topics(platform, data_source, topic_name)"),
-    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_non_douyin_name ON hot_topics(platform, topic_name) WHERE platform <> 'douyin'"),
+    d1.prepare("DROP INDEX IF EXISTS uq_hot_topics_platform_source_name"),
+    d1.prepare("DROP INDEX IF EXISTS uq_hot_topics_non_douyin_name"),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_hot_topics_daily_snapshot ON hot_topics(platform, data_source, topic_name, collection_date)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_collection_date_platform ON hot_topics(collection_date, platform)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_status_heat ON hot_topics(status, heat_value DESC)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_keyword ON hot_topics(keyword)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topics_platform_ranking ON hot_topics(platform, ranking)"),

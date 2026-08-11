@@ -9,6 +9,7 @@ import {
   parsePositiveId,
 } from "@/lib/data-collection-api-v2";
 import type { CommentRecord, ContentRecord, HotTopicRecord } from "@/lib/data-collection-v2";
+import { analyzeImportedHotTopic } from "@/lib/hot-topic-import-analysis";
 
 type LogRow = {
   id: number;
@@ -39,6 +40,19 @@ function topicDataSource(record: HotTopicRecord) {
   return "douyin_hot_rank";
 }
 
+function collectionDate(value: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+}
+
+function topicSnapshotKey(record: HotTopicRecord) {
+  return `${record.platform}|${topicDataSource(record)}|${record.topic_name}|${collectionDate(record.collect_time)}`;
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: collectionApiHeaders() });
 }
@@ -47,9 +61,9 @@ export async function POST(request: Request) {
   if (!collectionApiAuthorized(request)) return collectionApiJson({ error: "采集接口密钥无效" }, { status: 401 });
   const id = parsePositiveId(new URL(request.url).searchParams.get("id"));
   if (!id) return collectionApiJson({ error: "批次id无效" }, { status: 400 });
-  let confirmation: { confirmed?: unknown };
+  let confirmation: { confirmed?: unknown; duplicate_mode?: unknown };
   try {
-    confirmation = await request.json() as { confirmed?: unknown };
+    confirmation = await request.json() as { confirmed?: unknown; duplicate_mode?: unknown };
   } catch {
     return collectionApiJson({ error: "请提交JSON确认信息" }, { status: 400 });
   }
@@ -92,25 +106,88 @@ export async function POST(request: Request) {
   const statements: Array<ReturnType<typeof d1.prepare>> = [];
   let successCount = staged.results.length;
   let skippedCount = 0;
+  let insertedCount = 0;
+  let updatedCount = 0;
+  let aiRecommendedCount = 0;
 
   if (log.entity_type === "hot_topic") {
+    const records: HotTopicRecord[] = [];
     for (const row of staged.results) {
       const record = parseJsonObject<HotTopicRecord>(row.normalized_payload);
       if (!record) return collectionApiJson({ error: `第${row.record_index + 1}条标准热点数据损坏` }, { status: 409 });
+      records.push(record);
+    }
+    const dates = [...new Set(records.map((record) => collectionDate(record.collect_time)))];
+    const existing = await d1.prepare(`
+      SELECT platform, data_source, topic_name, collection_date FROM hot_topics
+      WHERE platform = ? AND source = ? AND collection_date IN (${dates.map(() => "?").join(",")})
+    `).bind(log.platform, log.source_name, ...dates).all<{
+      platform: string; data_source: string; topic_name: string; collection_date: string;
+    }>();
+    const existingKeys = new Set(existing.results.map((record) =>
+      `${record.platform}|${record.data_source}|${record.topic_name}|${record.collection_date}`));
+    const duplicateCount = records.filter((record) => existingKeys.has(topicSnapshotKey(record))).length;
+    const duplicateMode = String(confirmation.duplicate_mode ?? "");
+    if (duplicateCount && duplicateMode !== "overwrite" && duplicateMode !== "skip") {
+      return collectionApiJson({
+        error: "同一采集日期已有热点数据，请明确选择覆盖或跳过",
+        requiresDuplicateDecision: true,
+        duplicateCount,
+        allowedModes: ["overwrite", "skip"],
+      }, { status: 409 });
+    }
+    const selectedRecords = duplicateMode === "skip"
+      ? records.filter((record) => !existingKeys.has(topicSnapshotKey(record)))
+      : records;
+    skippedCount = records.length - selectedRecords.length;
+    updatedCount = duplicateMode === "overwrite" ? duplicateCount : 0;
+    insertedCount = selectedRecords.length - updatedCount;
+    successCount = selectedRecords.length;
+
+    const [posts, priorTopics] = await Promise.all([
+      d1.prepare("SELECT title, hashtags FROM social_posts ORDER BY publish_time DESC, id DESC LIMIT 300")
+        .all<{ title: string; hashtags: string | null }>(),
+      d1.prepare("SELECT topic_name, keyword, category FROM hot_topics ORDER BY collect_time DESC, id DESC LIMIT 500")
+        .all<{ topic_name: string; keyword: string; category: string | null }>(),
+    ]);
+    const historicalText = [
+      ...posts.results.map((post) => `${post.title} ${post.hashtags ?? ""}`),
+      ...priorTopics.results.map((topic) => `${topic.topic_name} ${topic.keyword} ${topic.category ?? ""}`),
+    ].join(" ");
+
+    for (const record of selectedRecords) {
+      const ai = analyzeImportedHotTopic(record, historicalText);
+      if (ai?.worthFollowing) aiRecommendedCount += 1;
       statements.push(d1.prepare(`
         INSERT INTO hot_topics
           (platform, source, topic_type, data_source, topic_name, keyword, ranking,
-           heat_value, trend, status, collection_log_id, collect_time, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT DO UPDATE SET
+           heat_value, trend, category, related_degree, ai_suggestion, status,
+           source_agent, hot_score, recommended_topic, video_direction, publish_time_suggestion,
+           collection_log_id, collect_time, collection_date, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(platform, data_source, topic_name, collection_date) DO UPDATE SET
           source = excluded.source, topic_type = excluded.topic_type,
+          keyword = excluded.keyword, category = excluded.category,
           ranking = excluded.ranking, heat_value = excluded.heat_value,
-          trend = excluded.trend, collection_log_id = excluded.collection_log_id,
+          trend = excluded.trend, related_degree = excluded.related_degree,
+          ai_suggestion = excluded.ai_suggestion, source_agent = excluded.source_agent,
+          hot_score = excluded.hot_score, recommended_topic = excluded.recommended_topic,
+          video_direction = excluded.video_direction,
+          publish_time_suggestion = excluded.publish_time_suggestion,
+          collection_log_id = excluded.collection_log_id,
           collect_time = excluded.collect_time, status = 'active'
       `).bind(
         record.platform, record.source, record.topic_type, topicDataSource(record),
-        record.topic_name, record.topic_name, record.ranking, record.heat_value,
-        record.trend, id, record.collect_time,
+        record.topic_name, record.keyword, record.ranking, record.heat_value,
+        record.trend, record.category,
+        ai ? ai.relevanceScore / 100 : null,
+        ai ? JSON.stringify({ worthFollowing: ai.worthFollowing, worthFollowingLabel: ai.worthFollowingLabel, analysis: ai.analysis }) : null,
+        record.source,
+        ai?.relevanceScore ?? null,
+        ai?.shortVideoTitle ?? null,
+        ai?.shootingDirection ?? null,
+        ai?.liveTheme ?? null,
+        id, record.collect_time, collectionDate(record.collect_time),
       ));
     }
   } else if (log.entity_type === "content") {
@@ -205,7 +282,10 @@ export async function POST(request: Request) {
     target,
     receivedCount: log.total_count,
     writtenCount: successCount,
+    insertedCount,
+    updatedCount,
     skippedCount,
+    aiRecommendedCount,
     message: `采集批次已确认并写入${target}`,
   });
 }

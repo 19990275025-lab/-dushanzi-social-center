@@ -163,8 +163,8 @@ export async function POST(request: Request) {
     const topic = await getD1().prepare(`
       INSERT INTO hot_topics
         (platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category, related_degree,
-          ai_suggestion, status, collect_time, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ai_suggestion, status, collect_time, collection_date, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, date('now', '+8 hours'), CURRENT_TIMESTAMP)
       RETURNING id, platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category,
         related_degree, ai_suggestion, status, collect_time, created_at
     `).bind(value.platform, value.topicType, value.dataSource, value.source, value.topicName, value.keyword, value.heatValue, value.trend,
@@ -191,7 +191,7 @@ export async function PATCH(request: Request) {
     const topic = await getD1().prepare(`
       UPDATE hot_topics SET platform = ?, topic_type = ?, data_source = ?, source = ?, topic_name = ?, keyword = ?, heat_value = ?,
         trend = ?, category = ?, related_degree = ?, ai_suggestion = ?, status = ?,
-        collect_time = CURRENT_TIMESTAMP
+        collect_time = CURRENT_TIMESTAMP, collection_date = date('now', '+8 hours')
       WHERE id = ?
       RETURNING id, platform, topic_type, data_source, source, topic_name, keyword, heat_value, trend, category,
         related_degree, ai_suggestion, status, collect_time, created_at

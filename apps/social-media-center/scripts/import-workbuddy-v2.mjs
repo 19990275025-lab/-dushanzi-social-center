@@ -14,8 +14,11 @@ const apiBaseUrl = (process.env.WORKBUDDY_API_BASE_URL
   || "https://dushanzi-social-center.pink-raven-4682.chatgpt.site").replace(/\/$/, "");
 const confirm = process.argv.includes("--confirm");
 const dryRun = process.argv.includes("--dry-run");
+const overwriteSameDay = process.argv.includes("--overwrite-same-day");
+const skipSameDay = process.argv.includes("--skip-same-day");
+if (overwriteSameDay && skipSameDay) throw new Error("同日数据处理方式只能选择覆盖或跳过其中一种");
 const limitArgument = process.argv.find((argument) => argument.startsWith("--limit="));
-const limit = Number(limitArgument?.split("=")[1] ?? 10);
+const limit = Number(limitArgument?.split("=")[1] ?? 500);
 if (!Number.isInteger(limit) || limit < 1 || limit > 500) throw new Error("--limit必须是1至500之间的整数");
 
 const files = (await readdir(sourceDirectory)).filter((name) => /^hot_topic_\d{8}\.json$/.test(name)).sort();
@@ -85,9 +88,15 @@ if (converted.errors.length) {
     }
     let confirmation = null;
     if (confirm) {
+      if (received.requiresDuplicateDecision && !overwriteSameDay && !skipSameDay) {
+        throw new Error(`批次${received.batchId}同日已有${received.sameDayExistingCount}条数据，请增加--overwrite-same-day或--skip-same-day`);
+      }
       confirmation = await requestJson(`/api/data-collection/v2/confirm?id=${received.batchId}`, {
         method: "POST",
-        body: JSON.stringify({ confirmed: true }),
+        body: JSON.stringify({
+          confirmed: true,
+          duplicate_mode: overwriteSameDay ? "overwrite" : skipSameDay ? "skip" : undefined,
+        }),
       });
     }
     batches.push({
@@ -96,6 +105,8 @@ if (converted.errors.length) {
       receivedCount: received.totalCount,
       previewCount: preview.records.length,
       previewErrors: previewErrors.length,
+      sameDayDates: received.sameDayDates,
+      sameDayExistingCount: received.sameDayExistingCount,
       confirmation,
     });
   }
@@ -112,6 +123,9 @@ if (converted.errors.length) {
     receivedCount: batches.reduce((sum, batch) => sum + batch.receivedCount, 0),
     previewCount: batches.reduce((sum, batch) => sum + batch.previewCount, 0),
     successCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.writtenCount ?? 0), 0),
+    insertedCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.insertedCount ?? 0), 0),
+    updatedCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.updatedCount ?? 0), 0),
+    aiRecommendedCount: batches.reduce((sum, batch) => sum + (batch.confirmation?.aiRecommendedCount ?? 0), 0),
     failedCount: batches.reduce((sum, batch) => sum + batch.previewErrors, 0),
     visibleInHotTopicCenter: visibleCount,
     confirmed: confirm,
