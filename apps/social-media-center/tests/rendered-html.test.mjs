@@ -22,6 +22,7 @@ for (const [path, heading] of [
   ["app/imports/page.tsx", "新媒体智能数据导入中心"],
   ["app/hot-topics/page.tsx", "多平台热点监测与AI选题推荐中心"],
   ["app/hot-topic-archive/page.tsx", "热点档案库"],
+  ["app/content-planning/page.tsx", "AI内容策划中心"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
   ["app/collector/page.tsx", "新媒体数据采集中心"],
   ["app/comment-insights/page.tsx", "游客评论洞察中心"],
@@ -58,7 +59,7 @@ test("content monitoring and fan analysis are independent navigation modules", a
   assert.match(source, /href="\/insights\/fans"/);
   assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "02"/);
   assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "03"/);
-  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "09"/);
+  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "10"/);
   assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });
 
@@ -807,6 +808,48 @@ test("hot topic archive V4.0 snapshots daily assets and exports Excel without al
   assert.match(vite, /30 0 \* \* \*/);
   assert.match(styles, /archive-kpi-grid/);
   assert.match(styles, /archive-table/);
+});
+
+test("AI content planning V1.0 closes hotspot to plan, task, post and seven-day review", async () => {
+  const [schema, bootstrap, migration, engine, api, page, shell, worker, styles] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0022_content_planning_v1.sql", root), "utf8"),
+    readFile(new URL("lib/content-planning.ts", root), "utf8"),
+    readFile(new URL("app/api/content-planning/route.ts", root), "utf8"),
+    readFile(new URL("app/content-planning/page.tsx", root), "utf8"),
+    readFile(new URL("components/AppShell.tsx", root), "utf8"),
+    readFile(new URL("worker/index.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  for (const source of [schema, bootstrap, migration]) {
+    assert.match(source, /content_plans/);
+    assert.match(source, /content_plan_feedback/);
+    for (const field of ["hot_topic_id", "title", "script", "shot_list", "cover_text", "hashtags", "publish_time", "status", "created_time"]) assert.match(source, new RegExp(field));
+    for (const field of ["plan_id", "post_id", "views", "likes", "comments", "favorites", "shares", "effect_score", "ai_summary"]) assert.match(source, new RegExp(field));
+  }
+  assert.match(migration, /REFERENCES `hot_topics`/);
+  assert.match(migration, /REFERENCES `content_tasks`/);
+  assert.match(migration, /REFERENCES `social_posts`/);
+  assert.match(engine, /generateContentPlan/);
+  assert.match(engine, /titleOptions/);
+  assert.match(engine, /shotList/);
+  assert.match(engine, /calculatePlanFeedback/);
+  assert.match(engine, /julianday\(\?\) - julianday\(p\.publish_time\) >= 7/);
+  assert.match(api, /FROM hot_topics/);
+  assert.match(api, /hot_topic_analysis/);
+  assert.match(api, /hot_topic_feedback/);
+  assert.match(api, /collection_logs/);
+  assert.match(api, /INSERT INTO content_tasks/);
+  assert.match(api, /related_post_id = \?/);
+  assert.match(api, /platform = 'douyin'/);
+  for (const label of ["今日推荐选题 TOP5", "查看方案", "生成任务", "短视频标题（5个）", "视频脚本", "拍摄分镜", "封面文案", "推荐发布时间", "推荐标签", "推荐话题", "推荐背景音乐", "直播主题", "预计播放量", "预计互动率", "涨粉预估", "内容任务", "发布效果", "AI复盘"]) assert.match(page, new RegExp(label));
+  assert.match(shell, /href: "\/content-planning", label: "AI内容策划中心", code: "07"/);
+  assert.match(worker, /refreshContentPlanFeedback/);
+  assert.match(styles, /planning-topic-grid/);
+  assert.match(styles, /planning-workspace/);
+  assert.match(styles, /planning-review-grid/);
+  assert.doesNotMatch(page, /快手|微博/);
 });
 
 test("production build artifacts exist", async () => {

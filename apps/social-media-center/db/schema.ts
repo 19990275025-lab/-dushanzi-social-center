@@ -564,3 +564,57 @@ export const contentTasks = sqliteTable(
     index("idx_content_tasks_responsible_person").on(table.responsiblePerson),
   ],
 );
+
+export const contentPlans = sqliteTable(
+  "content_plans",
+  {
+    planId: integer("plan_id").primaryKey({ autoIncrement: true }),
+    hotTopicId: integer("hot_topic_id").notNull().references(() => hotTopics.id, { onDelete: "restrict" }),
+    taskId: integer("task_id").references(() => contentTasks.id, { onDelete: "set null" }),
+    relatedPostId: integer("related_post_id").references(() => socialPosts.id, { onDelete: "set null" }),
+    platform: text("platform").notNull().default("douyin"),
+    contentType: text("content_type").notNull(),
+    title: text("title").notNull(),
+    titleOptions: text("title_options", { mode: "json" }).$type<string[]>().notNull().default([]),
+    script: text("script").notNull(),
+    shotList: text("shot_list", { mode: "json" }).$type<Array<{ shot: number; scene: string; visual: string; voiceover: string; duration: string }>>().notNull().default([]),
+    coverText: text("cover_text").notNull(),
+    hashtags: text("hashtags", { mode: "json" }).$type<string[]>().notNull().default([]),
+    recommendedTopics: text("recommended_topics", { mode: "json" }).$type<string[]>().notNull().default([]),
+    backgroundMusic: text("background_music"),
+    publishTime: text("publish_time").notNull(),
+    liveTheme: text("live_theme"),
+    targetViews: integer("target_views").notNull().default(0),
+    targetInteractionRate: real("target_interaction_rate").notNull().default(0),
+    targetFansGrowth: integer("target_fans_growth").notNull().default(0),
+    status: text("status").notNull().default("draft"),
+    createdTime: text("created_time").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedTime: text("updated_time").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_content_plans_topic_platform").on(table.hotTopicId, table.platform),
+    index("idx_content_plans_status_publish_time").on(table.status, table.publishTime),
+    index("idx_content_plans_task_id").on(table.taskId),
+    index("idx_content_plans_related_post_id").on(table.relatedPostId),
+  ],
+);
+
+export const contentPlanFeedback = sqliteTable(
+  "content_plan_feedback",
+  {
+    planId: integer("plan_id").primaryKey().references(() => contentPlans.planId, { onDelete: "cascade" }),
+    postId: integer("post_id").notNull().references(() => socialPosts.id, { onDelete: "restrict" }),
+    views: integer("views").notNull().default(0),
+    likes: integer("likes").notNull().default(0),
+    comments: integer("comments").notNull().default(0),
+    favorites: integer("favorites").notNull().default(0),
+    shares: integer("shares").notNull().default(0),
+    effectScore: real("effect_score").notNull().default(0),
+    aiSummary: text("ai_summary").notNull(),
+    evaluatedAt: text("evaluated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_content_plan_feedback_post_id").on(table.postId),
+    index("idx_content_plan_feedback_effect_score").on(table.effectScore),
+  ],
+);

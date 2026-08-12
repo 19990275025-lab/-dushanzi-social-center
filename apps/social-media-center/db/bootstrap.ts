@@ -411,6 +411,54 @@ const schemaStatements = [
     ON content_tasks(task_date, status)`,
   `CREATE INDEX IF NOT EXISTS idx_content_tasks_responsible_person
     ON content_tasks(responsible_person)`,
+  `CREATE TABLE IF NOT EXISTS content_plans (
+    plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hot_topic_id INTEGER NOT NULL REFERENCES hot_topics(id) ON DELETE RESTRICT,
+    task_id INTEGER REFERENCES content_tasks(id) ON DELETE SET NULL,
+    related_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL,
+    platform TEXT NOT NULL DEFAULT 'douyin' CHECK (platform = 'douyin'),
+    content_type TEXT NOT NULL CHECK (content_type IN ('guide','scenery','visitor_experience','challenge','live')),
+    title TEXT NOT NULL,
+    title_options TEXT NOT NULL DEFAULT '[]',
+    script TEXT NOT NULL,
+    shot_list TEXT NOT NULL DEFAULT '[]',
+    cover_text TEXT NOT NULL,
+    hashtags TEXT NOT NULL DEFAULT '[]',
+    recommended_topics TEXT NOT NULL DEFAULT '[]',
+    background_music TEXT,
+    publish_time TEXT NOT NULL,
+    live_theme TEXT,
+    target_views INTEGER NOT NULL DEFAULT 0 CHECK (target_views >= 0),
+    target_interaction_rate REAL NOT NULL DEFAULT 0 CHECK (target_interaction_rate >= 0),
+    target_fans_growth INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','task_created','published','reviewed')),
+    created_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_plans_topic_platform
+    ON content_plans(hot_topic_id, platform)`,
+  `CREATE INDEX IF NOT EXISTS idx_content_plans_status_publish_time
+    ON content_plans(status, publish_time DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_content_plans_task_id
+    ON content_plans(task_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_content_plans_related_post_id
+    ON content_plans(related_post_id)`,
+  `CREATE TABLE IF NOT EXISTS content_plan_feedback (
+    plan_id INTEGER PRIMARY KEY REFERENCES content_plans(plan_id) ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON DELETE RESTRICT,
+    views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
+    likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
+    comments INTEGER NOT NULL DEFAULT 0 CHECK (comments >= 0),
+    favorites INTEGER NOT NULL DEFAULT 0 CHECK (favorites >= 0),
+    shares INTEGER NOT NULL DEFAULT 0 CHECK (shares >= 0),
+    effect_score REAL NOT NULL DEFAULT 0 CHECK (effect_score >= 0 AND effect_score <= 100),
+    ai_summary TEXT NOT NULL,
+    evaluated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_plan_feedback_post_id
+    ON content_plan_feedback(post_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_content_plan_feedback_effect_score
+    ON content_plan_feedback(effect_score DESC)`,
 ];
 
 async function initialize() {

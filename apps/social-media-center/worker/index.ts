@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { beijingDate, generateAndStoreDailyArchive } from "../lib/hot-topic-archive";
+import { refreshContentPlanFeedback } from "../lib/content-planning";
 
 interface Env {
   ASSETS: Fetcher;
@@ -51,7 +52,10 @@ const worker = {
   },
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     const date = beijingDate(new Date(controller.scheduledTime));
-    ctx.waitUntil(generateAndStoreDailyArchive(env.DB, env.UPLOADS, date));
+    ctx.waitUntil(Promise.all([
+      generateAndStoreDailyArchive(env.DB, env.UPLOADS, date),
+      refreshContentPlanFeedback(env.DB, new Date(controller.scheduledTime)),
+    ]).then(() => undefined));
   },
 };
 
