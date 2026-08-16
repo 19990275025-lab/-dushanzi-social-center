@@ -159,10 +159,13 @@ export async function POST(request: Request) {
     const dueDate = payload.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(payload.dueDate) ? payload.dueDate : plan.publish_time.slice(0, 10);
     const typeMap: Record<string, string> = { guide: "video", scenery: "video", visitor_experience: "video", challenge: "video", live: "live" };
     const task = await d1.prepare(`
-      INSERT INTO content_tasks (task_date, platform, task_title, content_type, responsible_person, status, review_result)
-      VALUES (?, 'douyin', ?, ?, NULL, 'idea', ?)
+      INSERT INTO content_tasks
+        (task_date, platform, task_title, content_type, responsible_person, collaborators,
+         source_type, source_id, priority, status, review_result, updated_at)
+      VALUES (?, 'douyin', ?, ?, NULL, '[]', 'ai_content_plan', ?, 'high', 'planning', ?, CURRENT_TIMESTAMP)
       RETURNING id
-    `).bind(dueDate, plan.title, typeMap[plan.content_type] ?? "video", `任务来源：AI内容策划；来源热点ID：${plan.hot_topic_id}`).first<{ id: number }>();
+    `).bind(dueDate, plan.title, typeMap[plan.content_type] ?? "video", planId,
+      `任务来源：AI内容策划；来源热点ID：${plan.hot_topic_id}`).first<{ id: number }>();
     await d1.prepare("UPDATE content_plans SET task_id = ?, status = 'task_created', updated_time = CURRENT_TIMESTAMP WHERE plan_id = ?")
       .bind(task?.id, planId).run();
     return Response.json({ taskId: task?.id, dashboard: await loadDashboard(d1) });
@@ -178,7 +181,11 @@ export async function POST(request: Request) {
       WHERE plan_id = ? RETURNING task_id
     `).bind(postId, planId).first<{ task_id: number | null }>();
     if (!result) return Response.json({ error: "内容方案不存在" }, { status: 404 });
-    if (result.task_id) await d1.prepare("UPDATE content_tasks SET status = 'published' WHERE id = ?").bind(result.task_id).run();
+    if (result.task_id) await d1.prepare(`
+      UPDATE content_tasks SET status = 'published', related_post_id = ?,
+        completed_at = (SELECT publish_time FROM social_posts WHERE id = ?), updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).bind(postId, postId, result.task_id).run();
     await refreshContentPlanFeedback(d1);
     return Response.json({ dashboard: await loadDashboard(d1) });
   }

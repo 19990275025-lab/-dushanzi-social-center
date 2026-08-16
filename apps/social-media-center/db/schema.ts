@@ -555,13 +555,22 @@ export const contentTasks = sqliteTable(
     taskTitle: text("task_title").notNull(),
     contentType: text("content_type").notNull(),
     responsiblePerson: text("responsible_person"),
-    status: text("status").notNull().default("idea"),
+    collaborators: text("collaborators", { mode: "json" }).$type<string[]>().notNull().default([]),
+    sourceType: text("source_type").notNull().default("manual"),
+    sourceId: integer("source_id"),
+    priority: text("priority").notNull().default("normal"),
+    status: text("status").notNull().default("planning"),
+    relatedPostId: integer("related_post_id").references(() => socialPosts.id, { onDelete: "set null" }),
     reviewResult: text("review_result"),
+    completedAt: text("completed_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index("idx_content_tasks_date_status").on(table.taskDate, table.status),
     index("idx_content_tasks_responsible_person").on(table.responsiblePerson),
+    index("idx_content_tasks_source").on(table.sourceType, table.sourceId),
+    index("idx_content_tasks_related_post").on(table.relatedPostId),
   ],
 );
 

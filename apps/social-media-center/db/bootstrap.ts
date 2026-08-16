@@ -403,9 +403,16 @@ const schemaStatements = [
     task_title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     responsible_person TEXT,
-    status TEXT NOT NULL DEFAULT 'idea',
+    collaborators TEXT NOT NULL DEFAULT '[]',
+    source_type TEXT NOT NULL DEFAULT 'manual',
+    source_id INTEGER,
+    priority TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'planning',
+    related_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL,
     review_result TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    completed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS idx_content_tasks_date_status
     ON content_tasks(task_date, status)`,
@@ -646,6 +653,34 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_related_post ON hot_topic_feedback(related_post_id)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_platform_publish ON hot_topic_feedback(platform, publish_time DESC)"),
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_hot_topic_feedback_effect_score ON hot_topic_feedback(effect_score DESC)"),
+  ]);
+
+  const taskColumns = await d1.prepare("PRAGMA table_info(content_tasks)").all<{ name: string }>();
+  const taskColumnNames = new Set(taskColumns.results.map((column) => column.name));
+  const missingTaskColumns = [
+    ["collaborators", "ALTER TABLE content_tasks ADD COLUMN collaborators TEXT NOT NULL DEFAULT '[]'"],
+    ["source_type", "ALTER TABLE content_tasks ADD COLUMN source_type TEXT NOT NULL DEFAULT 'manual'"],
+    ["source_id", "ALTER TABLE content_tasks ADD COLUMN source_id INTEGER"],
+    ["priority", "ALTER TABLE content_tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'"],
+    ["related_post_id", "ALTER TABLE content_tasks ADD COLUMN related_post_id INTEGER REFERENCES social_posts(id) ON DELETE SET NULL"],
+    ["completed_at", "ALTER TABLE content_tasks ADD COLUMN completed_at TEXT"],
+    ["updated_at", "ALTER TABLE content_tasks ADD COLUMN updated_at TEXT"],
+  ] as const;
+  for (const [name, statement] of missingTaskColumns) {
+    if (!taskColumnNames.has(name)) await d1.prepare(statement).run();
+  }
+  await d1.batch([
+    d1.prepare(`UPDATE content_tasks SET status = CASE status
+      WHEN 'idea' THEN 'planning' WHEN 'approved' THEN 'shoot_pending'
+      WHEN 'in_production' THEN 'shooting' WHEN 'review' THEN 'review_pending'
+      WHEN 'scheduled' THEN 'publish_pending' WHEN 'done' THEN 'reviewed'
+      WHEN 'blocked' THEN 'planning' WHEN 'cancelled' THEN 'planning' ELSE status END`),
+    d1.prepare("UPDATE content_tasks SET updated_at = COALESCE(updated_at, created_at, CURRENT_TIMESTAMP)"),
+    d1.prepare(`UPDATE content_tasks SET source_type = 'ai_content_plan',
+      source_id = (SELECT plan_id FROM content_plans WHERE content_plans.task_id = content_tasks.id LIMIT 1)
+      WHERE EXISTS (SELECT 1 FROM content_plans WHERE content_plans.task_id = content_tasks.id)`),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_content_tasks_source ON content_tasks(source_type, source_id)"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_content_tasks_related_post ON content_tasks(related_post_id)"),
   ]);
 
   await d1.prepare("PRAGMA optimize").run();

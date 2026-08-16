@@ -852,6 +852,52 @@ test("AI content planning V1.0 closes hotspot to plan, task, post and seven-day 
   assert.doesNotMatch(page, /快手|微博/);
 });
 
+test("task management V2.0 provides an eight-stage Kanban, automatic post matching and weekly execution report", async () => {
+  const [schema, bootstrap, migration, backfill, helper, api, page, planningApi, worker, styles, readme] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0023_task_management_v2.sql", root), "utf8"),
+    readFile(new URL("drizzle/0024_task_source_backfill.sql", root), "utf8"),
+    readFile(new URL("lib/task-management.ts", root), "utf8"),
+    readFile(new URL("app/api/tasks/route.ts", root), "utf8"),
+    readFile(new URL("app/tasks/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/content-planning/route.ts", root), "utf8"),
+    readFile(new URL("worker/index.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("README.md", root), "utf8"),
+  ]);
+  for (const source of [schema, bootstrap, migration]) {
+    for (const field of ["source_type", "source_id", "collaborators", "priority", "related_post_id", "completed_at", "updated_at"]) {
+      assert.match(source, new RegExp(field));
+    }
+  }
+  for (const status of ["planning", "shoot_pending", "shooting", "edit_pending", "review_pending", "publish_pending", "published", "reviewed"]) {
+    assert.match(helper, new RegExp(status));
+    assert.match(page, new RegExp(status));
+  }
+  for (const label of ["待策划", "待拍摄", "拍摄中", "待剪辑", "待审核", "待发布", "已发布", "已复盘", "热点监测中心", "AI内容策划中心", "人工创建", "节日活动", "运营周报", "负责人"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /draggable/);
+  assert.match(page, /onDrop/);
+  assert.match(helper, /titleSimilarity/);
+  assert.match(helper, /same|platform === task\.platform/);
+  assert.match(helper, /refreshContentPlanFeedback/);
+  assert.match(helper, /status = 'reviewed'/);
+  assert.match(backfill, /source_type` = 'ai_content_plan'/);
+  assert.match(backfill, /content_plans/);
+  assert.match(api, /content_plan_feedback/);
+  assert.match(api, /collection_logs/);
+  assert.match(api, /buildWeeklyReport/);
+  assert.match(api, /export async function PUT/);
+  assert.match(planningApi, /'ai_content_plan'/);
+  assert.match(planningApi, /'planning'/);
+  assert.match(worker, /syncTaskPostAssociations/);
+  assert.match(styles, /task-kanban-board/);
+  assert.match(styles, /task-weekly-report/);
+  assert.match(readme, /任务管理中心 V2\.0/);
+});
+
 test("production build artifacts exist", async () => {
   await access(new URL("dist/server/index.js", root));
   await access(new URL("dist/client", root));
