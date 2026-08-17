@@ -93,6 +93,42 @@ test("content monitoring is Douyin-first while fan insights retain platform them
   assert.doesNotMatch(styles, /platform-themed-page\.theme-wechat_channels/);
 });
 
+test("fan analysis V2.0 adds growth, profile history, content acquisition and export without new schema", async () => {
+  const [page, api, exporter, styles, readme] = await Promise.all([
+    readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
+    readFile(new URL("lib/fan-report-export.ts", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("README.md", root), "utf8"),
+  ]);
+  for (const label of ["FAN ANALYSIS CENTER · V2.0", "当前粉丝", "新增粉丝", "流失粉丝", "增长率", "7天", "30天", "自然月", "自定义", "粉丝画像分析", "画像历史对比", "内容吸粉分析", "AI 粉丝运营周报", "本周粉丝分析", "增长原因", "流失原因", "下周内容建议", "导出PDF", "导出PNG"]) {
+    assert.match(page, new RegExp(label));
+  }
+  assert.match(page, /GrowthLineChart/);
+  assert.match(page, /window\.print\(\)/);
+  assert.match(page, /downloadFanReportPng/);
+  assert.match(page, /selected.*douyin/);
+  assert.match(api, /FROM social_fans/);
+  assert.match(api, /FROM fan_growth_records/);
+  assert.match(api, /FROM social_posts/);
+  assert.match(api, /platform = 'douyin'/);
+  assert.match(api, /lost_fans/);
+  assert.match(api, /profileComparison/);
+  assert.match(api, /contentAttraction/);
+  assert.match(api, /weeklyReport/);
+  assert.match(api, /find\(\(post\) => post\.fans_growth > 0\)/);
+  assert.match(api, /find\(\(item\) => item\.fansGrowth > 0\)/);
+  assert.match(api, /同日净增长仅作背景校验/);
+  assert.doesNotMatch(api, /CREATE TABLE|ALTER TABLE|INSERT INTO|DELETE FROM/);
+  assert.match(exporter, /canvas\.toBlob/);
+  assert.match(exporter, /image\/png/);
+  assert.match(styles, /fan-growth-line-chart/);
+  assert.match(styles, /profile-comparison-grid/);
+  assert.match(styles, /printing-fan-report/);
+  assert.match(readme, /粉丝分析中心 V2\.0/);
+  assert.match(readme, /另存为PDF/);
+});
+
 test("content monitoring V1.0 uses real Douyin posts, comments and hot-topic feedback", async () => {
   const [page, api, engine, styles] = await Promise.all([
     readFile(new URL("app/insights/content/page.tsx", root), "utf8"),

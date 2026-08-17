@@ -4,19 +4,64 @@ import { useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
 import { dateRangeQuery, type DateRange } from "@/lib/date-range";
 import { CustomDateRange, MonthPicker, useGlobalDateRange } from "@/components/GlobalDateFilter";
+import { downloadFanReportPng, type FanReportExportData } from "@/lib/fan-report-export";
 
 const platforms = ["all", "douyin", "kuaishou", "weibo"];
 const trendOptions = [{ value: "7d", label: "7天" }, { value: "30d", label: "30天" }, { value: "month", label: "自然月" }, { value: "custom", label: "自定义" }] as const;
 type TrendPeriod = typeof trendOptions[number]["value"];
 type Distribution = { label: string; value: number };
+type DistributionChange = Distribution & { previousValue: number; delta: number };
 type Trend = { record_date: string; fans_count: number; net_growth: number; new_fans: number; lost_fans: number; source_type: string };
 type Strategy = { positioning: string; actions: string[] };
-type FanPlatform = { platform: string; fansCount: number; netGrowth: number; newFans: number; growthRate: number; trend: Trend[]; trendSource: string; strategy: Strategy; profile: null | { gender: Distribution[]; ages: Distribution[]; regions: Distribution[]; interests: Distribution[]; activeTimes: Distribution[]; sourceType: string; collectedAt: string } };
-type FanData = { platforms: FanPlatform[]; trendPeriod: string; trendRange: { from: string; to: string }; sources: string[]; collectionApi: string; updatedAt: string };
+type Profile = { id: number; fansCount: number; gender: Distribution[]; ages: Distribution[]; regions: Distribution[]; interests: Distribution[]; activeTimes: Distribution[]; sourceType: string; collectedAt: string };
+type ProfileComparison = { currentDate: string; previousDate: string; gender: DistributionChange[]; ages: DistributionChange[]; regions: DistributionChange[]; interests: DistributionChange[]; activeTimes: DistributionChange[] };
+type FanPlatform = {
+  platform: string; fansCount: number; netGrowth: number; newFans: number; lostFans: number; growthRate: number;
+  trend: Trend[]; trendSource: string; strategy: Strategy; profile: Profile | null; previousProfile: Profile | null;
+  profileHistory: Profile[]; profileComparison: ProfileComparison | null;
+};
+type AttractionPost = { id: number; title: string; content_type: string; publish_time: string; views: number; likes: number; comments: number; favorites: number; shares: number; fans_growth: number; day_net_growth: number | null; interaction_rate: number };
+type WeeklyReport = {
+  growthSummary: string; profileSummary: string; growthReason: string; lossReason: string;
+  bestPost: null | { id: number; title: string; fansGrowth: number; views: number };
+  easiestContent: string; nextWeekSuggestions: string[]; profileSnapshotDate: string | null; previousProfileSnapshotDate: string | null;
+};
+type FanData = {
+  platforms: FanPlatform[]; trendPeriod: string; trendRange: { from: string; to: string };
+  contentAttraction: { platform: string; posts: AttractionPost[]; contentTypes: Array<{ contentType: string; label: string; posts: number; fansGrowth: number; views: number; averageFansGrowth: number }>; bestPost: AttractionPost | null; bestType: null | { label: string; fansGrowth: number; averageFansGrowth: number }; attributionNote: string };
+  weeklyReport: WeeklyReport; sources: string[]; collectionApi: string; updatedAt: string;
+};
 
 function ProfileBlock({ title, items, emptyMessage = "等待真实粉丝画像采集" }: { title: string; items: Distribution[]; emptyMessage?: string }) {
   const max = Math.max(...items.map((item) => item.value), 1);
   return <article className="fan-profile-card"><h3>{title}</h3>{items.length ? <div className="profile-bars">{items.slice(0, 8).map((item) => <div key={item.label}><span>{item.label}</span><i><b style={{ width: `${(item.value / max) * 100}%` }} /></i><strong>{item.value}%</strong></div>)}</div> : <p className="profile-empty">{emptyMessage}</p>}</article>;
+}
+
+function ProfileComparisonCard({ title, items, hasPrevious }: { title: string; items: DistributionChange[]; hasPrevious: boolean }) {
+  return <article className="profile-comparison-card"><h3>{title}</h3>{items.length ? <div>{items.slice(0, 6).map((item) => <p key={item.label}><span>{item.label}</span><strong>{item.value}%</strong>{hasPrevious ? <em className={item.delta > 0 ? "delta-up" : item.delta < 0 ? "delta-down" : "delta-flat"}>{item.delta > 0 ? "+" : ""}{item.delta}pp</em> : <em>首次快照</em>}</p>)}</div> : <p className="profile-empty">暂无该维度数据</p>}</article>;
+}
+
+function GrowthLineChart({ trend }: { trend: Trend[] }) {
+  if (trend.length < 2) return <div className="fan-empty-state"><strong>增长数据点不足</strong><p>至少需要两个日期的 fan_growth_records，才能绘制诚实的变化趋势。</p></div>;
+  const width = 960; const height = 300; const left = 56; const right = 22; const top = 30; const bottom = 54;
+  const chartWidth = width - left - right; const chartHeight = height - top - bottom;
+  const maximum = Math.max(...trend.flatMap((item) => [item.new_fans, item.lost_fans]), 1);
+  const points = (key: "new_fans" | "lost_fans") => trend.map((item, index) => {
+    const x = left + index / (trend.length - 1) * chartWidth;
+    const y = top + chartHeight - item[key] / maximum * chartHeight;
+    return { x, y, value: item[key], date: item.record_date };
+  });
+  const newPoints = points("new_fans"); const lostPoints = points("lost_fans");
+  return <div className="fan-growth-line-wrap">
+    <div className="fan-line-legend"><span><i className="line-new" />新增粉丝</span><span><i className="line-lost" />流失粉丝</span></div>
+    <svg className="fan-growth-line-chart" role="img" aria-label="抖音每日新增粉丝与流失粉丝折线趋势" viewBox={`0 0 ${width} ${height}`}>
+      {[0, 1, 2, 3].map((index) => { const y = top + index * chartHeight / 3; const value = Math.round(maximum * (1 - index / 3)); return <g key={index}><line x1={left} x2={width - right} y1={y} y2={y} /><text x={left - 12} y={y + 5} textAnchor="end">{value}</text></g>; })}
+      <polyline className="new-fans-line" points={newPoints.map((point) => `${point.x},${point.y}`).join(" ")} />
+      <polyline className="lost-fans-line" points={lostPoints.map((point) => `${point.x},${point.y}`).join(" ")} />
+      {newPoints.map((point, index) => <g key={`new-${point.date}`}><circle className="new-fans-dot" cx={point.x} cy={point.y} r="4" /><title>{point.date} 新增 {point.value}</title>{(index === 0 || index === newPoints.length - 1 || trend.length <= 8) && <text className="date-label" x={point.x} y={height - 20} textAnchor="middle">{point.date.slice(5)}</text>}</g>)}
+      {lostPoints.map((point) => <circle className="lost-fans-dot" cx={point.x} cy={point.y} r="4" key={`lost-${point.date}`}><title>{point.date} 流失 {point.value}</title></circle>)}
+    </svg>
+  </div>;
 }
 
 function aggregatePlatforms(items: FanPlatform[]): FanPlatform {
@@ -29,16 +74,17 @@ function aggregatePlatforms(items: FanPlatform[]): FanPlatform {
   const trend = [...trendMap.values()].sort((a, b) => a.record_date.localeCompare(b.record_date));
   const fansCount = items.reduce((sum, item) => sum + item.fansCount, 0);
   const netGrowth = items.reduce((sum, item) => sum + item.netGrowth, 0);
-  return { platform: "all", fansCount, netGrowth, newFans: items.reduce((sum, item) => sum + item.newFans, 0), growthRate: fansCount - netGrowth > 0 ? Number(((netGrowth / (fansCount - netGrowth)) * 100).toFixed(2)) : 0, trend, trendSource: "三平台增长记录汇总", strategy: { positioning: "分平台制定运营策略", actions: ["选择具体平台查看定位建议"] }, profile: null };
+  return { platform: "all", fansCount, netGrowth, newFans: items.reduce((sum, item) => sum + item.newFans, 0), lostFans: items.reduce((sum, item) => sum + item.lostFans, 0), growthRate: fansCount - netGrowth > 0 ? Number((netGrowth / (fansCount - netGrowth) * 100).toFixed(2)) : 0, trend, trendSource: "三平台增长记录汇总", strategy: { positioning: "分平台制定运营策略", actions: ["选择具体平台查看定位建议"] }, profile: null, previousProfile: null, profileHistory: [], profileComparison: null };
 }
 
 export default function FanAnalysisCenterPage() {
   const range = useGlobalDateRange();
   const [data, setData] = useState<FanData | null>(null);
-  const [selected, setSelected] = useState("all");
+  const [selected, setSelected] = useState("douyin");
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("7d");
   const [trendRange, setTrendRange] = useState<DateRange | null>(null);
   const [openTrendPicker, setOpenTrendPicker] = useState<"month" | "custom" | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const activeTrendRange = trendRange ?? range;
 
@@ -51,85 +97,122 @@ export default function FanAnalysisCenterPage() {
 
   useEffect(() => {
     if (!openTrendPicker) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenTrendPicker(null);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpenTrendPicker(null); };
+    window.addEventListener("keydown", closeOnEscape); return () => window.removeEventListener("keydown", closeOnEscape);
   }, [openTrendPicker]);
 
   function selectTrendPeriod(period: TrendPeriod) {
-    if (period === "month" || period === "custom") {
-      setOpenTrendPicker((current) => current === period ? null : period);
-      return;
-    }
-    setTrendPeriod(period);
-    setTrendRange(null);
-    setOpenTrendPicker(null);
+    if (period === "month" || period === "custom") { setOpenTrendPicker((current) => current === period ? null : period); return; }
+    setTrendPeriod(period); setTrendRange(null); setOpenTrendPicker(null);
   }
 
   function applyTrendRange(nextRange: DateRange) {
-    setTrendPeriod(nextRange.preset === "month" ? "month" : "custom");
-    setTrendRange(nextRange);
-    setOpenTrendPicker(null);
+    setTrendPeriod(nextRange.preset === "month" ? "month" : "custom"); setTrendRange(nextRange); setOpenTrendPicker(null);
   }
 
   const platformData = useMemo(() => data ? [aggregatePlatforms(data.platforms), ...data.platforms] : [], [data]);
   const current = platformData.find((item) => item.platform === selected) ?? null;
-  const maxGrowth = useMemo(() => Math.max(...(current?.trend.map((item) => Math.abs(item.net_growth)) ?? [0]), 1), [current]);
   const currentPlatformLabel = selected === "all" ? "全部平台" : platformLabel(selected);
 
   if (error) return <div className="error-panel">{error}</div>;
   if (!data || !current) return <div className="loading-panel"><span className="loading-dot" />正在读取粉丝资产…</div>;
 
-  const weeklyReport = {
-    change: `${currentPlatformLabel}粉丝净增长 ${current.netGrowth >= 0 ? "+" : ""}${formatCompact(current.netGrowth)}，新增粉丝 ${formatCompact(current.newFans)}。`,
-    issue: current.trend.length === 0 ? "当前周期缺少连续增长记录，暂不能判断增长稳定性。" : current.growthRate <= 0 ? "粉丝净增长未转正，需要复盘内容触达与取关原因。" : "粉丝保持增长，应继续验证增长来源是否可持续。",
-    suggestion: selected === "all" ? "分别进入三个平台，按平台定位制定差异化运营动作。" : current.strategy.actions[0],
-    nextWeek: selected === "all" ? "完成三平台粉丝画像和增长记录补采。" : `围绕“${current.strategy.positioning}”执行 1 个重点动作，并在下周复盘增长率。`,
+  const isDouyin = selected === "douyin";
+  const profile = current.profile;
+  const comparison = current.profileComparison;
+  const report = data.weeklyReport;
+  const exportData: FanReportExportData = {
+    period: `${data.trendRange.from} 至 ${data.trendRange.to}`,
+    fansCount: current.fansCount, newFans: current.newFans, lostFans: current.lostFans, growthRate: current.growthRate,
+    trend: current.trend, growthSummary: report.growthSummary, profileSummary: report.profileSummary,
+    growthReason: report.growthReason, lossReason: report.lossReason, easiestContent: report.easiestContent,
+    bestPost: report.bestPost ? { title: report.bestPost.title, fansGrowth: report.bestPost.fansGrowth, views: report.bestPost.views } : null,
+    suggestions: report.nextWeekSuggestions,
+    sourceNote: `数据来源：social_fans、fan_growth_records、social_posts · 更新时间：${formatDate(data.updatedAt)}`,
   };
 
+  async function exportPng() {
+    if (!isDouyin) return;
+    try { setExporting(true); await downloadFanReportPng(exportData); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "PNG导出失败"); }
+    finally { setExporting(false); }
+  }
+
+  function exportPdf() {
+    if (!isDouyin) return;
+    document.body.classList.add("printing-fan-report");
+    const cleanup = () => document.body.classList.remove("printing-fan-report");
+    window.addEventListener("afterprint", cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1500);
+  }
+
   return <div className={`page-stack fan-analysis-center-page fan-insights-page platform-themed-page theme-${selected}`}>
-    <header className="page-heading compact-heading">
-      <div><p className="eyebrow">FAN ANALYSIS CENTER · V1.0</p><h1>{selected === "all" ? "粉丝分析中心" : `${currentPlatformLabel}粉丝分析`}</h1><p>每周分析粉丝结构、增长变化与活跃特征，形成分平台运营策略。</p></div>
-      <span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span>
+    <header className="page-heading compact-heading fan-v2-heading">
+      <div><p className="eyebrow">FAN ANALYSIS CENTER · V2.0</p><h1>{selected === "all" ? "粉丝分析中心" : `${currentPlatformLabel}粉丝分析`}</h1><p>监测粉丝增长、画像变化与作品吸粉效果，形成可执行的下周运营策略。</p></div>
+      <div className="fan-v2-heading-actions"><span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span>{isDouyin && <div className="fan-export-actions"><button onClick={exportPdf} title="在打印窗口中选择另存为PDF">导出PDF</button><button onClick={() => void exportPng()} disabled={exporting}>{exporting ? "生成中…" : "导出PNG"}</button></div>}</div>
     </header>
 
     <section className="fan-platform-grid">
-      {platformData.map((item) => <button aria-pressed={selected === item.platform} className={`fan-platform-card platform-${item.platform} ${selected === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setSelected(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{selected === item.platform ? "当前平台" : item.platform === "all" ? "三平台汇总" : item.profile ? "画像已采集" : "画像待采集"}</small></div><strong>{formatCompact(item.fansCount)}<em>粉丝</em></strong><p className={item.netGrowth >= 0 ? "growth-up" : "growth-down"}>{item.netGrowth >= 0 ? "+" : ""}{formatCompact(item.netGrowth)} 净增长</p></button>)}
+      {platformData.map((item) => <button aria-pressed={selected === item.platform} className={`fan-platform-card platform-${item.platform} ${selected === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setSelected(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{selected === item.platform ? "当前平台" : item.platform === "douyin" ? "V2 深度分析" : item.profile ? "V1 基础数据" : "画像待采集"}</small></div><strong>{formatCompact(item.fansCount)}<em>粉丝</em></strong><p className={item.netGrowth >= 0 ? "growth-up" : "growth-down"}>{item.netGrowth >= 0 ? "+" : ""}{formatCompact(item.netGrowth)} 净增长</p></button>)}
     </section>
 
     <nav className="insight-platform-tabs fan-tabs" aria-label="粉丝分析平台筛选">{platforms.map((item) => <button aria-pressed={selected === item} className={`${selected === item ? "active" : ""} platform-tab-${item}`} key={item} onClick={() => setSelected(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}</nav>
 
-    <section className="fan-summary-grid fan-overview-grid">
-      <article><span>粉丝数量</span><strong>{formatCompact(current.fansCount)}</strong><small>当前账号汇总</small></article>
+    <section className="fan-summary-grid fan-overview-grid fan-v2-summary">
+      <article><span>当前粉丝</span><strong>{formatCompact(current.fansCount)}</strong><small>最新真实快照</small></article>
       <article><span>新增粉丝</span><strong>+{formatCompact(current.newFans)}</strong><small>{data.trendRange.from} 至 {data.trendRange.to}</small></article>
+      <article><span>流失粉丝</span><strong>{formatCompact(current.lostFans)}</strong><small>fan_growth_records</small></article>
       <article><span>增长率</span><strong>{current.growthRate}%</strong><small>净增长 / 期初粉丝</small></article>
-      <article><span>画像状态</span><strong className="status-text">{selected === "all" ? "分平台查看" : current.profile ? "已采集" : "待采集"}</strong><small>social_fans</small></article>
     </section>
 
-    <section className="panel fan-trend-panel">
-      <div className="panel-heading"><div><span className="section-kicker">GROWTH TREND</span><h2>粉丝增长趋势</h2></div><div className="fan-trend-controls"><div className="trend-period-switch">{trendOptions.map((item) => <button aria-expanded={item.value === "month" || item.value === "custom" ? openTrendPicker === item.value : undefined} className={trendPeriod === item.value || openTrendPicker === item.value ? "active" : ""} key={item.value} onClick={() => selectTrendPeriod(item.value)}>{item.label}</button>)}</div>{openTrendPicker === "month" && <MonthPicker range={activeTrendRange} onClose={() => setOpenTrendPicker(null)} onSelect={applyTrendRange} />}{openTrendPicker === "custom" && <CustomDateRange key={`${activeTrendRange.from}-${activeTrendRange.to}`} range={activeTrendRange} onApply={applyTrendRange} onClose={() => setOpenTrendPicker(null)} />}</div></div>
-      {current.trend.length ? <div className="growth-chart" aria-label="粉丝增长趋势图">{current.trend.map((item) => <div key={item.record_date}><span className={item.net_growth >= 0 ? "positive-bar" : "negative-bar"} style={{ height: `${Math.max(8, (Math.abs(item.net_growth) / maxGrowth) * 100)}%` }} /><strong>{item.net_growth >= 0 ? "+" : ""}{item.net_growth}</strong><small>{item.record_date.slice(5)}</small></div>)}</div> : <div className="fan-empty-state"><strong>暂无增长记录</strong><p>自动采集写入 fan_growth_records 后，此处将展示连续趋势。</p></div>}
-      <small className="chart-source">来源：{current.trendSource} · {data.trendRange.from} — {data.trendRange.to}</small>
+    <section className="panel fan-trend-panel fan-v2-trend-panel">
+      <div className="panel-heading"><div><span className="section-kicker">GROWTH ANALYSIS</span><h2>粉丝增长分析</h2></div><div className="fan-trend-controls"><div className="trend-period-switch">{trendOptions.map((item) => <button aria-expanded={item.value === "month" || item.value === "custom" ? openTrendPicker === item.value : undefined} className={trendPeriod === item.value || openTrendPicker === item.value ? "active" : ""} key={item.value} onClick={() => selectTrendPeriod(item.value)}>{item.label}</button>)}</div>{openTrendPicker === "month" && <MonthPicker range={activeTrendRange} onClose={() => setOpenTrendPicker(null)} onSelect={applyTrendRange} />}{openTrendPicker === "custom" && <CustomDateRange key={`${activeTrendRange.from}-${activeTrendRange.to}`} range={activeTrendRange} onApply={applyTrendRange} onClose={() => setOpenTrendPicker(null)} />}</div></div>
+      <GrowthLineChart trend={current.trend} />
+      <small className="chart-source">来源：{current.trendSource} · {data.trendRange.from} — {data.trendRange.to} · 折线展示每日新增与流失，不以条形图替代连续趋势</small>
     </section>
 
-    <section><div className="section-title"><div><span className="section-kicker">AUDIENCE PROFILE</span><h2>粉丝画像</h2></div><span className="section-note">地域、年龄、性别、兴趣与活跃时间</span></div><div className="fan-profile-grid">
-      <ProfileBlock title="地域" items={current.profile?.regions ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
-      <ProfileBlock title="年龄" items={current.profile?.ages ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
-      <ProfileBlock title="性别" items={current.profile?.gender ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
-      <ProfileBlock title="兴趣标签" items={current.profile?.interests ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
-      <ProfileBlock title="活跃时间" items={current.profile?.activeTimes ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
+    <section><div className="section-title"><div><span className="section-kicker">AUDIENCE PROFILE</span><h2>粉丝画像分析</h2></div><span className="section-note">最新快照 · 年龄、性别、地域、兴趣、活跃时间</span></div><div className="fan-profile-grid">
+      <ProfileBlock title="年龄" items={profile?.ages ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
+      <ProfileBlock title="性别" items={profile?.gender ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
+      <ProfileBlock title="地域" items={profile?.regions ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
+      <ProfileBlock title="兴趣标签" items={profile?.interests ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
+      <ProfileBlock title="活跃时间" items={profile?.activeTimes ?? []} emptyMessage={selected === "all" ? "请选择具体平台查看画像" : undefined} />
     </div></section>
 
-    <section className="panel platform-position-panel">
-      <div className="panel-heading"><div><span className="section-kicker">PLATFORM POSITIONING</span><h2>平台定位分析</h2></div><span className="section-note">选择平台后查看建议</span></div>
-      {selected === "all" ? <div className="positioning-grid">{data.platforms.map((item) => <article key={item.platform}><span>{platformLabel(item.platform)}</span><strong>{item.strategy.positioning}</strong><p>{item.strategy.actions[0]}</p></article>)}</div> : <div className="selected-positioning"><span>{currentPlatformLabel}</span><h3>{current.strategy.positioning}</h3><ol>{current.strategy.actions.map((item, index) => <li key={item}><b>{String(index + 1).padStart(2, "0")}</b>{item}</li>)}</ol></div>}
-    </section>
+    {isDouyin ? <>
+      <section className="panel profile-history-panel">
+        <div className="panel-heading"><div><span className="section-kicker">PROFILE HISTORY</span><h2>画像历史对比</h2></div><span className="section-note">{comparison ? `${formatDate(comparison.previousDate)} 对比 ${formatDate(comparison.currentDate)}` : "需要至少两次画像快照"}</span></div>
+        <div className="profile-comparison-grid">
+          <ProfileComparisonCard title="年龄变化" items={comparison?.ages ?? profile?.ages.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
+          <ProfileComparisonCard title="地域变化" items={comparison?.regions ?? profile?.regions.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
+          <ProfileComparisonCard title="兴趣变化" items={comparison?.interests ?? profile?.interests.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
+          <ProfileComparisonCard title="活跃时间变化" items={comparison?.activeTimes ?? profile?.activeTimes.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
+        </div>
+      </section>
 
-    <section className="panel weekly-fan-report">
-      <div className="panel-heading light-heading"><div><span className="section-kicker">AI WEEKLY REPORT</span><h2>AI 粉丝运营周报</h2></div><span className="rule-badge">WEEKLY</span></div>
-      <div className="weekly-report-grid"><article><span>粉丝变化</span><p>{weeklyReport.change}</p></article><article><span>问题分析</span><p>{weeklyReport.issue}</p></article><article><span>运营建议</span><p>{weeklyReport.suggestion}</p></article><article><span>下周计划</span><p>{weeklyReport.nextWeek}</p></article></div>
+      <section className="panel content-fan-attribution-panel">
+        <div className="panel-heading"><div><span className="section-kicker">CONTENT ACQUISITION</span><h2>内容吸粉分析</h2></div><span className="section-note">抖音 · {data.contentAttraction.posts.length} 条作品</span></div>
+        <div className="content-fan-summary"><article><span>最易涨粉内容</span><strong>{data.contentAttraction.bestType?.label ?? "待积累数据"}</strong><small>{report.easiestContent}</small></article><article><span>最佳涨粉作品</span><strong>{report.bestPost ? `+${report.bestPost.fansGrowth}` : "暂无"}</strong><small>{report.bestPost?.title ?? "等待作品 fans_growth 数据"}</small></article></div>
+        <div className="content-fan-table-wrap"><table className="content-fan-table"><thead><tr><th>作品</th><th>发布时间</th><th>播放</th><th>作品涨粉</th><th>同日净增长</th><th>互动率</th></tr></thead><tbody>{data.contentAttraction.posts.slice(0, 10).map((post) => <tr key={post.id}><td><a href={`/insights/content/detail?id=${post.id}`}>{post.title}</a><small>{post.content_type}</small></td><td>{formatDate(post.publish_time)}</td><td>{formatCompact(post.views)}</td><td className={post.fans_growth > 0 ? "growth-up" : post.fans_growth < 0 ? "growth-down" : ""}>{post.fans_growth > 0 ? "+" : ""}{post.fans_growth}</td><td>{post.day_net_growth === null ? "—" : `${post.day_net_growth >= 0 ? "+" : ""}${post.day_net_growth}`}</td><td>{post.interaction_rate}%</td></tr>)}{!data.contentAttraction.posts.length && <tr><td colSpan={6}>当前周期暂无已入库抖音作品。</td></tr>}</tbody></table></div>
+        <p className="fan-attribution-note">{data.contentAttraction.attributionNote}</p>
+      </section>
+
+      <section className="panel weekly-fan-report fan-v2-weekly-report">
+        <div className="panel-heading light-heading"><div><span className="section-kicker">AI WEEKLY REPORT</span><h2>AI 粉丝运营周报</h2></div><div className="fan-export-actions"><button onClick={exportPdf}>导出PDF</button><button onClick={() => void exportPng()} disabled={exporting}>{exporting ? "生成中…" : "导出PNG"}</button></div></div>
+        <div className="weekly-report-grid fan-v2-report-grid"><article><span>本周粉丝分析</span><p>{report.growthSummary}</p></article><article><span>画像变化</span><p>{report.profileSummary}</p></article><article><span>增长原因</span><p>{report.growthReason}</p></article><article><span>流失原因</span><p>{report.lossReason}</p></article><article><span>最佳作品</span><p>{report.bestPost ? `“${report.bestPost.title}”带来 ${report.bestPost.fansGrowth} 名涨粉。` : "暂无可归因作品。"}</p></article><article className="fan-next-week-card"><span>下周内容建议</span><ol>{report.nextWeekSuggestions.map((item) => <li key={item}>{item}</li>)}</ol></article></div>
+        <p className="fan-report-source">规则模型 V2.0 · 画像快照：{report.profileSnapshotDate ? formatDate(report.profileSnapshotDate) : "暂无"} · 数据缺失不生成模拟值</p>
+      </section>
+    </> : <section className="panel fan-v2-platform-note"><span>V2.0 SCOPE</span><h2>深度分析当前优先支持抖音</h2><p>快手和微博继续保留原有粉丝总览、趋势与画像展示，本阶段不新增内容吸粉归因、AI周报或导出能力。</p></section>}
+
+    <section className="fan-report-print-sheet" aria-hidden="true">
+      <header><span>FAN OPERATIONS WEEKLY REPORT · V2.0</span><h1>抖音粉丝运营周报</h1><p>{data.trendRange.from} 至 {data.trendRange.to}</p></header>
+      <div className="print-metrics"><article>当前粉丝<strong>{formatCompact(current.fansCount)}</strong></article><article>新增粉丝<strong>+{formatCompact(current.newFans)}</strong></article><article>流失粉丝<strong>{formatCompact(current.lostFans)}</strong></article><article>增长率<strong>{current.growthRate}%</strong></article></div>
+      <section><h2>粉丝增长趋势</h2><GrowthLineChart trend={current.trend} /></section>
+      <section className="print-insights"><article><h3>本周粉丝分析</h3><p>{report.growthSummary}</p></article><article><h3>画像变化</h3><p>{report.profileSummary}</p></article><article><h3>增长原因</h3><p>{report.growthReason}</p></article><article><h3>流失原因</h3><p>{report.lossReason}</p></article></section>
+      <section><h2>最佳作品</h2><p>{report.bestPost ? `“${report.bestPost.title}”带来 ${report.bestPost.fansGrowth} 名涨粉，播放 ${formatCompact(report.bestPost.views)}。` : "暂无可归因作品。"}</p></section>
+      <section><h2>下周内容建议</h2><ol>{report.nextWeekSuggestions.map((item) => <li key={item}>{item}</li>)}</ol></section>
+      <footer>数据来源：social_fans、fan_growth_records、social_posts · 生成时间：{formatDate(data.updatedAt)}</footer>
     </section>
 
     <section className="panel future-collection-note"><div><span>API READY</span><h2>自动采集兼容</h2></div><p>画像快照继续写入 <code>social_fans</code>，每日粉丝变化继续写入 <code>fan_growth_records</code>；原有抖音采集逻辑保持不变。</p><small>预留适配路径：{data.collectionApi}</small></section>
