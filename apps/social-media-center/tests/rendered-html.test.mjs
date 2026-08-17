@@ -63,6 +63,10 @@ test("content monitoring and fan analysis are independent navigation modules", a
   assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "11"/);
   assert.match(shell, /platformNavPaths.*\/insights\/content.*\/hot-topics/);
   assert.match(shell, /platformSubnav/);
+  assert.match(shell, /collapsedPlatformMenu/);
+  assert.match(shell, /setCollapsedPlatformMenu/);
+  assert.match(shell, /aria-expanded/);
+  assert.match(shell, /nav-expand-icon/);
   for (const platform of ["抖音", "快手", "微博"]) assert.match(shell, new RegExp(`label: "${platform}"`));
   assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });

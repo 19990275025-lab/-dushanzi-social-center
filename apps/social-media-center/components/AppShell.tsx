@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { GlobalDateFilter } from "@/components/GlobalDateFilter";
 
 const navItems = [
@@ -40,6 +40,7 @@ function locationSnapshot() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const location = useSyncExternalStore(subscribeLocation, locationSnapshot, () => "");
+  const [collapsedPlatformMenu, setCollapsedPlatformMenu] = useState<string | null>(null);
   const currentUrl = new URL(location || "/", "https://social-center.local");
   const pathname = currentUrl.pathname;
   const selectedPlatform = platformSubnav.some((item) => item.value === currentUrl.searchParams.get("platform"))
@@ -69,13 +70,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               || (item.href === "/insights/content" && pathname.startsWith("/insights/content/"))
               || (item.href === "/collector" && pathname === "/imports");
             const hasPlatformSubnav = platformNavPaths.has(item.href);
+            const expanded = active && hasPlatformSubnav && collapsedPlatformMenu !== item.href;
             return (
-              <div className={`nav-group ${hasPlatformSubnav ? "platform-nav-group" : ""} ${active && hasPlatformSubnav ? "expanded" : ""}`} key={item.href}>
-                <a className={active ? "nav-item active" : "nav-item"} href={hasPlatformSubnav ? platformHref(item.href, "douyin") : item.href}>
+              <div className={`nav-group ${hasPlatformSubnav ? "platform-nav-group" : ""} ${expanded ? "expanded" : ""}`} key={item.href}>
+                <a
+                  aria-expanded={hasPlatformSubnav ? expanded : undefined}
+                  className={active ? "nav-item active" : "nav-item"}
+                  href={hasPlatformSubnav ? platformHref(item.href, "douyin") : item.href}
+                  onClick={hasPlatformSubnav && active ? (event) => {
+                    event.preventDefault();
+                    setCollapsedPlatformMenu((current) => current === item.href ? null : item.href);
+                  } : undefined}
+                >
                   <span>{item.code}</span>
                   {item.label}
+                  {hasPlatformSubnav && <i className={`nav-expand-icon ${expanded ? "expanded" : ""}`} aria-hidden="true">⌄</i>}
                 </a>
-                {active && hasPlatformSubnav && <div className="platform-subnav" aria-label={`${item.label}平台选择`}>
+                {expanded && <div className="platform-subnav" aria-label={`${item.label}平台选择`}>
                   {platformSubnav.map((platform) => <a
                     aria-current={selectedPlatform === platform.value ? "page" : undefined}
                     className={`${selectedPlatform === platform.value ? "active" : ""} platform-${platform.value}`}
