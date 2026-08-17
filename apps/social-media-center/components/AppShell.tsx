@@ -17,14 +17,42 @@ const navItems = [
   { href: "/tasks", label: "任务管理中心", code: "11" },
 ];
 
+const platformSubnav = [
+  { value: "douyin", label: "抖音" },
+  { value: "kuaishou", label: "快手" },
+  { value: "weibo", label: "微博" },
+] as const;
+
+const platformNavPaths = new Set(["/insights/content", "/hot-topics"]);
+
+function subscribeLocation(callback: () => void) {
+  window.addEventListener("popstate", callback);
+  window.addEventListener("platform-navigation", callback);
+  return () => {
+    window.removeEventListener("popstate", callback);
+    window.removeEventListener("platform-navigation", callback);
+  };
+}
+
+function locationSnapshot() {
+  return `${window.location.pathname}${window.location.search}`;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = useSyncExternalStore(
-    () => () => undefined,
-    () => window.location.pathname,
-    () => "",
-  );
+  const location = useSyncExternalStore(subscribeLocation, locationSnapshot, () => "");
+  const currentUrl = new URL(location || "/", "https://social-center.local");
+  const pathname = currentUrl.pathname;
+  const selectedPlatform = platformSubnav.some((item) => item.value === currentUrl.searchParams.get("platform"))
+    ? currentUrl.searchParams.get("platform")
+    : "douyin";
   const dateFilterPages = ["/", "/insights/content", "/insights/fans", "/comment-insights", "/ai-analysis"];
   const isHotTopicsPage = pathname === "/hot-topics";
+
+  function platformHref(path: string, platform: string) {
+    const params = pathname === path ? new URLSearchParams(currentUrl.searchParams) : new URLSearchParams();
+    params.set("platform", platform);
+    return `${path}?${params.toString()}`;
+  }
 
   return (
     <div className="app-shell">
@@ -40,11 +68,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             const active = pathname === item.href
               || (item.href === "/insights/content" && pathname.startsWith("/insights/content/"))
               || (item.href === "/collector" && pathname === "/imports");
+            const hasPlatformSubnav = platformNavPaths.has(item.href);
             return (
-              <a className={active ? "nav-item active" : "nav-item"} href={item.href} key={item.href}>
-                <span>{item.code}</span>
-                {item.label}
-              </a>
+              <div className={`nav-group ${hasPlatformSubnav ? "platform-nav-group" : ""} ${active && hasPlatformSubnav ? "expanded" : ""}`} key={item.href}>
+                <a className={active ? "nav-item active" : "nav-item"} href={hasPlatformSubnav ? platformHref(item.href, "douyin") : item.href}>
+                  <span>{item.code}</span>
+                  {item.label}
+                </a>
+                {active && hasPlatformSubnav && <div className="platform-subnav" aria-label={`${item.label}平台选择`}>
+                  {platformSubnav.map((platform) => <a
+                    aria-current={selectedPlatform === platform.value ? "page" : undefined}
+                    className={`${selectedPlatform === platform.value ? "active" : ""} platform-${platform.value}`}
+                    href={platformHref(item.href, platform.value)}
+                    key={platform.value}
+                  >{platform.label}</a>)}
+                </div>}
+              </div>
             );
           })}
         </nav>

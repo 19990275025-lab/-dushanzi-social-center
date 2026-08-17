@@ -188,10 +188,16 @@ function topicTrend() {
   return "首次采集";
 }
 
+function platformFromLocation() {
+  if (typeof window === "undefined") return "douyin";
+  const value = new URLSearchParams(window.location.search).get("platform");
+  return platformTabs.some((tab) => tab.value === value) ? value as typeof platformTabs[number]["value"] : "douyin";
+}
+
 export default function HotTopicsPage() {
   const range = useGlobalDateRange({ defaultPreset: "today", scope: "hot-topics" });
   const [topics, setTopics] = useState<AgentHotTopic[]>([]);
-  const [activePlatform, setActivePlatform] = useState("all");
+  const [activePlatform, setActivePlatform] = useState("douyin");
   const [activeLevel, setActiveLevel] = useState<"all" | "A" | "B" | "C">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("report");
   const [loading, setLoading] = useState(true);
@@ -244,6 +250,17 @@ export default function HotTopicsPage() {
   }, [loadTopics]);
 
   useEffect(() => {
+    const syncPlatform = () => setActivePlatform(platformFromLocation());
+    syncPlatform();
+    window.addEventListener("popstate", syncPlatform);
+    window.addEventListener("platform-navigation", syncPlatform);
+    return () => {
+      window.removeEventListener("popstate", syncPlatform);
+      window.removeEventListener("platform-navigation", syncPlatform);
+    };
+  }, []);
+
+  useEffect(() => {
     if (viewMode !== "review") return;
     const timer = window.setTimeout(() => void loadFeedback(), 0);
     return () => window.clearTimeout(timer);
@@ -291,6 +308,15 @@ export default function HotTopicsPage() {
 
   const advice = platformAdvice[activePlatform] ?? platformAdvice.other;
   const currentLabel = platformTabs.find((tab) => tab.value === activePlatform)?.label ?? "全部热点";
+
+  function selectPlatform(platform: typeof platformTabs[number]["value"]) {
+    setActivePlatform(platform);
+    setSelectedAnalysis(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set("platform", platform);
+    window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
+    window.dispatchEvent(new Event("platform-navigation"));
+  }
 
   async function analyzeTopic(topic: AgentHotTopic) {
     setAnalyzingId(topic.id);
@@ -450,7 +476,7 @@ export default function HotTopicsPage() {
 
       <div className="hot-topic-view-toolbar">
         <nav className="insight-platform-tabs hot-unified-platform-tabs" aria-label="热点平台筛选">
-          {platformTabs.map((tab) => <button key={tab.value} type="button" className={activePlatform === tab.value ? "active" : ""} onClick={() => { setActivePlatform(tab.value); setSelectedAnalysis(null); }}>{tab.label}</button>)}
+          {platformTabs.map((tab) => <button key={tab.value} type="button" className={activePlatform === tab.value ? "active" : ""} onClick={() => selectPlatform(tab.value)}>{tab.label}</button>)}
         </nav>
         <div className="hot-view-switch" role="group" aria-label="热点展示方式">
           <button className={viewMode === "report" ? "active" : ""} onClick={() => setViewMode("report")}>分析报告</button>

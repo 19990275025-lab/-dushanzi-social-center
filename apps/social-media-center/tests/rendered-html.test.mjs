@@ -61,10 +61,13 @@ test("content monitoring and fan analysis are independent navigation modules", a
   assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "03"/);
   assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "04"/);
   assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "11"/);
+  assert.match(shell, /platformNavPaths.*\/insights\/content.*\/hot-topics/);
+  assert.match(shell, /platformSubnav/);
+  for (const platform of ["抖音", "快手", "微博"]) assert.match(shell, new RegExp(`label: "${platform}"`));
   assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });
 
-test("content monitoring is Douyin-first while fan insights retain platform themes", async () => {
+test("content monitoring and fan insights retain platform themes", async () => {
   const [content, fans, styles] = await Promise.all([
     readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
     readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
@@ -75,10 +78,11 @@ test("content monitoring is Douyin-first while fan insights retain platform them
     assert.match(source, /current-platform-badge/);
     assert.match(source, /当前平台/);
   }
-  assert.match(content, /抖音内容监测中心/);
-  assert.match(content, /theme-douyin/);
-  assert.match(content, /当前平台：抖音/);
-  assert.doesNotMatch(content, /platformOptions|setPlatform|快手|微博/);
+  assert.match(content, /\{currentPlatformLabel\}内容监测中心/);
+  assert.match(content, /theme-\$\{platform\}/);
+  assert.match(content, /当前平台：\{currentPlatformLabel\}/);
+  assert.match(content, /supportedPlatforms/);
+  assert.match(content, /platformSnapshot/);
   assert.match(fans, /theme-\$\{/);
   assert.match(fans, /`\$\{currentPlatformLabel\}粉丝分析`/);
   assert.match(fans, /platform: "all"/);
@@ -129,7 +133,7 @@ test("fan analysis V2.0 adds growth, profile history, content acquisition and ex
   assert.match(readme, /另存为PDF/);
 });
 
-test("content monitoring V1.0 uses real Douyin posts, comments and hot-topic feedback", async () => {
+test("content monitoring uses selected-platform posts, comments and hot-topic feedback", async () => {
   const [page, api, engine, styles] = await Promise.all([
     readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
     readFile(new URL("app/api/content-monitoring/route.ts", root), "utf8"),
@@ -142,7 +146,10 @@ test("content monitoring V1.0 uses real Douyin posts, comments and hot-topic fee
   assert.match(page, /\/api\/content-monitoring/);
   assert.match(page, /social_posts、social_comments、hot_topic_feedback/);
   assert.match(api, /FROM social_posts/);
-  assert.match(api, /platform = 'douyin'/);
+  assert.match(api, /supportedPlatforms/);
+  assert.match(api, /searchParams\.get\("platform"\)/);
+  assert.match(api, /WHERE platform = \?/);
+  assert.match(api, /WHERE p\.platform = \?/);
   assert.match(api, /FROM social_comments/);
   assert.match(api, /FROM hot_topic_feedback/);
   assert.match(api, /JOIN hot_topics/);
@@ -152,10 +159,11 @@ test("content monitoring V1.0 uses real Douyin posts, comments and hot-topic fee
   assert.match(engine, /buildLowEfficiencyDiagnosis/);
   assert.match(engine, /post\.likes \+ post\.comments \+ post\.favorites \+ post\.shares/);
   assert.match(styles, /content-monitor-kpis/);
+  assert.match(styles, /platform-subnav/);
   assert.match(styles, /breakout-analysis-grid/);
   assert.match(styles, /low-efficiency-list/);
   assert.match(styles, /content-hot-link-table/);
-  assert.doesNotMatch(styles.slice(styles.indexOf("\/\* 抖音内容监测中心 V1\.0 \*\/")), /linear-gradient/);
+  assert.match(styles, /content-monitor-v1[^}]+--monitor-red: var\(--insight-primary\)/);
 });
 
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {

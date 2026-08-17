@@ -63,7 +63,7 @@ export default function ContentDetailPage() {
       <header className="detail-work-hero">
         <div className={`detail-work-cover ${post.cover_url ? "has-cover" : ""}`} style={post.cover_url ? { backgroundImage: `url(${post.cover_url})` } : undefined}><span>{post.cover_url ? "" : "作品"}</span></div>
         <div className="detail-work-copy"><span className={`platform-tag tag-${post.platform}`}>{platformLabel(post.platform)}</span><h1>{post.title}</h1><p>{formatDate(post.publish_time)} · {post.content_type === "video" ? "短视频" : post.content_type}</p><strong className="work-status"><i />作品状态正常</strong></div>
-        <a className="back-to-insights" href="/insights/content">← 返回内容分析</a>
+        <a className="back-to-insights" href={`/insights/content?platform=${post.platform}`}>← 返回内容分析</a>
       </header>
 
       <nav className="detail-analysis-tabs" aria-label="作品数据分析">

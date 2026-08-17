@@ -37,6 +37,8 @@ type FeedbackRow = {
   ai_summary: string | null;
 };
 
+const supportedPlatforms = new Set(["douyin", "kuaishou", "weibo"]);
+
 function parseHashtags(value: string) {
   try {
     const parsed = JSON.parse(value) as unknown;
@@ -59,6 +61,10 @@ export async function GET(request: Request) {
   await ensureDatabase();
   const searchParams = new URL(request.url).searchParams;
   const range = resolveDateRange(searchParams);
+  const platform = searchParams.get("platform") ?? "douyin";
+  if (!supportedPlatforms.has(platform)) {
+    return Response.json({ error: "仅支持抖音、快手和微博内容监测" }, { status: 400 });
+  }
   const today = chinaToday().iso;
   const d1 = getD1();
 
@@ -67,16 +73,16 @@ export async function GET(request: Request) {
       SELECT id, account_id, platform, title, content_type, publish_time, views, likes,
         comments, favorites, shares, fans_growth, hashtags, duration, completion_rate, skip_rate
       FROM social_posts
-      WHERE platform = 'douyin' AND date(publish_time) BETWEEN date(?) AND date(?)
+      WHERE platform = ? AND date(publish_time) BETWEEN date(?) AND date(?)
       ORDER BY publish_time DESC, id DESC
       LIMIT 500
-    `).bind(range.from, range.to).all<PostRow>(),
+    `).bind(platform, range.from, range.to).all<PostRow>(),
     d1.prepare(`
       SELECT platform, topic_name, keyword, heat_value, trend, related_degree, ai_suggestion
       FROM hot_topics
-      WHERE platform = 'douyin' AND status = 'active'
+      WHERE platform = ? AND status = 'active'
       ORDER BY heat_value DESC LIMIT 100
-    `).all<AnalysisTopic>(),
+    `).bind(platform).all<AnalysisTopic>(),
     d1.prepare(`
       SELECT c.post_id, COUNT(*) AS captured_comments,
         SUM(CASE WHEN c.sentiment = 'positive' THEN 1 ELSE 0 END) AS positive_comments,
@@ -84,9 +90,9 @@ export async function GET(request: Request) {
         GROUP_CONCAT(NULLIF(TRIM(c.keyword), ''), '、') AS keyword_text
       FROM social_comments c
       INNER JOIN social_posts p ON p.id = c.post_id
-      WHERE p.platform = 'douyin' AND date(p.publish_time) BETWEEN date(?) AND date(?)
+      WHERE p.platform = ? AND date(p.publish_time) BETWEEN date(?) AND date(?)
       GROUP BY c.post_id
-    `).bind(range.from, range.to).all<CommentRow>(),
+    `).bind(platform, range.from, range.to).all<CommentRow>(),
     d1.prepare(`
       SELECT f.id AS feedback_id, COALESCE(f.related_post_id, f.social_post_id) AS post_id,
         p.title AS post_title, h.id AS topic_id, h.topic_name, f.recommended_at,
@@ -94,11 +100,11 @@ export async function GET(request: Request) {
       FROM hot_topic_feedback f
       INNER JOIN hot_topics h ON h.id = f.hot_topic_id
       INNER JOIN social_posts p ON p.id = COALESCE(f.related_post_id, f.social_post_id)
-      WHERE p.platform = 'douyin' AND date(p.publish_time) BETWEEN date(?) AND date(?)
+      WHERE p.platform = ? AND date(p.publish_time) BETWEEN date(?) AND date(?)
       ORDER BY f.recommended_at DESC, f.id DESC
-    `).bind(range.from, range.to).all<FeedbackRow>(),
-    d1.prepare("SELECT COUNT(*) AS count FROM social_posts WHERE platform = 'douyin' AND date(publish_time) = date(?)")
-      .bind(today).first<{ count: number }>(),
+    `).bind(platform, range.from, range.to).all<FeedbackRow>(),
+    d1.prepare("SELECT COUNT(*) AS count FROM social_posts WHERE platform = ? AND date(publish_time) = date(?)")
+      .bind(platform, today).first<{ count: number }>(),
   ]);
 
   const commentByPost = new Map(commentResult.results.map((row) => [row.post_id, row]));
@@ -169,7 +175,7 @@ export async function GET(request: Request) {
   }));
 
   return Response.json({
-    platform: "douyin",
+    platform,
     range,
     summary: {
       todayPublished: Number(todayResult?.count ?? 0),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 import { dateRangeQuery } from "@/lib/date-range";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
@@ -51,7 +51,7 @@ type HotLink = {
 };
 
 type ContentMonitoringData = {
-  platform: "douyin";
+  platform: "douyin" | "kuaishou" | "weibo";
   range: { from: string; to: string; label: string };
   summary: {
     todayPublished: number;
@@ -75,6 +75,24 @@ type ContentMonitoringData = {
   updatedAt: string;
 };
 
+type MonitoringPlatform = ContentMonitoringData["platform"];
+
+const supportedPlatforms = new Set<MonitoringPlatform>(["douyin", "kuaishou", "weibo"]);
+
+function subscribePlatform(callback: () => void) {
+  window.addEventListener("popstate", callback);
+  window.addEventListener("platform-navigation", callback);
+  return () => {
+    window.removeEventListener("popstate", callback);
+    window.removeEventListener("platform-navigation", callback);
+  };
+}
+
+function platformSnapshot(): MonitoringPlatform {
+  const value = new URLSearchParams(window.location.search).get("platform") as MonitoringPlatform | null;
+  return value && supportedPlatforms.has(value) ? value : "douyin";
+}
+
 const metricCards = [
   { key: "todayPublished", label: "今日发布", note: "北京时间今日" },
   { key: "views", label: "播放量", note: "筛选周期累计" },
@@ -86,6 +104,8 @@ const metricCards = [
 
 export default function ContentMonitoringPage() {
   const range = useGlobalDateRange();
+  const platform = useSyncExternalStore(subscribePlatform, platformSnapshot, () => "douyin");
+  const currentPlatformLabel = platformLabel(platform);
   const [data, setData] = useState<ContentMonitoringData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -93,7 +113,9 @@ export default function ContentMonitoringPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/content-monitoring?${dateRangeQuery(range)}`);
+      const query = new URLSearchParams(dateRangeQuery(range));
+      query.set("platform", platform);
+      const response = await fetch(`/api/content-monitoring?${query.toString()}`);
       if (!response.ok) throw new Error("内容监测数据读取失败");
       setData(await response.json() as ContentMonitoringData);
       setError("");
@@ -102,28 +124,28 @@ export default function ContentMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [platform, range]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  if (loading && !data) return <div className="loading-panel"><span className="loading-dot" />正在读取抖音作品监测数据…</div>;
+  if (loading && !data) return <div className="loading-panel"><span className="loading-dot" />正在读取{currentPlatformLabel}作品监测数据…</div>;
   if (error || !data) return <div className="error-panel">{error || "暂无内容监测数据"}</div>;
 
-  return <div className="page-stack content-monitor-v1 platform-themed-page theme-douyin">
+  return <div className={`page-stack content-monitor-v1 platform-themed-page theme-${platform}`}>
     <header className="page-heading compact-heading">
       <div>
         <p className="eyebrow">CONTENT MONITORING CENTER · V1.0</p>
-        <h1>抖音内容监测中心</h1>
+        <h1>{currentPlatformLabel}内容监测中心</h1>
         <p>围绕作品表现、爆款结构、低效原因和热点转化，形成每日可执行的内容优化闭环。</p>
       </div>
-      <span className="current-platform-badge" aria-live="polite"><i />当前平台：抖音</span>
+      <span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span>
     </header>
 
     <section className="content-monitor-scope" aria-label="监测范围">
-      <div><span>监测平台</span><strong>抖音</strong><small>V1.0 优先支持</small></div>
+      <div><span>监测平台</span><strong>{currentPlatformLabel}</strong><small>左侧平台入口切换</small></div>
       <div><span>数据周期</span><strong>{data.range.label}</strong><small>{data.range.from} — {data.range.to}</small></div>
       <div><span>周期发布</span><strong>{data.summary.periodPublished} 条</strong><small>来源 social_posts</small></div>
       <div><span>评论样本</span><strong>{data.summary.capturedComments} 条</strong><small>来源 social_comments</small></div>
@@ -154,14 +176,14 @@ export default function ContentMonitoringPage() {
             {data.topPosts.map((post, index) => <tr key={post.id}>
               <td><span className={`rank-chip rank-${index + 1}`}>TOP {index + 1}</span></td>
               <td><strong>{post.title}</strong><small className="table-subline">{formatDate(post.publish_time)}</small></td>
-              <td><span className="platform-tag tag-douyin">{platformLabel(post.platform)}</span></td>
+              <td><span className={`platform-tag tag-${post.platform}`}>{platformLabel(post.platform)}</span></td>
               <td className="metric-cell">{formatCompact(post.views)}</td>
               <td>{formatCompact(post.interactions)}</td>
               <td>{post.interactionRate}%</td>
               <td><span className={`score-pill ${post.aiScore >= 75 ? "score-good" : post.aiScore >= 60 ? "score-mid" : "score-low"}`}>{post.aiScore}</span></td>
               <td><a className="content-analysis-link" href={`/insights/content/detail?id=${post.id}`}>数据分析</a></td>
             </tr>)}
-            {!data.topPosts.length && <tr><td className="empty-cell" colSpan={8}>筛选周期内暂无抖音作品</td></tr>}
+            {!data.topPosts.length && <tr><td className="empty-cell" colSpan={8}>筛选周期内暂无{currentPlatformLabel}作品</td></tr>}
           </tbody>
         </table>
       </div>
@@ -184,7 +206,7 @@ export default function ContentMonitoringPage() {
           </dl>
           <p>{item.commentSignal} · 播放 {formatCompact(item.views)}</p>
         </article>)}
-        {!data.breakoutAnalysis.length && <div className="empty-monitor-state">暂无可分析作品，采集抖音作品后将自动生成爆款结构分析。</div>}
+        {!data.breakoutAnalysis.length && <div className="empty-monitor-state">暂无可分析作品，采集{currentPlatformLabel}作品后将自动生成爆款结构分析。</div>}
       </div>
     </section>
 
