@@ -92,6 +92,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className={`${selectedPlatform === platform.value ? "active" : ""} platform-${platform.value}`}
                     href={platformHref(item.href, platform.value)}
                     key={platform.value}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      window.location.assign(event.currentTarget.href);
+                    }}
                   >{platform.label}</a>)}
                 </div>}
               </div>

@@ -109,15 +109,8 @@ type FeedbackData = {
   effectivenessRule: string;
 };
 
-const platformTabs = [
-  { value: "all", label: "全部热点" },
-  { value: "douyin", label: "抖音" },
-  { value: "kuaishou", label: "快手" },
-  { value: "weibo", label: "微博" },
-  { value: "other", label: "其他平台" },
-] as const;
-
-const primaryPlatforms = new Set(["douyin", "kuaishou", "weibo"]);
+type HotPlatform = "douyin" | "kuaishou" | "weibo";
+const supportedHotPlatforms = new Set<HotPlatform>(["douyin", "kuaishou", "weibo"]);
 const levelTabs = [
   { value: "all", label: "全部" },
   { value: "A", label: "A级 · 强烈推荐" },
@@ -126,13 +119,7 @@ const levelTabs = [
 ] as const;
 const levelOrder = { A: 0, B: 1, C: 2 } as const;
 
-const platformAdvice: Record<string, { eyebrow: string; title: string; summary: string; actions: string[] }> = {
-  all: {
-    eyebrow: "CROSS-PLATFORM STRATEGY",
-    title: "多平台协同建议",
-    summary: "同一热点按平台传播机制拆分表达，避免直接复制同一条内容。",
-    actions: ["抖音优先验证短视频钩子", "快手承接互动与直播答疑", "微博放大品牌话题与事件传播"],
-  },
+const platformAdvice: Record<HotPlatform, { eyebrow: string; title: string; summary: string; actions: string[] }> = {
   douyin: {
     eyebrow: "DOUYIN CONTENT",
     title: "抖音短视频内容建议",
@@ -150,12 +137,6 @@ const platformAdvice: Record<string, { eyebrow: string; title: string; summary: 
     title: "微博品牌传播建议",
     summary: "结合公共话题价值与传播风险，建立景区品牌关联。",
     actions: ["优先选择旅游、新疆与自然风景话题", "用图文或短视频解释景区独特性", "避免生硬蹭热点，明确品牌立场与信息来源"],
-  },
-  other: {
-    eyebrow: "FUTURE CHANNELS",
-    title: "其他平台扩展建议",
-    summary: "为小红书等新增平台保留统一入口，接入后按平台内容机制生成建议。",
-    actions: ["沿用 WorkBuddy 标准字段接入", "新增平台配置而非复制页面", "根据平台搜索、社区与转化特点配置规则"],
   },
 };
 
@@ -188,16 +169,16 @@ function topicTrend() {
   return "首次采集";
 }
 
-function platformFromLocation() {
+function platformFromLocation(): HotPlatform {
   if (typeof window === "undefined") return "douyin";
-  const value = new URLSearchParams(window.location.search).get("platform");
-  return platformTabs.some((tab) => tab.value === value) ? value as typeof platformTabs[number]["value"] : "douyin";
+  const value = new URLSearchParams(window.location.search).get("platform") as HotPlatform | null;
+  return value && supportedHotPlatforms.has(value) ? value : "douyin";
 }
 
 export default function HotTopicsPage() {
   const range = useGlobalDateRange({ defaultPreset: "today", scope: "hot-topics" });
   const [topics, setTopics] = useState<AgentHotTopic[]>([]);
-  const [activePlatform, setActivePlatform] = useState("douyin");
+  const [activePlatform, setActivePlatform] = useState<HotPlatform>("douyin");
   const [activeLevel, setActiveLevel] = useState<"all" | "A" | "B" | "C">("all");
   const [viewMode, setViewMode] = useState<ViewMode>("report");
   const [loading, setLoading] = useState(true);
@@ -272,8 +253,7 @@ export default function HotTopicsPage() {
   }), [topics, range.from, range.to]);
 
   const platformScopedTopics = useMemo(() => topicsInRange
-    .filter((topic) => activePlatform === "all"
-      || (activePlatform === "other" ? !primaryPlatforms.has(topic.platform) : topic.platform === activePlatform)), [topicsInRange, activePlatform]);
+    .filter((topic) => topic.platform === activePlatform), [topicsInRange, activePlatform]);
 
   const platformTopics = useMemo(() => platformScopedTopics
     .filter((topic) => activeLevel === "all" || topic.recommendation_level === activeLevel)
@@ -306,17 +286,8 @@ export default function HotTopicsPage() {
   }), [reportAnalyses, reportTopics]);
   const usesWorkBuddyReport = useMemo(() => reportTopics.some((topic) => topic.analysis_source === "WorkBuddy热点监测报告"), [reportTopics]);
 
-  const advice = platformAdvice[activePlatform] ?? platformAdvice.other;
-  const currentLabel = platformTabs.find((tab) => tab.value === activePlatform)?.label ?? "全部热点";
-
-  function selectPlatform(platform: typeof platformTabs[number]["value"]) {
-    setActivePlatform(platform);
-    setSelectedAnalysis(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("platform", platform);
-    window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
-    window.dispatchEvent(new Event("platform-navigation"));
-  }
+  const advice = platformAdvice[activePlatform];
+  const currentLabel = platformLabel(activePlatform);
 
   async function analyzeTopic(topic: AgentHotTopic) {
     setAnalyzingId(topic.id);
@@ -463,9 +434,9 @@ export default function HotTopicsPage() {
     <div className="page-stack hot-topic-page">
       <header className="page-heading compact-heading">
         <div>
-          <p className="eyebrow">MULTI-PLATFORM HOT TOPICS</p>
-          <h1>多平台热点监测与AI选题推荐中心</h1>
-          <p>统一读取 WorkBuddy 热点数据，按平台查看 TOP20，并生成适合独山子大峡谷的跟进与内容建议。</p>
+          <p className="eyebrow">{activePlatform.toUpperCase()} HOT TOPICS</p>
+          <h1>{currentLabel}热点监测与AI选题推荐中心</h1>
+          <p>读取 WorkBuddy {currentLabel}热点数据，展示该平台 TOP20，并生成适合独山子大峡谷的跟进与内容建议。</p>
         </div>
         <div className="agent-import-actions">
           <label className="agent-file-button">{agentFile ? agentFile.name : "选择WorkBuddy文件"}<input type="file" accept=".json,.xlsx,.xls" onChange={(event) => setAgentFile(event.target.files?.[0] ?? null)} /></label>
@@ -474,10 +445,7 @@ export default function HotTopicsPage() {
         </div>
       </header>
 
-      <div className="hot-topic-view-toolbar">
-        <nav className="insight-platform-tabs hot-unified-platform-tabs" aria-label="热点平台筛选">
-          {platformTabs.map((tab) => <button key={tab.value} type="button" className={activePlatform === tab.value ? "active" : ""} onClick={() => selectPlatform(tab.value)}>{tab.label}</button>)}
-        </nav>
+      <div className="hot-topic-view-toolbar hot-topic-mode-toolbar">
         <div className="hot-view-switch" role="group" aria-label="热点展示方式">
           <button className={viewMode === "report" ? "active" : ""} onClick={() => setViewMode("report")}>分析报告</button>
           <button className={viewMode === "ranking" ? "active" : ""} onClick={() => setViewMode("ranking")}>TOP20列表</button>

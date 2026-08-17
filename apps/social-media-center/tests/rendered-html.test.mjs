@@ -21,7 +21,7 @@ for (const [path, heading] of [
   ["app/content/page.tsx", "内容分析"],
   ["app/tasks/page.tsx", "任务管理"],
   ["app/imports/page.tsx", "新媒体智能数据导入中心"],
-  ["app/hot-topics/page.tsx", "多平台热点监测与AI选题推荐中心"],
+  ["app/hot-topics/page.tsx", "热点监测与AI选题推荐中心"],
   ["app/hot-topic-archive/page.tsx", "热点档案库"],
   ["app/content-planning/page.tsx", "AI内容策划中心"],
   ["app/ai-analysis/page.tsx", "AI 内容分析中心"],
@@ -339,7 +339,7 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.match(workbuddyMigration, /CREATE TABLE `HOT_TOPIC_DATA`/);
   assert.match(schema, /sqliteTable\(\s*"HOT_TOPIC_DATA"/);
   for (const field of ["ai_relevance_score", "ai_analysis", "ai_recommendation"]) assert.match(workbuddyMigration, new RegExp(field));
-  assert.match(page, /多平台热点监测与AI选题推荐中心/);
+  assert.match(page, /\{currentLabel\}热点监测与AI选题推荐中心/);
   assert.match(page, /AI分析/);
   assert.match(page, /选择WorkBuddy文件/);
   assert.match(page, /替换当前数据/);
@@ -353,7 +353,7 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.doesNotMatch(localService, /playwright|douyin\.com|weibo\.com|kuaishou\.com/);
 });
 
-test("hot topic center presents WorkBuddy TOP20 with unified platform filters", async () => {
+test("hot topic center uses the sidebar as its only platform selector", async () => {
   const [page, shell, filter, api, agentApi, analysisApi, schema, migration] = await Promise.all([
     readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
     readFile(new URL("components/AppShell.tsx", root), "utf8"),
@@ -364,11 +364,13 @@ test("hot topic center presents WorkBuddy TOP20 with unified platform filters", 
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("drizzle/0015_hot_topic_data_source.sql", root), "utf8"),
   ]);
-  for (const label of ["全部热点", "抖音", "快手", "微博", "其他平台", "TOP20", "AI热点分析与选题推荐"]) {
+  for (const label of ["抖音", "快手", "微博", "TOP20", "AI热点分析与选题推荐"]) {
     assert.match(page, new RegExp(label));
   }
+  for (const removedSelector of ["全部热点", "其他平台", "hot-unified-platform-tabs", "selectPlatform"]) assert.doesNotMatch(page, new RegExp(removedSelector));
   for (const removedCard of ["hot-module-tabs", "平台热点趋势", "内容热度分析"]) assert.doesNotMatch(page, new RegExp(removedCard));
-  assert.match(page, /insight-platform-tabs/);
+  assert.match(page, /platformFromLocation/);
+  assert.match(page, /topic\.platform === activePlatform/);
   for (const label of ["分析报告", "TOP20列表", "热点总数", "强烈推荐借势", "推荐直播主题", "今日运营建议"]) assert.match(page, new RegExp(label));
   assert.match(page, /viewMode === "report"/);
   assert.match(page, /reportTopics\.map/);
