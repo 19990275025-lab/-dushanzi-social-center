@@ -4,16 +4,17 @@ import { useSyncExternalStore } from "react";
 import { GlobalDateFilter } from "@/components/GlobalDateFilter";
 
 const navItems = [
-  { href: "/", label: "运营驾驶舱", code: "01" },
-  { href: "/insights/content", label: "内容监测中心", code: "02" },
-  { href: "/insights/fans", label: "粉丝分析中心", code: "03" },
-  { href: "/collector", label: "数据采集中心", code: "04" },
-  { href: "/hot-topics", label: "热点监测中心", code: "05" },
-  { href: "/hot-topic-archive", label: "热点档案库", code: "06" },
-  { href: "/content-planning", label: "AI内容策划中心", code: "07" },
-  { href: "/ai-analysis", label: "AI内容分析中心", code: "08" },
-  { href: "/comment-insights", label: "游客评论洞察中心", code: "09" },
-  { href: "/tasks", label: "任务管理中心", code: "10" },
+  { href: "/marketing-operations", label: "营销运营中心", code: "01" },
+  { href: "/", label: "运营驾驶舱", code: "02" },
+  { href: "/insights/content", label: "内容监测中心", code: "03" },
+  { href: "/insights/fans", label: "粉丝分析中心", code: "04" },
+  { href: "/collector", label: "数据采集中心", code: "05" },
+  { href: "/hot-topics", label: "热点监测中心", code: "06" },
+  { href: "/hot-topic-archive", label: "热点档案库", code: "07" },
+  { href: "/content-planning", label: "AI内容策划中心", code: "08" },
+  { href: "/ai-analysis", label: "AI内容分析中心", code: "09" },
+  { href: "/comment-insights", label: "游客评论洞察中心", code: "10" },
+  { href: "/tasks", label: "任务管理中心", code: "11" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

@@ -16,6 +16,7 @@ async function readProjectMigration(fileName) {
 }
 
 for (const [path, heading] of [
+  ["app/marketing-operations/page.tsx", "营销运营中心"],
   ["app/page.tsx", "新媒体运营驾驶舱"],
   ["app/content/page.tsx", "内容分析"],
   ["app/tasks/page.tsx", "任务管理"],
@@ -57,9 +58,9 @@ test("content monitoring and fan analysis are independent navigation modules", a
   assert.match(source, /内容与用户洞察中心/);
   assert.match(source, /href="\/insights\/content"/);
   assert.match(source, /href="\/insights\/fans"/);
-  assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "02"/);
-  assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "03"/);
-  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "10"/);
+  assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "03"/);
+  assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "04"/);
+  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "11"/);
   assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
 });
 
@@ -802,7 +803,7 @@ test("hot topic archive V4.0 snapshots daily assets and exports Excel without al
   assert.match(download, /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
   assert.match(download, /content-disposition/);
   for (const label of ["热点历史查询", "生成当日报告", "下载Excel", "日期", "平台", "热点类型"]) assert.match(page, new RegExp(label));
-  assert.match(shell, /href: "\/hot-topic-archive", label: "热点档案库", code: "06"/);
+  assert.match(shell, /href: "\/hot-topic-archive", label: "热点档案库", code: "07"/);
   assert.match(worker, /async scheduled/);
   assert.match(worker, /generateAndStoreDailyArchive/);
   assert.match(vite, /30 0 \* \* \*/);
@@ -844,7 +845,7 @@ test("AI content planning V1.0 closes hotspot to plan, task, post and seven-day 
   assert.match(api, /related_post_id = \?/);
   assert.match(api, /platform = 'douyin'/);
   for (const label of ["今日推荐选题 TOP5", "查看方案", "生成任务", "短视频标题（5个）", "视频脚本", "拍摄分镜", "封面文案", "推荐发布时间", "推荐标签", "推荐话题", "推荐背景音乐", "直播主题", "预计播放量", "预计互动率", "涨粉预估", "内容任务", "发布效果", "AI复盘"]) assert.match(page, new RegExp(label));
-  assert.match(shell, /href: "\/content-planning", label: "AI内容策划中心", code: "07"/);
+  assert.match(shell, /href: "\/content-planning", label: "AI内容策划中心", code: "08"/);
   assert.match(worker, /refreshContentPlanFeedback/);
   assert.match(styles, /planning-topic-grid/);
   assert.match(styles, /planning-workspace/);
@@ -896,6 +897,39 @@ test("task management V2.0 provides an eight-stage Kanban, automatic post matchi
   assert.match(styles, /task-kanban-board/);
   assert.match(styles, /task-weekly-report/);
   assert.match(readme, /任务管理中心 V2\.0/);
+});
+
+test("marketing operations V1.0 is a read-only daily hub backed by existing modules", async () => {
+  const [api, page, shell, styles, dashboard, readme] = await Promise.all([
+    readFile(new URL("app/api/marketing-operations/route.ts", root), "utf8"),
+    readFile(new URL("app/marketing-operations/page.tsx", root), "utf8"),
+    readFile(new URL("components/AppShell.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("app/api/dashboard/route.ts", root), "utf8"),
+    readFile(new URL("README.md", root), "utf8"),
+  ]);
+  for (const source of ["hot_topics", "hot_topic_analysis", "content_tasks", "content_plans", "content_plan_feedback", "social_posts", "fan_growth_records", "collection_logs"]) {
+    assert.match(api, new RegExp(source));
+  }
+  assert.doesNotMatch(api, /CREATE TABLE|ALTER TABLE|INSERT INTO|DELETE FROM/);
+  for (const label of ["今日待办", "今日推荐热点", "今日待拍内容", "今日待发布内容", "今日逾期任务", "今日待复盘内容", "运营日历", "发布计划", "直播计划", "营销活动", "节假日", "热点事件", "营销目标", "AI每日简报", "今日热点", "昨日最佳作品", "风险提醒", "今日建议与运营动作"]) {
+    assert.match(page, new RegExp(label));
+  }
+  for (const label of ["本月作品完成率", "本月直播完成率", "粉丝增长完成率", "播放目标完成率"]) {
+    assert.match(api, new RegExp(label));
+  }
+  assert.match(api, /timeZone: "Asia\/Shanghai"/);
+  assert.match(api, /requestedMonth/);
+  assert.match(api, /recommendationLevel/);
+  assert.match(page, /shiftMonth/);
+  assert.match(page, /未设目标/);
+  assert.match(shell, /href: "\/marketing-operations", label: "营销运营中心", code: "01"/);
+  assert.match(styles, /operations-todo-grid/);
+  assert.match(styles, /operations-calendar-grid/);
+  assert.match(styles, /marketing-goals-grid/);
+  assert.match(styles, /operations-brief-grid/);
+  assert.match(dashboard, /status IN \('published', 'reviewed'\)/);
+  assert.match(readme, /营销运营中心 V1\.0/);
 });
 
 test("production build artifacts exist", async () => {

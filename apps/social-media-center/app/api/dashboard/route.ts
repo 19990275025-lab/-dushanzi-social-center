@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       d1.prepare(`
         SELECT platform,
           COUNT(*) AS total,
-          SUM(CASE WHEN status IN ('published', 'done') THEN 1 ELSE 0 END) AS completed
+          SUM(CASE WHEN status IN ('published', 'reviewed') THEN 1 ELSE 0 END) AS completed
         FROM content_tasks
         WHERE platform IN ('douyin', 'kuaishou', 'weibo')
           AND date(task_date) BETWEEN date(?) AND date(?)
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
         SELECT COUNT(*) AS count
         FROM content_tasks
         WHERE platform IN ('douyin', 'kuaishou', 'weibo')
-          AND status NOT IN ('published', 'done', 'cancelled')
+          AND status NOT IN ('published', 'reviewed')
           AND date(task_date) BETWEEN date(?) AND date(?)
       `).bind(range.from, range.to).first<{ count: number }>(),
     ]);
