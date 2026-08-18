@@ -1,0 +1,40 @@
+name: 舆情或突发事件
+description: 记录、升级和跟踪线上风险事件
+title: "[事件] "
+labels: ["incident"]
+body:
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 初步等级
+      options:
+        - P0 人身安全/重大事故/严重扩散
+        - P1 集中投诉/媒体关注/错误扩散
+        - P2 单点投诉/一般事实错误
+        - P3 普通咨询/建议/轻微负面
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: 原始链接
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 已留存证据
+      description: 记录截图位置、时间、账号、传播量和评论趋势；不要提交个人敏感信息。
+    validations:
+      required: true
+  - type: textarea
+    id: facts
+    attributes:
+      label: 已确认事实与待核事项
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: 当前负责人
+    validations:
+      required: true
+

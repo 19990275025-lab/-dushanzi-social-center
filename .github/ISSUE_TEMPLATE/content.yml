@@ -1,0 +1,57 @@
+name: 内容选题
+description: 提交并推进一条新媒体内容
+title: "[内容] "
+labels: ["idea"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - 抖音
+        - 小红书
+        - 微信视频号
+        - 微信公众号
+        - 多平台
+    validations:
+      required: true
+  - type: input
+    id: audience
+    attributes:
+      label: 目标受众
+      placeholder: 例如：首次到访的新疆自驾游客
+    validations:
+      required: true
+  - type: textarea
+    id: proposition
+    attributes:
+      label: 一句话选题与用户价值
+      placeholder: 这条内容解决用户的什么问题？
+    validations:
+      required: true
+  - type: dropdown
+    id: goal
+    attributes:
+      label: 主要目标
+      options:
+        - 有效触达
+        - 完播/读完
+        - 收藏/分享
+        - 有效咨询
+        - 可归因转化
+        - 游客服务
+    validations:
+      required: true
+  - type: textarea
+    id: facts
+    attributes:
+      label: 待核验信息与风险
+      description: 写明票务、开放、交通、天气、安全、授权等事项。
+    validations:
+      required: true
+  - type: input
+    id: due
+    attributes:
+      label: 期望发布日期
+      placeholder: YYYY-MM-DD
+

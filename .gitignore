@@ -1,0 +1,13 @@
+.DS_Store
+*.log
+secrets.*
+.env
+.env.*
+assets/raw/
+assets/exports/
+*.mp4
+*.mov
+*.mxf
+*.psd
+*.prproj
+*.aep
