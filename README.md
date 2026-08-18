@@ -1,83 +1,132 @@
-# 独山子大峡谷新媒体运营中心
+# 独山子大峡谷 AI 新媒体运营中心
 
-这是一个以 GitHub 为协作底座的“运营操作系统”，用于统一管理独山子大峡谷的新媒体品牌、账号矩阵、选题生产、发布审核、数据复盘和舆情响应。
+独山子大峡谷 AI 新媒体运营中心是景区 AI 营销中台的新媒体子系统，用于统一接收热点、作品、评论和粉丝数据，并完成监测分析、内容策划、生产任务、发布关联和效果复盘。
 
-> 当前版本是启动基线。景区开放时间、票务、交通、项目规则、联系方式等动态信息，发布前必须由景区业务负责人核验，不在仓库里写死。
+当前仓库是独立的新媒体运营中心仓库，不包含 OTA 销售驾驶舱代码。正式业务闭环优先支持抖音；快手、微博已有平台筛选和统一数据协议，但真实内容与粉丝数据仍需持续接入。视频号不在当前系统范围。
 
-## 90 天目标
+## 当前版本
 
-1. 建立统一品牌口径和素材资产规范，避免多账号各自表达。
-2. 跑通“选题 → 采集 → 制作 → 审核 → 发布 → 互动 → 复盘”的日常机制。
-3. 形成抖音、快手、微博的差异化账号矩阵。
-4. 建立可追踪的内容指标和到访转化链路。
-5. 建立天气、安全、投诉和舆情事件的快速响应机制。
+- 建议阶段版本：**`social-v0.9.0` 候选基线**
+- `package.json`：`0.1.0`
+- 正式 Git tag：尚未创建
+- V1.0 目标：抖音“采集 → 监测 → 策划 → 任务 → 发布 → 复盘”稳定闭环
 
-## 文件导航
+版本路线见 [docs/version-roadmap.md](docs/version-roadmap.md)。
 
-| 模块 | 用途 |
+## 主要模块
+
+| 模块 | 路径 | 当前能力 | 状态 |
+|---|---|---|---|
+| 运营驾驶舱 | `/` | 周期 KPI、发布、播放互动、作品排行、热点和运营建议 | 已完成 |
+| 内容监测中心 | `/insights/content` | 分平台作品监测、TOP10、爆款分析、低效诊断、热点关联 | 待优化 |
+| 粉丝分析中心 | `/insights/fans` | 总量、增长、流失、画像、内容吸粉、周报和导出 | 待优化 |
+| 数据采集中心 | `/collector`、`/imports` | 抖音 V3 预览确认、统一 V2 API、Excel/图片导入和采集日志 | 开发中 |
+| 热点监测中心 | `/hot-topics` | WorkBuddy 热点、关联分析、A/B/C 推荐、选题和效果复盘 | 已完成 |
+| 热点档案库 | `/hot-topic-archive` | 历史查询、每日快照和 Excel 下载 | 已完成 |
+| AI 内容分析中心 | `/ai-analysis` | 规则型作品评分、平台建议、日报/周报 | 待优化 |
+| AI 内容策划中心 | `/content-planning` | 抖音 A 级热点生成方案、任务、作品关联和 7 日复盘 | 待优化 |
+| 游客评论洞察中心 | `/comment-insights` | 情绪、关键词、游客需求和运营建议 | 待优化 |
+| 任务管理中心 | `/tasks` | 八阶段 Kanban 拖拽、来源记录、作品关联和周报 | 已完成 |
+| 营销运营中心 | `/marketing-operations` | 今日待办、运营日历、月度目标和每日简报 | 已完成 |
+
+完整状态和问题见 [docs/module-status.md](docs/module-status.md)。
+
+## 系统架构简图
+
+```mermaid
+flowchart LR
+  S["WorkBuddy / 抖音创作者中心 / Excel"] --> C["数据采集中心\n接收·标准化·预览·确认"]
+  C --> D["Cloudflare D1\n作品·评论·粉丝·热点·任务"]
+  C --> R["Cloudflare R2\n上传文件·热点档案"]
+  D --> M["热点监测 / 内容监测 / 粉丝分析 / 评论洞察"]
+  M --> A["规则型 AI 分析与内容策划"]
+  A --> T["任务管理"]
+  T --> P["作品发布与数据回采"]
+  P --> F["热点 / 内容 / 任务效果复盘"]
+  F --> D
+```
+
+技术栈：Next.js 16、React 19、TypeScript、Vinext/Vite、Cloudflare Worker/Sites、D1、R2、Drizzle ORM。
+
+## 数据来源现状
+
+| 来源 | 当前状态 | 说明 |
+|---|---|---|
+| WorkBuddy 热点监测 Agent | 已接入 | 通过 JSON/Excel 或统一 V2 API 接收热点，预览确认后写入标准热点表 |
+| 抖音创作者中心 | 已有接收闭环 | V3 JSON 支持粉丝、增长、作品、观众和评论的预览确认；主站不保证云端直接控制本机 App |
+| Excel / 图片 | 已实现 | Excel 可导入作品；图片保存记录并人工确认，复杂 OCR 未实现 |
+| MediaCrawler | 未接入 | 仅完成评估和接口规划，未安装依赖、未运行采集任务 |
+| Agent-Reach | 未接入 | 仅完成全网趋势/新闻补充的技术评估 |
+
+当前“AI”分析主要是可复核的规则模型，不是已上线的大模型自动运营。所有正式数据必须来自数据库或明确的数据接收流程，不使用永久模拟数据填充业务结果。
+
+## 数据库
+
+核心链路：
+
+- 账号/内容：`social_accounts`、`social_posts`、`social_comments`、`content_audience_analysis`
+- 粉丝：`social_fans`、`fan_growth_records`
+- 热点：`hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、`hot_topic_archive`
+- 策划/任务：`content_plans`、`content_plan_feedback`、`content_tasks`
+- 采集审计：`collection_logs`、`collection_staging_records`、`data_import_logs`
+
+字段、关系、来源和使用模块见 [docs/database-design.md](docs/database-design.md)。
+
+## 本地开发
+
+```bash
+cd apps/social-media-center
+pnpm install --frozen-lockfile
+pnpm dev
+```
+
+检查：
+
+```bash
+pnpm lint
+pnpm build
+pnpm test
+```
+
+环境变量、D1/R2 绑定、Sites 发布和回滚步骤见 [docs/deployment.md](docs/deployment.md)。禁止把真实 Cookie、密码、Token、Webhook 密钥或数据库访问凭据提交到 Git。
+
+## 文档入口
+
+### 技术与产品基线
+
+| 文档 | 内容 |
 |---|---|
-| [运营中心章程](docs/00-运营中心章程.md) | 定位、目标、权责和工作节奏 |
-| [品牌与受众](docs/01-品牌与受众.md) | 品牌表达、核心人群、内容支柱 |
-| [账号矩阵](docs/02-账号矩阵.md) | 各平台定位、内容形态和频率 |
-| [内容生产 SOP](docs/03-内容生产SOP.md) | 从立项到复盘的完整流程 |
-| [首月内容计划](docs/04-首月内容计划.md) | 4 周启动节奏和首批选题 |
-| [KPI 与数据看板](docs/05-KPI与数据看板.md) | 指标口径、阶段目标和复盘方法 |
-| [舆情与危机响应](docs/06-舆情与危机响应.md) | 风险等级、时限和处置流程 |
-| [组织与岗位](docs/07-组织与岗位.md) | 最小团队配置与 RACI |
-| [新媒体运营中心 V1.0 架构设计](docs/social-media-center-v1-architecture.md) | AI 营销中台新增模块的架构、页面、API 与阶段规划 |
-| [新媒体运营数据库 V1.0](docs/social-media-database-v1.md) | 六张核心表、关系、迁移、测试数据与自动采集预留说明 |
-| [新媒体运营驾驶舱 V1.0](apps/social-media-center/README.md) | 平台总览、内容分析和任务管理的可运行页面 |
-| [内容监测中心 V1.0](apps/social-media-center/README.md#内容监测中心-v10) | 抖音、快手、微博作品监测、内容分类、同行对比和 AI 每日报告 |
-| [粉丝分析中心 V1.0](apps/social-media-center/README.md#粉丝分析中心-v10) | 粉丝总览、增长周期、画像、平台定位和 AI 周报 |
-| [新媒体智能数据导入中心 V1.0](apps/social-media-center/README.md#数据导入中心-v10) | Excel 预览确认、图片留档、导入记录与安全回滚 |
-| [新媒体热点监测中心 V1.0](apps/social-media-center/README.md#热点监测中心-v10) | 热点管理、TOP10、景区关联评分与规则型 AI 选题推荐 |
-| [AI 内容分析中心 V1.0](apps/social-media-center/README.md#ai-内容分析中心-v10) | 作品评分、平台洞察、选题升级及 AI 日报/周报 |
-| [新媒体智能采集中心 V1.0](apps/social-media-center/README.md#新媒体智能采集中心-v10) | 抖音 Chrome 采集、统一校验、人工确认入库和采集日志 |
-| [抖音 30 天真实采集测试 V1.0](docs/douyin-30day-collection-test-v1.md) | 2026-07-10 至 2026-08-08 作品与评论预览、失败明细及游客洞察 |
-| [抖音智能采集中心 V2.1](apps/social-media-center/README.md#抖音智能采集中心-v21) | 粉丝趋势/活跃度、作品流量/观众和评论数据的无落库预览与 80% 完整率门禁 |
-| [内容简报模板](templates/内容简报.md) | 每条内容立项模板 |
-| [发布检查表](templates/发布检查表.md) | 上线前的必检项 |
-| [内容排期表](data/内容排期表.csv) | 可导入表格工具的排期数据 |
+| [系统架构](docs/system-architecture.md) | 分层架构、模块职责和端到端闭环 |
+| [模块状态](docs/module-status.md) | 版本、完成度、数据来源、问题和计划 |
+| [数据库设计](docs/database-design.md) | 全部核心表、字段、关系与数据质量 |
+| [API 设计](docs/api-design.md) | 现有路由、输入、输出和安全约定 |
+| [数据流](docs/data-flow.md) | WorkBuddy、抖音及规划工具到复盘的 Mermaid 流程 |
+| [版本路线](docs/version-roadmap.md) | `social-v0.9.0` 至 `social-v3.0.0` 目标和验收 |
+| [开发与部署](docs/deployment.md) | 本地环境、D1/R2、Sites、GitHub 和回滚 |
+| [更新日志](CHANGELOG.md) | 新增、优化、修复、数据库和接口变化 |
 
-## 每日使用方式
+### 历史规划与运营规范
 
-1. 用 GitHub Issue 提交选题或舆情事件。
-2. 选题通过后填写内容简报，明确平台、受众、钩子、行动号召和审核人。
-3. 素材与成片存放在批准的云盘或数字资产库；仓库只存文案、链接和状态，不提交大体积视频原文件。
-4. 发布前执行检查表；涉及安全、票务、开放信息时必须由对应业务负责人复核。
-5. 发布后 24 小时记录首轮数据，7 天完成复盘并沉淀可复用结论。
+| 文档 | 内容 |
+|---|---|
+| [运营中心章程](docs/00-运营中心章程.md) | 定位、目标、权责和节奏 |
+| [品牌与受众](docs/01-品牌与受众.md) | 品牌表达、核心人群和内容支柱 |
+| [账号矩阵](docs/02-账号矩阵.md) | 平台定位、内容形态和频率 |
+| [内容生产 SOP](docs/03-内容生产SOP.md) | 从立项到复盘的流程 |
+| [首月内容计划](docs/04-首月内容计划.md) | 启动节奏和选题 |
+| [KPI 与数据看板](docs/05-KPI与数据看板.md) | 指标口径和复盘方法 |
+| [舆情与危机响应](docs/06-舆情与危机响应.md) | 风险等级和处置流程 |
+| [组织与岗位](docs/07-组织与岗位.md) | 团队配置与 RACI |
+| [采集工具评估](docs/data-collector-integration.md) | Agent-Reach 与 MediaCrawler 技术评估 |
+| [数据采集中心 V2 架构](docs/data-collection-center-v2.md) | WorkBuddy、MediaCrawler、Agent-Reach 接口规划 |
 
-## GitHub 状态约定
+历史设计文档可能早于当前代码；如与本 README 或技术基线文档冲突，以当前代码、数据库 schema 和 API 实现为准，并在后续版本中修订历史文档。
 
-- `idea`：待评估选题
-- `approved`：已通过、可生产
-- `in-production`：拍摄或制作中
-- `review`：待审核
-- `scheduled`：已排期
-- `published`：已发布
-- `blocked`：存在依赖或风险
-- `incident`：舆情或突发事件
+## 开发与发布原则
 
-## 启动前必须补齐
-
-- 各平台官方账号、管理员和双重验证方式
-- 景区业务负责人、安全负责人、客服负责人及值班联系方式
-- 官方票务/预约链接、地图定位和客服入口
-- 可用素材授权清单、音乐与字体商用授权
-- 当前客流基线、历史内容数据和可归因的转化链路
-- 对外信息审批时限与夜间/节假日值班机制
-
-## 新媒体运营驾驶舱 V1.0
-
-驾驶舱位于 `apps/social-media-center/`，包含三个独立页面：
-
-- `/`：平台运营总览、今日内容、爆款排行、热点趋势与 AI 运营建议。
-- `/content`：作品列表、平台与日期筛选、指标排序。
-- `/tasks`：任务列表、新增任务和状态更新。
-- `/imports`：Excel/图片上传、数据预览、确认写入、重新导入和批次回滚。
-- `/hot-topics`：热点新增、编辑、删除、TOP10 排行、关联分析和规则选题推荐。
-- `/ai-analysis`：作品爆款评分、五维内容评分、平台分析、选题升级和运营报告。
-- `/collector`：抖音 V2.1 粉丝与内容分析采集、无落库预览、三类完整率门禁、确认日志和批次回滚。
-- `/comment-insights`：规则型评论情绪、关键词、游客需求排行与内容建议。
-
-页面通过 `/api/dashboard`、`/api/posts`、`/api/tasks`、`/api/imports`、`/api/hot-topics`、`/api/ai-analysis`、`/api/collections`、`/api/comment-insights` 提供数据库操作、分析、采集校验和日志。抖音近 30 天作品与评论结果必须经过服务端校验与人工确认后才写入 `social_posts` 和 `social_comments`。快手、微博自动采集、画面识别和复杂 OCR 尚未实现，也未接入或修改 OTA 销售驾驶舱、OTA 舆情监测中心。
+1. 新媒体与 OTA 使用独立仓库和版本号；本仓库提交使用 `feat(social)`、`fix(social)`、`docs(social)` 等范围。
+2. 数据写入遵循“接收 → 标准化 → 预览 → 人工确认 → 数据库”。
+3. 不用模拟数据掩盖采集失败或空数据；页面应显示真实的数据状态。
+4. 动态票务、交通、开放时间、安全和联系方式发布前必须由景区业务负责人核验。
+5. 大体积视频素材存放在批准的云盘或数字资产库，仓库只保存代码、文案、配置模板和可审计记录。
+6. 创建正式版本前更新 CHANGELOG、执行测试并确认 `main` 与 `origin/main` 同步。
