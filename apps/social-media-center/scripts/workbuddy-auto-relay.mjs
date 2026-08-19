@@ -27,8 +27,26 @@ function todayInBeijing() {
   }).format(new Date());
 }
 
+async function withTimeout(operation, timeoutMs, message) {
+  let timer;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function locateFile() {
-  const files = (await readdir(sourceDirectory))
+  const files = (await withTimeout(
+    readdir(sourceDirectory),
+    15_000,
+    `读取WorkBuddy目录超时，请检查后台进程的桌面目录访问权限：${sourceDirectory}`,
+  ))
     .filter((name) => /^hot_topic_\d{8}\.(json|xlsx|xls)$/i.test(name))
     .sort((a, b) => (fileDate(a) ?? "").localeCompare(fileDate(b) ?? "") || a.localeCompare(b));
   const expectedDate = todayInBeijing();
@@ -58,7 +76,7 @@ if (process.env.WORKBUDDY_SITES_BEARER_TOKEN) {
 }
 
 async function requestJson(path, init = {}) {
-  const args = ["--silent", "--show-error", "--location", "--max-time", "180", "--request", init.method || "GET"];
+  const args = ["--silent", "--show-error", "--location", "--max-time", "30", "--request", init.method || "GET"];
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(?::|\/|$)/i.test(apiBaseUrl)) args.unshift("--noproxy", "*");
   for (const [name, value] of Object.entries({ ...requestHeaders, ...init.headers })) args.push("--header", `${name}: ${value}`);
   if (init.body !== undefined) args.push("--data-binary", "@-");
