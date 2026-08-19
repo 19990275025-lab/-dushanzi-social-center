@@ -189,3 +189,15 @@ git log --oneline --decorate -10
 4. 对照业务时间字段：作品 `publish_time`、热点 `collection_date`、粉丝 `record_date`。
 5. 检查平台代码映射与账号/作品外键关联。
 6. 在隔离环境复现后再修复生产，禁止用模拟数据掩盖空数据问题。
+
+## 11. WorkBuddy 热点自动接力
+
+Cloudflare Sites 无法直接读取运营电脑的桌面目录。生产链路由本机 LaunchAgent 发现 WorkBuddy 当天文件，再调用部署站点的接力和统一采集接口；数据库、AI 分析和档案仍在 Sites、D1 与 R2 运行。
+
+安装前从安全的本机凭据来源设置 `WORKBUDDY_API_BASE_URL`、`WORKBUDDY_AGENT_KEY` 和私有 Sites 所需的 `WORKBUDDY_SITES_BEARER_TOKEN`，然后在 `apps/social-media-center` 执行：
+
+```bash
+pnpm automation:workbuddy:install
+```
+
+安装器不会把真实值写进仓库，LaunchAgent 配置权限固定为 `0600`。完整的文件规则、失败保护和检查方式见 [workbuddy-hot-topic-relay-v1.md](workbuddy-hot-topic-relay-v1.md)。

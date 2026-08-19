@@ -742,6 +742,18 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
 .collector-log-panel td strong, .collector-log-panel td small { display: block; }.collector-log-panel td small { color: #89948f; font-size: 7px; margin-top: 3px; max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .collection-status { border-radius: 99px; display: inline-flex; font-size: 7px; font-weight: 700; padding: 5px 8px; }.collection-status.status-pending { background: #fff5df; color: #9b6412; }.collection-status.status-completed { background: #e7f7f0; color: #0b7653; }.collection-status.status-failed { background: #fff0eb; color: #a34c35; }.collection-status.status-deleted { background: #eef1f0; color: #6d7874; }
 .collector-compliance { color: #89948f; font-size: 8px; line-height: 1.6; margin: 10px 0 0; text-align: center; }
+.workbuddy-relay-status { border-top: 4px solid #18855f; margin-bottom: 16px; }
+.relay-status-badge { background: #eef3f1; border-radius: 999px; color: #66736e; font-size: 9px; padding: 8px 12px; }
+.relay-status-badge.status-success { background: #e4f5ed; color: #0f7754; }
+.relay-status-badge.status-failed { background: #fff0e8; color: #a34c28; }
+.relay-status-badge.status-processing { background: #fff7dd; color: #84620f; }
+.workbuddy-relay-grid { display: grid; gap: 10px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.workbuddy-relay-grid article { background: #f5f8f7; border: 1px solid #e2e9e6; border-radius: 12px; padding: 16px; }
+.workbuddy-relay-grid span, .workbuddy-relay-grid small { color: #7a8782; display: block; font-size: 8px; }
+.workbuddy-relay-grid strong { color: #12382d; display: block; font-size: 22px; margin: 8px 0 5px; }
+.workbuddy-relay-grid small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workbuddy-relay-meta { color: #7c8984; display: flex; flex-wrap: wrap; font-size: 8px; gap: 18px; margin-top: 12px; }
+.workbuddy-relay-failure { background: #fff4ed; border: 1px solid #f1d3c3; border-radius: 9px; color: #8e4323; display: grid; font-size: 8px; gap: 4px; margin-top: 12px; padding: 10px 12px; }
 .collector-progress-panel { display: grid; gap: 14px; margin-bottom: 16px; }
 .collector-progress-track { background: rgba(21, 80, 72, .1); border-radius: 999px; display: block; height: 10px; overflow: hidden; }
 .collector-progress-track > span { background: linear-gradient(90deg, #167c6d, #36b58f); border-radius: inherit; display: block; height: 100%; transition: width .3s ease; }
@@ -1015,6 +1027,7 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
   .analysis-post-list { max-height: 340px; }
   .mini-score-grid { grid-template-columns: repeat(3, 1fr); }
   .collector-summary-strip { grid-template-columns: repeat(2, 1fr); }.collector-summary-strip article:nth-child(2) { border-right: 0; }
+  .workbuddy-relay-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .collector-steps { grid-template-columns: repeat(2, 1fr); row-gap: 13px; }.collector-steps li:nth-child(2) { border-right: 0; }.collector-steps li:nth-child(3) { padding-left: 0; }
   .insight-core-grid { grid-template-columns: 1fr; }.insight-suggestion-grid { grid-template-columns: repeat(2, 1fr); }
   .content-insight-grid { grid-template-columns: 1fr; }
@@ -1085,6 +1098,7 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
   .collector-dropzone { grid-template-columns: 42px 1fr; }.collector-dropzone > b { display: none; }
   .collector-preview-head { align-items: stretch; flex-direction: column; gap: 10px; }.collector-preview-head .primary-button { width: 100%; }
   .collection-center-tabs { grid-template-columns: 1fr; }.collection-center-tabs button { min-height: 56px; }
+  .workbuddy-relay-grid { grid-template-columns: 1fr; }
   .comment-insights-page .page-heading { align-items: stretch; flex-direction: column; }.insight-heading-action { justify-content: space-between; }.insight-summary-grid { grid-template-columns: repeat(2, 1fr); }.insight-summary-grid article:nth-child(2) { border-right: 0; }.need-bars, .insight-suggestion-grid { grid-template-columns: 1fr; }.sentiment-visual { gap: 18px; }.need-row { grid-template-columns: 82px 1fr 30px; }
   .insight-entry-grid { grid-template-columns: 1fr; }.insight-entry-card { min-height: 325px; padding: 25px; }.insight-entry-card h2 { font-size: 25px; }.insight-boundary-panel { grid-template-columns: 1fr; }
   .content-insights-page .page-heading, .fan-insights-page .page-heading { align-items: stretch; flex-direction: column; }.back-to-insights { text-align: center; }

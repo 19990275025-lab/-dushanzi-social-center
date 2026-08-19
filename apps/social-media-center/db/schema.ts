@@ -325,7 +325,13 @@ export const hotTopics = sqliteTable(
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
-    uniqueIndex("uq_hot_topics_daily_snapshot").on(table.platform, table.dataSource, table.topicName, table.collectionDate),
+    uniqueIndex("uq_hot_topics_relay_identity").on(
+      table.collectionDate,
+      table.platform,
+      table.topicType,
+      table.topicName,
+      table.ranking,
+    ),
     index("idx_hot_topics_platform_collect_time").on(table.platform, table.collectTime),
     index("idx_hot_topics_collection_date_platform").on(table.collectionDate, table.platform),
     index("idx_hot_topics_related_degree").on(table.relatedDegree),

@@ -1,6 +1,7 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { generateContentPlan, planningRecommendation, refreshContentPlanFeedback, type PlanningTopic } from "@/lib/content-planning";
+import { beijingDate } from "@/lib/hot-topic-archive";
 
 type PlanRow = {
   plan_id: number; hot_topic_id: number; task_id: number | null; related_post_id: number | null;
@@ -18,7 +19,7 @@ const parseJson = <T,>(value: string, fallback: T): T => {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 };
 
-async function loadDashboard(d1: D1Database) {
+async function loadDashboard(d1: D1Database, recommendationDate = beijingDate()) {
   const [topicResult, planResult, baseline, postsResult, collectionFreshness] = await Promise.all([
     d1.prepare(`
       SELECT h.id, h.platform, h.topic_name, h.keyword, h.category, h.heat_value,
@@ -30,10 +31,10 @@ async function loadDashboard(d1: D1Database) {
         SELECT candidate.id FROM hot_topic_analysis candidate
         WHERE candidate.hot_topic_id = h.id ORDER BY candidate.created_at DESC, candidate.id DESC LIMIT 1
       )
-      WHERE h.platform = 'douyin' AND h.status = 'active'
+      WHERE h.platform = 'douyin' AND h.status = 'active' AND h.collection_date = ?
       ORDER BY a.relevance_score DESC, h.heat_value DESC, COALESCE(h.ranking, 999), h.id DESC
       LIMIT 100
-    `).all<PlanningTopic>(),
+    `).bind(recommendationDate).all<PlanningTopic>(),
     d1.prepare(`
       SELECT cp.*, h.topic_name, a.relevance_score, t.task_title, t.status AS task_status,
         p.title AS post_title, p.publish_time AS post_publish_time,
@@ -83,6 +84,7 @@ async function loadDashboard(d1: D1Database) {
   }));
   return {
     topics, plans, availablePosts: postsResult.results,
+    recommendationDate,
     baseline: baseline ?? { average_views: 0, average_interaction_rate: 0, average_fans_growth: 0 },
     summary: {
       recommended: topics.length,
@@ -96,11 +98,13 @@ async function loadDashboard(d1: D1Database) {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   await ensureDatabase();
   const d1 = getD1();
   await refreshContentPlanFeedback(d1);
-  return Response.json(await loadDashboard(d1));
+  const requestedDate = new URL(request.url).searchParams.get("date");
+  const recommendationDate = requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : beijingDate();
+  return Response.json(await loadDashboard(d1, recommendationDate));
 }
 
 export async function POST(request: Request) {

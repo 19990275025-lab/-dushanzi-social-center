@@ -134,14 +134,15 @@ export async function POST(request: Request) {
 
   const log = await d1.prepare(`
     INSERT INTO collection_logs
-      (platform, source_type, source_name, entity_type, status, total_count,
+      (platform, source_type, source_name, source_url, entity_type, status, total_count,
        success_count, error_count, comment_count, error_message, collected_at, updated_at)
-    VALUES (?, 'api', ?, ?, ?, ?, 0, ?, 0, ?, ?, CURRENT_TIMESTAMP)
+    VALUES (?, 'api', ?, ?, ?, ?, ?, 0, ?, 0, ?, ?, CURRENT_TIMESTAMP)
     RETURNING id, platform, source_type, source_name, entity_type, status,
       total_count, success_count, error_count, collected_at, created_at
   `).bind(
     platform,
     envelope.source,
+    envelope.sourceFile,
     envelope.dataType,
     status,
     results.length,

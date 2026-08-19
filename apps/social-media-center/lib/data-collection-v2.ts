@@ -61,6 +61,7 @@ export type CollectionEnvelope = {
   source: string;
   platform: CollectionPlatform | null;
   collectedAt: string;
+  sourceFile: string | null;
   accountId: number | null;
   postId: number | null;
   records: UnknownRecord[];
@@ -238,11 +239,16 @@ export function parseCollectionEnvelope(payload: unknown): { envelope: Collectio
     : isoDate(rawCollectedAt, "collected_at", dateErrors);
   errors.push(...dateErrors);
 
+  const rawSourceFile = pick(payload, ["source_file", "sourceFile", "file_name", "fileName", "文件名"]);
+  const sourceFile = rawSourceFile === undefined
+    ? null
+    : textValue(rawSourceFile, "source_file", errors, 500);
+
   const accountId = optionalPositiveInteger(pick(payload, ["account_id", "accountId", "账号ID"]));
   const postId = optionalPositiveInteger(pick(payload, ["post_id", "postId", "作品ID"]));
 
   if (errors.length || !dataType) return { envelope: null, errors };
-  return { envelope: { dataType, source, platform, collectedAt, accountId, postId, records }, errors: [] };
+  return { envelope: { dataType, source, platform, collectedAt, sourceFile, accountId, postId, records }, errors: [] };
 }
 
 function normalizeHotTopic(record: UnknownRecord, envelope: CollectionEnvelope, errors: string[]): HotTopicRecord {
@@ -328,7 +334,7 @@ export function normalizeCollectionRecords(envelope: CollectionEnvelope): Normal
     const platform = errors.some((error) => error.startsWith("platform")) ? null : normalized.platform;
     const source = normalized.source || envelope.source;
     const dedupeKey = envelope.dataType === "hot_topic"
-      ? `${normalized.platform}|${normalized.source}|${(normalized as HotTopicRecord).topic_type}|${(normalized as HotTopicRecord).topic_name}`
+      ? `${(normalized as HotTopicRecord).collect_time.slice(0, 10)}|${normalized.platform}|${(normalized as HotTopicRecord).topic_type}|${(normalized as HotTopicRecord).topic_name}|${(normalized as HotTopicRecord).ranking}`
       : envelope.dataType === "content"
         ? `${normalized.platform}|${(normalized as ContentRecord).account_id ?? ""}|${(normalized as ContentRecord).title}`
         : `${normalized.platform}|${(normalized as CommentRecord).post_id ?? ""}|${(normalized as CommentRecord).username}|${(normalized as CommentRecord).comment_text}|${(normalized as CommentRecord).comment_time}`;

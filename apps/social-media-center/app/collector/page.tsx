@@ -13,7 +13,7 @@ type CollectionLog = {
   source_type: string;
   source_name: string;
   source_url: string | null;
-  entity_type: "post" | "comment" | "douyin_v2";
+  entity_type: "post" | "comment" | "douyin_v2" | "workbuddy_relay";
   status: string;
   total_count: number;
   success_count: number;
@@ -32,11 +32,39 @@ type Summary = {
   latest_collection: string | null;
 };
 
+type WorkBuddyRelayRun = {
+  relayLogId: number;
+  status: string;
+  fileName: string | null;
+  fileDate: string | null;
+  stage: string | null;
+  originalCount: number;
+  standardizedCount: number;
+  importedCount: number;
+  analysisCount: number;
+  gradeACount: number;
+  archiveGenerated: boolean;
+  archiveFileName: string | null;
+  contentPlanningUpdated: boolean;
+  failedReason: string | null;
+  updatedAt: string;
+};
+
+type WorkBuddyRelayStatus = {
+  today: string;
+  todayStatus: WorkBuddyRelayRun | null;
+  latestSuccess: WorkBuddyRelayRun | null;
+};
+
 const statusNames: Record<string, string> = {
   pending: "待确认",
   completed: "已入库",
   failed: "校验失败",
   deleted: "已回滚",
+  processing: "处理中",
+  success: "接力成功",
+  validation_failed: "校验失败",
+  pending_confirmation: "待确认",
 };
 
 export default function CollectorPage() {
@@ -49,6 +77,7 @@ export default function CollectorPage() {
   const [commentLogId, setCommentLogId] = useState<number | null>(null);
   const [logs, setLogs] = useState<CollectionLog[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [relayStatus, setRelayStatus] = useState<WorkBuddyRelayStatus | null>(null);
   const [errors, setErrors] = useState<CollectionValidationError[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -60,6 +89,10 @@ export default function CollectorPage() {
         setLogs(result.logs);
         setSummary(result.summary);
       });
+    fetch("/api/workbuddy-relay")
+      .then((response) => response.json() as Promise<WorkBuddyRelayStatus>)
+      .then(setRelayStatus)
+      .catch(() => setRelayStatus(null));
   }, []);
 
   useEffect(loadLogs, [loadLogs]);
@@ -276,7 +309,7 @@ export default function CollectorPage() {
     loadLogs();
   }
 
-  async function rollbackCollection(id: number, entityType: "post" | "comment" | "douyin_v2") {
+  async function rollbackCollection(id: number, entityType: "post" | "comment" | "douyin_v2" | "workbuddy_relay") {
     const label = entityType === "douyin_v2" ? "粉丝、作品、观众和评论数据" : entityType === "comment" ? "评论" : "作品";
     if (!window.confirm(`确认回滚该采集批次写入的${label}？采集日志仍会保留。`)) return;
     const response = await fetch(`/api/collections?id=${id}`, { method: "DELETE" });
@@ -306,6 +339,29 @@ export default function CollectorPage() {
       </nav>
 
       {activeTab === "automatic" ? <>
+
+      <section className="panel workbuddy-relay-status">
+        <div className="panel-heading">
+          <div><span>WORKBUDDY AUTOMATIC RELAY · V1.0</span><h2>热点自动接力状态</h2></div>
+          <b className={`relay-status-badge status-${relayStatus?.todayStatus?.status ?? "waiting"}`}>
+            今日WorkBuddy采集：{relayStatus?.todayStatus?.status === "success" ? "成功" : relayStatus?.todayStatus?.status === "failed" ? "失败" : relayStatus?.todayStatus?.status === "processing" ? "处理中" : "待检测"}
+          </b>
+        </div>
+        <div className="workbuddy-relay-grid">
+          <article><span>今日热点入库</span><strong>{formatCompact(relayStatus?.todayStatus?.importedCount ?? 0)}</strong><small>hot_topics</small></article>
+          <article><span>今日AI分析</span><strong>{formatCompact(relayStatus?.todayStatus?.analysisCount ?? 0)}</strong><small>hot_topic_analysis</small></article>
+          <article><span>今日A级热点</span><strong>{formatCompact(relayStatus?.todayStatus?.gradeACount ?? 0)}</strong><small>内容策划候选</small></article>
+          <article><span>今日归档</span><strong>{relayStatus?.todayStatus?.archiveGenerated ? "成功" : "未生成"}</strong><small>{relayStatus?.todayStatus?.archiveFileName ?? "失败批次不会生成档案"}</small></article>
+        </div>
+        <div className="workbuddy-relay-meta">
+          <span>检测日期：{relayStatus?.today ?? "读取中"}</span>
+          <span>最后成功：{relayStatus?.latestSuccess?.updatedAt ? formatDateTime(relayStatus.latestSuccess.updatedAt) : "暂无"}</span>
+          <span>文件：{relayStatus?.todayStatus?.fileName ?? relayStatus?.latestSuccess?.fileName ?? "尚未检测"}</span>
+        </div>
+        {relayStatus?.todayStatus?.failedReason && (
+          <div className="workbuddy-relay-failure"><strong>失败环节：{relayStatus.todayStatus.stage ?? "未知"}</strong><span>{relayStatus.todayStatus.failedReason}</span></div>
+        )}
+      </section>
 
       <section className="collector-summary-strip">
         <article><span>自动采集平台</span><strong>1 / 4</strong><small>抖音已开放</small></article>
@@ -515,7 +571,7 @@ export default function CollectorPage() {
               {logs.map((log) => (
                 <tr key={log.id}>
                   <td><strong>#{log.id}</strong><small>{log.source_name}</small></td>
-                  <td>抖音<small>{log.entity_type === "douyin_v2" ? "粉丝与内容分析 V2.1" : log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
+                  <td>抖音<small>{log.entity_type === "workbuddy_relay" ? "WorkBuddy热点自动接力" : log.entity_type === "douyin_v2" ? "粉丝与内容分析 V2.1" : log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
                   <td><span className={`collection-status status-${log.status}`}>{statusNames[log.status] ?? log.status}</span></td>
                   <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}{log.entity_type === "comment" && <small>评论 {log.comment_count}</small>}{log.error_message && <small className="log-error-summary" title={log.error_message}>含失败明细</small>}</td><td>{formatDateTime(log.created_at)}</td>
                   <td>{log.status === "completed" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id, log.entity_type)} type="button">回滚数据</button> : "—"}</td>

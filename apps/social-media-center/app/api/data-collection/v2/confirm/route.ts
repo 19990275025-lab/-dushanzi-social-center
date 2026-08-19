@@ -49,7 +49,7 @@ function collectionDate(value: string) {
 }
 
 function topicSnapshotKey(record: HotTopicRecord) {
-  return `${record.platform}|${topicDataSource(record)}|${record.topic_name}|${collectionDate(record.collect_time)}`;
+  return `${collectionDate(record.collect_time)}|${record.platform}|${record.topic_type}|${record.topic_name}|${record.ranking}`;
 }
 
 export async function OPTIONS() {
@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   let skippedCount = 0;
   let insertedCount = 0;
   let updatedCount = 0;
-  let aiRecommendedCount = 0;
+  const aiRecommendedCount = 0;
 
   if (log.entity_type === "hot_topic") {
     const records: HotTopicRecord[] = [];
@@ -118,13 +118,13 @@ export async function POST(request: Request) {
     }
     const dates = [...new Set(records.map((record) => collectionDate(record.collect_time)))];
     const existing = await d1.prepare(`
-      SELECT platform, data_source, topic_name, collection_date FROM hot_topics
+      SELECT platform, topic_type, topic_name, ranking, collection_date FROM hot_topics
       WHERE platform = ? AND source = ? AND collection_date IN (${dates.map(() => "?").join(",")})
     `).bind(log.platform, log.source_name, ...dates).all<{
-      platform: string; data_source: string; topic_name: string; collection_date: string;
+      platform: string; topic_type: string; topic_name: string; ranking: number; collection_date: string;
     }>();
     const existingKeys = new Set(existing.results.map((record) =>
-      `${record.platform}|${record.data_source}|${record.topic_name}|${record.collection_date}`));
+      `${record.collection_date}|${record.platform}|${record.topic_type}|${record.topic_name}|${record.ranking}`));
     const duplicateCount = records.filter((record) => existingKeys.has(topicSnapshotKey(record))).length;
     const duplicateMode = String(confirmation.duplicate_mode ?? "");
     if (duplicateCount && duplicateMode !== "overwrite" && duplicateMode !== "skip") {
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
            heat_value, trend, category, status, source_url, raw_payload, source_agent,
            collection_log_id, collect_time, collection_date, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(platform, data_source, topic_name, collection_date) DO UPDATE SET
+        ON CONFLICT(collection_date, platform, topic_type, topic_name, ranking) DO UPDATE SET
           source = excluded.source, topic_type = excluded.topic_type,
           keyword = excluded.keyword, category = excluded.category,
           ranking = excluded.ranking, heat_value = excluded.heat_value,

@@ -731,6 +731,53 @@ test("WorkBuddy report analysis is stored separately from raw hot topics", async
   for (const source of [script, confirmRoute, analysisImport]) assert.doesNotMatch(source, /MediaCrawler|Agent-Reach|crawler\/start/);
 });
 
+test("WorkBuddy automatic relay validates, deduplicates, analyzes and archives a complete batch", async () => {
+  const [adapter, relayRoute, relayModule, script, collector, schema, bootstrap, migration, planning] = await Promise.all([
+    import(new URL("../lib/workbuddy-v2-adapter.ts", import.meta.url)),
+    readFile(new URL("app/api/workbuddy-relay/route.ts", root), "utf8"),
+    readFile(new URL("lib/workbuddy-relay.ts", root), "utf8"),
+    readFile(new URL("scripts/workbuddy-auto-relay.mjs", root), "utf8"),
+    readFile(new URL("app/collector/page.tsx", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0025_workbuddy_relay_identity.sql", root), "utf8"),
+    readFile(new URL("app/api/content-planning/route.ts", root), "utf8"),
+  ]);
+  const rows = [
+    { platform: "抖音", list_type: "热点榜", rank: 1, topic: "新疆自驾新路线", heat_value: "1000万", trend: "新上榜", keyword: "新疆 自驾", collect_time: "2026-08-16T08:00:00+08:00" },
+    { platform: "快手", list_type: "挑战榜", rank: 2, topic: "户外旅行挑战", heat_value: "800万", trend: "上升", keyword: "户外 旅行", collect_time: "2026-08-16T08:00:00+08:00" },
+    { platform: "微博", list_type: "热搜榜", rank: 3, topic: "暑期旅游", heat_value: "700万", trend: "持平", keyword: "暑期 旅游", collect_time: "2026-08-16T08:00:00+08:00" },
+  ];
+  const converted = adapter.buildWorkBuddyV2Records(rows, "2026-08-16T08:00:00+08:00", 500, {
+    expectedCollectionDate: "2026-08-16", requireCollectionTime: true, requireTopicType: true,
+  });
+  assert.deepEqual(converted.errors, []);
+  assert.equal(converted.records.length, 3);
+  assert.deepEqual(converted.records.map((record) => record.topic_type), ["hot_rank", "challenge_rank", "hot_rank"]);
+  assert.deepEqual(converted.records.map((record) => record.trend), ["new", "up", "stable"]);
+  const duplicated = adapter.buildWorkBuddyV2Records([...rows, rows[0]], "2026-08-16T08:00:00+08:00", 500, {
+    expectedCollectionDate: "2026-08-16", requireCollectionTime: true, requireTopicType: true,
+  });
+  assert.equal(duplicated.errors.length, 1);
+  assert.match(duplicated.errors[0].reason, /重复热点/);
+  for (const action of ["start", "preflight", "finalize", "fail"]) assert.match(relayRoute, new RegExp(`action === "${action}"`));
+  assert.match(relayModule, /analyzeWorkBuddyTopic/);
+  assert.match(relayModule, /generateAndStoreDailyArchive/);
+  assert.match(relayModule, /planningRecommendation/);
+  assert.match(relayModule, /status = 'success'/);
+  assert.match(script, /hot_topic_\\d\{8\}\\\.\(json\|xlsx\|xls\)/);
+  assert.match(script, /\/api\/data-collection\/v2\/receive/);
+  assert.match(script, /\/api\/data-collection\/v2\/preview/);
+  assert.match(script, /\/api\/data-collection\/v2\/confirm/);
+  assert.match(script, /\/api\/workbuddy-relay/);
+  assert.match(collector, /今日WorkBuddy采集/);
+  assert.match(collector, /今日热点入库/);
+  assert.match(collector, /今日AI分析/);
+  assert.match(collector, /今日归档/);
+  for (const source of [schema, bootstrap, migration]) assert.match(source, /uq_hot_topics_relay_identity/);
+  assert.match(planning, /h\.collection_date = \?/);
+});
+
 test("hot topic V2.5 adds action levels, TOP5, conversion scoring and topic generation without schema changes", async () => {
   const [scoreModel, page, api, generator, styles] = await Promise.all([
     import(new URL("../lib/hot-topic-action-score.ts", import.meta.url)),
