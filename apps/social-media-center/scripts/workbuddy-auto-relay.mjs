@@ -213,6 +213,7 @@ try {
     ...finalized.summary,
     failedStage: null,
   }, null, 2));
+  process.exit(0);
 } catch (error) {
   await failRelay(context, context.stage, error);
   console.error(JSON.stringify({
@@ -223,5 +224,5 @@ try {
     failedStage: context.stage,
     failureReason: error instanceof Error ? error.message : String(error),
   }, null, 2));
-  process.exitCode = 1;
+  process.exit(1);
 }
