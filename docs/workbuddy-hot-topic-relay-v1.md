@@ -75,6 +75,8 @@ pnpm automation:workbuddy:install
 
 安装器会创建权限为 `0600` 的 `~/Library/LaunchAgents/com.dushanzi.social-center.workbuddy-hot-topic-relay.plist`。服务监听输出目录并每 600 秒兜底检查一次，只处理北京时间当天文件；历史真实文件测试必须显式传入 `--file`。
 
+由于 WorkBuddy 输出目录位于 macOS 受保护的 `Desktop`，首次启用后台调度时还需要在“系统设置 → 隐私与安全性 → 完全磁盘访问权限”中允许安装器实际使用的 Node 可执行文件（当前安装路径可通过 `which node` 查看）。这是 macOS 的一次性系统授权，未授权时系统会阻止 LaunchAgent 读取热点文件；不要通过关闭系统安全机制绕过。
+
 ## 失败保护
 
 - 文件不存在、为空或格式错误：记录 `detect` / `validate` 失败。

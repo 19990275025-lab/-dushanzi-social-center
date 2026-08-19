@@ -201,3 +201,5 @@ pnpm automation:workbuddy:install
 ```
 
 安装器不会把真实值写进仓库，LaunchAgent 配置权限固定为 `0600`。完整的文件规则、失败保护和检查方式见 [workbuddy-hot-topic-relay-v1.md](workbuddy-hot-topic-relay-v1.md)。
+
+若 WorkBuddy 目录位于 `Desktop`，需为 `which node` 返回的 Node 可执行文件授予 macOS“完全磁盘访问权限”，否则后台 LaunchAgent 无法读取该受保护目录。授权后重新执行安装命令或使用 `launchctl kickstart` 启动服务；无需修改 WorkBuddy 调度。
