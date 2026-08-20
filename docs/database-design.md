@@ -16,11 +16,16 @@ erDiagram
   fan_collection_batches ||--o{ fan_growth_records : contains
   fan_collection_batches ||--o{ fan_profile_records : contains
   social_posts ||--o{ social_post_snapshots : snapshots
+  content_collection_files ||--o| collection_logs : completes_as
+  social_post_snapshots ||--o{ social_post_metric_series : contains
   social_post_snapshots ||--o| social_post_traffic : traffic
   social_post_snapshots ||--o{ social_post_traffic_sources : sources
+  social_post_snapshots ||--o{ social_post_paid_traffic : paid_traffic
+  social_post_snapshots ||--o{ social_post_audience : audience
   social_post_snapshots ||--o{ content_audience_analysis : audience
   social_post_snapshots ||--o{ social_post_comment_keywords : keywords
   social_posts ||--o{ social_comments : has
+  social_comments ||--o{ social_comment_replies : replies
   data_import_logs ||--o{ social_posts : imports
   collection_logs ||--o{ collection_staging_records : stages
   collection_logs ||--o{ social_posts : collects
@@ -88,17 +93,33 @@ erDiagram
 
 用途：每次采集的作品表现快照，保存播放、点赞、平台评论总数、收藏、分享、涨粉以及各详情模块可用状态。`post_id + snapshot_time` 唯一。
 
-关键字段包括 `play_count`、`like_count`、`comment_overview_count`、`actual_loaded_count`、`comment_rows_count`、`favorite_count`、`share_count`、`follower_gain`、`post_age_days`、六类 `*_availability_status`、`source_file` 和 `raw_payload`。`comment_overview_count` 是平台累计评论数，`actual_loaded_count` 是页面本次声明的实际加载数，`comment_rows_count` 是 JSON 中实际评论行数，三个口径分别保存。
+关键字段包括 `play_count`、`like_count`、`comment_overview_count`、`actual_loaded_count`、`comment_rows_count`、`favorite_count`、`share_count`、`follower_gain`、`post_age_days`、六类 `*_availability_status`、`source_record_status`、`source_failure_reason`、`source_file` 和 `raw_payload`。`comment_overview_count` 是平台累计评论数，`actual_loaded_count` 是页面本次声明的实际加载数，`comment_rows_count` 是 JSON 中实际评论行数，三个口径分别保存。私密作品的指标保持 `NULL`，状态单独保存为 `private`。
 
-#### 2.2.2 `social_post_traffic`
+#### 2.2.2 `content_collection_files`
+
+用途：登记 WorkBuddy 原始作品文件的只读处理状态。保存 `file_name`、`full_path`、SHA-256 `checksum`、文件大小、源采集日期/时间/批次、作品数、完整度、检测/校验/处理时间、`detected / validated / processing / completed / failed` 状态、采集日志和错误信息。`checksum` 唯一，已完成文件禁止重复写入；该表不保存或改写原始文件内容。
+
+#### 2.2.3 `social_post_metric_series`
+
+用途：保存 WorkBuddy 从作品图表真实读取的时间序列点。每行包含作品、快照、指标类型、序列名称、`point_index`、真实存在时才保存的 `point_time` / `point_label`、指标值、单位、源 JSON 路径和原始值。无时间轴的图表只保留点序，不人工推算时间。
+
+#### 2.2.4 `social_post_traffic`
 
 用途：作品每个快照的流量分析。保存完播率、平均播放时长、2 秒跳出率、5 秒完播率、划走率以及图文详情页实际出现的点击、展开、互动等指标。缺失或超过抖音有效期的字段保持 `NULL`，状态保存为 `partial / expired / unavailable`，禁止写 0。
 
-#### 2.2.3 `social_post_traffic_sources`
+#### 2.2.5 `social_post_traffic_sources`
 
-用途：保存每个快照的流量来源明细。`traffic_nature` 区分 `organic`（自然）、`paid`（付费）和 `other`。DOU+ 记录为 `paid`，内容监测和 AI 排名使用自然播放，不把付费播放直接判断为爆款。
+用途：保存每个快照的自然、搜索、推荐及其他平台流量来源明细。`traffic_nature` 区分 `organic` 和 `other`；付费投流不混入本表。
 
-#### 2.2.4 `social_post_comment_keywords`
+#### 2.2.6 `social_post_paid_traffic`
+
+用途：独立保存 DOU+ 等付费流量。关键字段为 `campaign_type`、`play_count`、`relationship_to_overview`（`additional / included / unknown`）、详情可用状态、原始数据和采集日志。只有源页面明确口径时才计算合计曝光；未知关系不从播放量中反推自然播放。
+
+#### 2.2.7 `social_post_audience`
+
+用途：保存 WorkBuddy V2.1 的作品级观众画像快照。采用 `dimension_type + dimension_name` 通用行结构，支持性别、年龄、地域、兴趣、设备、活跃度、关注关键词和其他真实维度，并保存数值、占比、排名、原始值和可用状态。该表与账号级 `fan_profile_records` 严格分离。
+
+#### 2.2.8 `social_post_comment_keywords`
 
 用途：保存平台真实提供的作品评论热词及排名。包含 `keyword`、`ranking`、`occurrence_count`、`sentiment`、`category` 和可用状态。没有热词页的作品仅在快照表标记不可用，不生成空热词或模拟热词。
 
@@ -117,7 +138,8 @@ erDiagram
 | `comment_text` | TEXT NULL | 评论正文；图片/表情无文字时允许为空 |
 | `comment_type` | TEXT | `text / image / emoji / mixed / other` |
 | `comment_time` / `comment_time_raw` | TEXT NULL | 标准时间和平台相对时间原文 |
-| `likes` / `reply_count` | INTEGER | 评论点赞和回复数量 |
+| `likes` / `reply_count` | INTEGER NULL / INTEGER | 评论点赞和回复数量；点赞不可读时为 NULL |
+| `likes_availability_status` / `likes_raw_value` | TEXT / TEXT(JSON) NULL | 区分真实 0 与平台未提供，并保留原始值 |
 | `is_author` / `author_replied` | INTEGER NULL | 作者身份和作者是否回复；未知保持 NULL |
 | `sentiment` | TEXT | 情绪标签，初始可为 `unknown` |
 | `keyword` | TEXT NULL | 提取关键词 |
@@ -129,7 +151,11 @@ erDiagram
 
 来源：WorkBuddy 作品详情、抖音评论确认或统一评论接口。主要供游客评论洞察、内容监测和作品详情使用。平台评论总量和页面实际加载量保存在快照表，本表只保存 JSON 中真实存在的评论明细。
 
-### 2.4 `content_audience_analysis`
+### 2.3.1 `social_comment_replies`
+
+用途：预留并保存 WorkBuddy 原始文件真实提供的评论回复明细，通过 `comment_id` 关联父评论。字段包含平台回复 ID/指纹、用户名、可为空的正文、评论类型、标准/原始时间、点赞、作者身份、原始 JSON 和采集日志。当前首批 V2.1 源文件只有回复数量、没有回复正文，因此写入 0 行，不生成模拟回复。
+
+### 2.4 `content_audience_analysis`（兼容）
 
 用途：保存单个作品的观众画像。
 
@@ -149,7 +175,7 @@ erDiagram
 | `collected_at` | TEXT | 源数据采集时间 |
 | `created_at` / `updated_at` | TEXT | 创建和更新时间 |
 
-来源：WorkBuddy 抖音作品详情。该表只表示作品级观众画像，不与账号粉丝画像 `fan_profile_records` 混用；同一作品不同采集时间可以保存不同快照。
+来源：早期 WorkBuddy 抖音作品详情和 V2 兼容接口。深度 V2.1 新数据写入 `social_post_audience`；本表保留给已有接口和历史记录，不与账号粉丝画像 `fan_profile_records` 混用。
 
 ### 2.5 `social_fans`
 

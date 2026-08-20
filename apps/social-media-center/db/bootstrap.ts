@@ -248,12 +248,100 @@ const schemaStatements = [
     source_file TEXT NOT NULL,
     raw_payload TEXT NOT NULL,
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    source_record_status TEXT NOT NULL DEFAULT 'normal',
+    source_failure_reason TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_snapshots_post_time
     ON social_post_snapshots(post_id, snapshot_time)`,
   `CREATE INDEX IF NOT EXISTS idx_social_post_snapshots_platform_time
     ON social_post_snapshots(platform, snapshot_time DESC)`,
+  `CREATE TABLE IF NOT EXISTS content_collection_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_name TEXT NOT NULL,
+    full_path TEXT NOT NULL,
+    checksum TEXT NOT NULL,
+    file_size INTEGER NOT NULL CHECK (file_size >= 0),
+    collection_date TEXT,
+    collection_time TEXT,
+    collection_batch TEXT,
+    actual_post_count INTEGER NOT NULL DEFAULT 0 CHECK (actual_post_count >= 0),
+    completeness_score REAL,
+    detected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    validated_at TEXT,
+    processed_at TEXT,
+    status TEXT NOT NULL DEFAULT 'detected'
+      CHECK (status IN ('detected','validated','processing','completed','failed')),
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    metadata TEXT,
+    error_message TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_collection_files_checksum
+    ON content_collection_files(checksum)`,
+  `CREATE INDEX IF NOT EXISTS idx_content_collection_files_status_time
+    ON content_collection_files(status, collection_time DESC)`,
+  `CREATE TABLE IF NOT EXISTS social_post_metric_series (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT NOT NULL,
+    metric_type TEXT NOT NULL,
+    series_name TEXT NOT NULL,
+    point_index INTEGER NOT NULL CHECK (point_index >= 0),
+    point_time TEXT,
+    point_label TEXT,
+    metric_value REAL,
+    unit TEXT,
+    source_path TEXT NOT NULL,
+    raw_value TEXT,
+    data_availability_status TEXT NOT NULL DEFAULT 'available',
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_metric_series_point
+    ON social_post_metric_series(snapshot_id, metric_type, series_name, point_index)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_metric_series_post_type_time
+    ON social_post_metric_series(post_id, metric_type, point_time)`,
+  `CREATE TABLE IF NOT EXISTS social_post_paid_traffic (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT NOT NULL,
+    campaign_type TEXT NOT NULL,
+    play_count INTEGER CHECK (play_count IS NULL OR play_count >= 0),
+    relationship_to_overview TEXT NOT NULL DEFAULT 'unknown'
+      CHECK (relationship_to_overview IN ('unknown','included','additional')),
+    detail_available INTEGER CHECK (detail_available IS NULL OR detail_available IN (0, 1)),
+    data_availability_status TEXT NOT NULL,
+    raw_payload TEXT NOT NULL,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_paid_traffic_snapshot_type
+    ON social_post_paid_traffic(snapshot_id, campaign_type)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_paid_traffic_post_time
+    ON social_post_paid_traffic(post_id, snapshot_time DESC)`,
+  `CREATE TABLE IF NOT EXISTS social_post_audience (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT NOT NULL,
+    dimension_type TEXT NOT NULL,
+    dimension_name TEXT NOT NULL,
+    dimension_value REAL,
+    percentage REAL,
+    ranking INTEGER,
+    raw_value TEXT,
+    data_availability_status TEXT NOT NULL,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_audience_snapshot_dimension
+    ON social_post_audience(snapshot_id, dimension_type, dimension_name)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_audience_post_type
+    ON social_post_audience(post_id, dimension_type)`,
   `CREATE TABLE IF NOT EXISTS social_post_traffic (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -370,6 +458,8 @@ const schemaStatements = [
     comment_time TEXT,
     comment_time_raw TEXT,
     likes INTEGER NOT NULL DEFAULT 0,
+    likes_availability_status TEXT NOT NULL DEFAULT 'available',
+    likes_raw_value TEXT,
     reply_count INTEGER NOT NULL DEFAULT 0 CHECK (reply_count >= 0),
     is_author INTEGER NOT NULL DEFAULT 0 CHECK (is_author IN (0, 1)),
     author_replied INTEGER CHECK (author_replied IS NULL OR author_replied IN (0, 1)),
@@ -390,6 +480,29 @@ const schemaStatements = [
     ON social_comments(sentiment)`,
   `CREATE INDEX IF NOT EXISTS idx_social_comments_user_need
     ON social_comments(user_need)`,
+  `CREATE TABLE IF NOT EXISTS social_comment_replies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id INTEGER NOT NULL REFERENCES social_comments(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    source_reply_id TEXT,
+    reply_fingerprint TEXT NOT NULL,
+    username TEXT NOT NULL,
+    reply_text TEXT,
+    reply_type TEXT NOT NULL DEFAULT 'text',
+    reply_time TEXT,
+    reply_time_raw TEXT,
+    likes INTEGER,
+    is_author INTEGER CHECK (is_author IS NULL OR is_author IN (0, 1)),
+    data_availability_status TEXT NOT NULL DEFAULT 'available',
+    raw_payload TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_comment_replies_fingerprint
+    ON social_comment_replies(comment_id, reply_fingerprint)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_comment_replies_post
+    ON social_comment_replies(post_id, reply_time DESC)`,
   `CREATE TABLE IF NOT EXISTS hot_topics (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo','web')),
@@ -725,6 +838,15 @@ async function initialize() {
     )
     .run();
 
+  const snapshotColumns = await d1.prepare("PRAGMA table_info(social_post_snapshots)").all<{ name: string }>();
+  const snapshotColumnNames = new Set(snapshotColumns.results.map((column) => column.name));
+  if (!snapshotColumnNames.has("source_record_status")) {
+    await d1.prepare("ALTER TABLE social_post_snapshots ADD COLUMN source_record_status TEXT NOT NULL DEFAULT 'normal'").run();
+  }
+  if (!snapshotColumnNames.has("source_failure_reason")) {
+    await d1.prepare("ALTER TABLE social_post_snapshots ADD COLUMN source_failure_reason TEXT").run();
+  }
+
   const collectionColumns = await d1
     .prepare("PRAGMA table_info(collection_logs)")
     .all<{ name: string }>();
@@ -872,6 +994,8 @@ async function initialize() {
         comment_time TEXT,
         comment_time_raw TEXT,
         likes INTEGER NOT NULL DEFAULT 0,
+        likes_availability_status TEXT NOT NULL DEFAULT 'available',
+        likes_raw_value TEXT,
         reply_count INTEGER NOT NULL DEFAULT 0 CHECK (reply_count >= 0),
         is_author INTEGER NOT NULL DEFAULT 0 CHECK (is_author IN (0, 1)),
         author_replied INTEGER CHECK (author_replied IS NULL OR author_replied IN (0, 1)),
@@ -906,6 +1030,8 @@ async function initialize() {
     ["snapshot_time", "ALTER TABLE social_comments ADD COLUMN snapshot_time TEXT"],
     ["comment_type", "ALTER TABLE social_comments ADD COLUMN comment_type TEXT NOT NULL DEFAULT 'text'"],
     ["comment_time_raw", "ALTER TABLE social_comments ADD COLUMN comment_time_raw TEXT"],
+    ["likes_availability_status", "ALTER TABLE social_comments ADD COLUMN likes_availability_status TEXT NOT NULL DEFAULT 'available'"],
+    ["likes_raw_value", "ALTER TABLE social_comments ADD COLUMN likes_raw_value TEXT"],
     ["reply_count", "ALTER TABLE social_comments ADD COLUMN reply_count INTEGER NOT NULL DEFAULT 0"],
     ["is_author", "ALTER TABLE social_comments ADD COLUMN is_author INTEGER NOT NULL DEFAULT 0"],
     ["author_replied", "ALTER TABLE social_comments ADD COLUMN author_replied INTEGER"],

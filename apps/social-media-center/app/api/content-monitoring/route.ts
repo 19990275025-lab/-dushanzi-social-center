@@ -19,6 +19,7 @@ type PostRow = MonitorPost & {
   paid_views: number;
   has_paid_traffic: number;
   data_availability_status: string;
+  source_record_status: string;
 };
 
 type CommentRow = {
@@ -88,13 +89,22 @@ export async function GET(request: Request) {
         p.hashtags, COALESCE(p.duration_seconds, p.duration) AS duration,
         COALESCE(t.completion_rate, p.completion_rate) AS completion_rate,
         COALESCE(t.swipe_away_rate, p.skip_rate) AS skip_rate,
-        COALESCE((SELECT SUM(ts.traffic_value) FROM social_post_traffic_sources ts
-          WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0) AS paid_views,
-        MAX(0, COALESCE(s.play_count, p.views) - COALESCE((SELECT SUM(ts.traffic_value)
-          FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0)) AS organic_views,
-        CASE WHEN EXISTS (SELECT 1 FROM social_post_traffic_sources ts
-          WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid') THEN 1 ELSE 0 END AS has_paid_traffic,
+        COALESCE((SELECT SUM(pt.play_count) FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id),
+          (SELECT SUM(ts.traffic_value) FROM social_post_traffic_sources ts
+            WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0) AS paid_views,
+        CASE
+          WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id AND pt.relationship_to_overview = 'additional')
+            THEN COALESCE(s.play_count, p.views)
+          WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id AND pt.relationship_to_overview = 'included')
+            THEN MAX(0, COALESCE(s.play_count, p.views) - COALESCE((SELECT SUM(pt.play_count) FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id), 0))
+          ELSE MAX(0, COALESCE(s.play_count, p.views) - COALESCE((SELECT SUM(ts.traffic_value)
+            FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0))
+        END AS organic_views,
+        CASE WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id)
+          OR EXISTS (SELECT 1 FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid')
+          THEN 1 ELSE 0 END AS has_paid_traffic,
         COALESCE(s.data_availability_status, p.data_availability_status, 'unavailable') AS data_availability_status
+        , COALESCE(s.source_record_status, CASE WHEN p.post_status = '私密' THEN 'private' ELSE 'normal' END) AS source_record_status
       FROM social_posts p
       INNER JOIN social_accounts a ON a.id = p.account_id
       LEFT JOIN ranked_snapshots s ON s.post_id = p.id AND s.snapshot_rank = 1
@@ -138,8 +148,9 @@ export async function GET(request: Request) {
   ]);
 
   const commentByPost = new Map(commentResult.results.map((row) => [row.post_id, row]));
+  const analyticalRows = postResult.results.filter((post) => !["private", "failed", "unavailable"].includes(post.source_record_status));
   const analyzedPosts = ruleBasedContentEngine.analyzePosts(
-    postResult.results.map((post) => ({
+    analyticalRows.map((post) => ({
       id: post.id,
       account_id: post.account_id,
       platform: post.platform,
@@ -159,7 +170,7 @@ export async function GET(request: Request) {
   );
   const scoreById = new Map(analyzedPosts.map((post) => [post.id, post.overallScore]));
 
-  const posts = postResult.results.map((post) => {
+  const posts = analyticalRows.map((post) => {
     const comment = commentByPost.get(post.id);
     return {
       ...post,
@@ -209,7 +220,7 @@ export async function GET(request: Request) {
     range,
     summary: {
       todayPublished: Number(todayResult?.count ?? 0),
-      periodPublished: posts.length,
+      periodPublished: postResult.results.length,
       ...totals,
       paidViews: posts.reduce((total, post) => total + post.paid_views, 0),
       organicViews: posts.reduce((total, post) => total + post.organic_views, 0),
@@ -220,7 +231,7 @@ export async function GET(request: Request) {
     lowEfficiency,
     hotLinks,
     sourceFreshness: { latestPost, capturedCommentCount: totals.capturedComments },
-    sources: ["social_posts", "social_post_snapshots", "social_post_traffic_sources", "social_comments", "hot_topic_feedback"],
+    sources: ["social_posts", "social_post_snapshots", "social_post_traffic_sources", "social_post_paid_traffic", "social_comments", "hot_topic_feedback"],
     engine: ruleBasedContentEngine.name,
     updatedAt: new Date().toISOString(),
   });

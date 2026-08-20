@@ -259,6 +259,8 @@ export const socialPosts = sqliteTable(
     coverUrl: text("cover_url"),
     views: integer("views").notNull().default(0),
     likes: integer("likes").notNull().default(0),
+    likesAvailabilityStatus: text("likes_availability_status").notNull().default("available"),
+    likesRawValue: text("likes_raw_value"),
     comments: integer("comments").notNull().default(0),
     favorites: integer("favorites").notNull().default(0),
     shares: integer("shares").notNull().default(0),
@@ -332,11 +334,113 @@ export const socialPostSnapshots = sqliteTable(
     sourceFile: text("source_file").notNull(),
     rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
     collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    sourceRecordStatus: text("source_record_status").notNull().default("normal"),
+    sourceFailureReason: text("source_failure_reason"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex("uq_social_post_snapshots_post_time").on(table.postId, table.snapshotTime),
     index("idx_social_post_snapshots_platform_time").on(table.platform, table.snapshotTime),
+  ],
+);
+
+export const contentCollectionFiles = sqliteTable(
+  "content_collection_files",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    fileName: text("file_name").notNull(),
+    fullPath: text("full_path").notNull(),
+    checksum: text("checksum").notNull(),
+    fileSize: integer("file_size").notNull(),
+    collectionDate: text("collection_date"),
+    collectionTime: text("collection_time"),
+    collectionBatch: text("collection_batch"),
+    actualPostCount: integer("actual_post_count").notNull().default(0),
+    completenessScore: real("completeness_score"),
+    detectedAt: text("detected_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    validatedAt: text("validated_at"),
+    processedAt: text("processed_at"),
+    status: text("status").notNull().default("detected"),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    errorMessage: text("error_message"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_content_collection_files_checksum").on(table.checksum),
+    index("idx_content_collection_files_status_time").on(table.status, table.collectionTime),
+  ],
+);
+
+export const socialPostMetricSeries = sqliteTable(
+  "social_post_metric_series",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    postId: integer("post_id").notNull().references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotId: integer("snapshot_id").notNull().references(() => socialPostSnapshots.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotTime: text("snapshot_time").notNull(),
+    metricType: text("metric_type").notNull(),
+    seriesName: text("series_name").notNull(),
+    pointIndex: integer("point_index").notNull(),
+    pointTime: text("point_time"),
+    pointLabel: text("point_label"),
+    metricValue: real("metric_value"),
+    unit: text("unit"),
+    sourcePath: text("source_path").notNull(),
+    rawValue: text("raw_value", { mode: "json" }).$type<unknown>(),
+    dataAvailabilityStatus: text("data_availability_status").notNull().default("available"),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_post_metric_series_point").on(table.snapshotId, table.metricType, table.seriesName, table.pointIndex),
+    index("idx_social_post_metric_series_post_type_time").on(table.postId, table.metricType, table.pointTime),
+  ],
+);
+
+export const socialPostPaidTraffic = sqliteTable(
+  "social_post_paid_traffic",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    postId: integer("post_id").notNull().references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotId: integer("snapshot_id").notNull().references(() => socialPostSnapshots.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotTime: text("snapshot_time").notNull(),
+    campaignType: text("campaign_type").notNull(),
+    playCount: integer("play_count"),
+    relationshipToOverview: text("relationship_to_overview").notNull().default("unknown"),
+    detailAvailable: integer("detail_available", { mode: "boolean" }),
+    dataAvailabilityStatus: text("data_availability_status").notNull(),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_post_paid_traffic_snapshot_type").on(table.snapshotId, table.campaignType),
+    index("idx_social_post_paid_traffic_post_time").on(table.postId, table.snapshotTime),
+  ],
+);
+
+export const socialPostAudience = sqliteTable(
+  "social_post_audience",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    postId: integer("post_id").notNull().references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotId: integer("snapshot_id").notNull().references(() => socialPostSnapshots.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotTime: text("snapshot_time").notNull(),
+    dimensionType: text("dimension_type").notNull(),
+    dimensionName: text("dimension_name").notNull(),
+    dimensionValue: real("dimension_value"),
+    percentage: real("percentage"),
+    ranking: integer("ranking"),
+    rawValue: text("raw_value", { mode: "json" }).$type<unknown>(),
+    dataAvailabilityStatus: text("data_availability_status").notNull(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_post_audience_snapshot_dimension").on(table.snapshotId, table.dimensionType, table.dimensionName),
+    index("idx_social_post_audience_post_type").on(table.postId, table.dimensionType),
   ],
 );
 
@@ -514,6 +618,33 @@ export const socialComments = sqliteTable(
     index("idx_social_comments_user_need").on(table.userNeed),
     index("idx_social_comments_collection_log_id").on(table.collectionLogId),
     uniqueIndex("uq_social_comments_fingerprint").on(table.postId, table.commentFingerprint),
+  ],
+);
+
+export const socialCommentReplies = sqliteTable(
+  "social_comment_replies",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    commentId: integer("comment_id").notNull().references(() => socialComments.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    postId: integer("post_id").notNull().references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotId: integer("snapshot_id").references(() => socialPostSnapshots.id, { onDelete: "set null", onUpdate: "cascade" }),
+    sourceReplyId: text("source_reply_id"),
+    replyFingerprint: text("reply_fingerprint").notNull(),
+    username: text("username").notNull(),
+    replyText: text("reply_text"),
+    replyType: text("reply_type").notNull().default("text"),
+    replyTime: text("reply_time"),
+    replyTimeRaw: text("reply_time_raw"),
+    likes: integer("likes"),
+    isAuthor: integer("is_author", { mode: "boolean" }),
+    dataAvailabilityStatus: text("data_availability_status").notNull().default("available"),
+    rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_comment_replies_fingerprint").on(table.commentId, table.replyFingerprint),
+    index("idx_social_comment_replies_post").on(table.postId, table.replyTime),
   ],
 );
 

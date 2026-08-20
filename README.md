@@ -18,9 +18,9 @@
 | 模块 | 路径 | 当前能力 | 状态 |
 |---|---|---|---|
 | 运营驾驶舱 | `/` | 周期 KPI、发布、播放互动、作品排行、热点和运营建议 | 已完成 |
-| 内容监测中心 | `/insights/content` | 分平台作品监测、TOP10、爆款分析、低效诊断、热点关联 | 待优化 |
+| 内容监测中心 | `/insights/content` | WorkBuddy 深度作品快照、真实趋势、流量、DOU+、作品观众、热词、评论和内容诊断 | 待优化 |
 | 粉丝分析中心 | `/insights/fans` | 抖音真实总量、跨批次增长/画像/热词比较、期间作品关联、内容吸粉、周报和导出 | 待优化 |
-| 数据采集中心 | `/collector`、`/imports` | 抖音 V3 预览确认、统一 V2 API、WorkBuddy热点自动接力、Excel/图片导入和采集日志 | 开发中 |
+| 数据采集中心 | `/collector`、`/imports` | 抖音粉丝、WorkBuddy 深度作品 V2.1、统一 V2 API、热点自动接力、Excel/图片导入和采集日志 | 开发中 |
 | 热点监测中心 | `/hot-topics` | WorkBuddy 热点、关联分析、A/B/C 推荐、选题和效果复盘 | 已完成 |
 | 热点档案库 | `/hot-topic-archive` | 历史查询、每日快照和 Excel 下载 | 已完成 |
 | AI 内容分析中心 | `/ai-analysis` | 规则型作品评分、平台建议、日报/周报 | 待优化 |
@@ -54,7 +54,7 @@ flowchart LR
 |---|---|---|
 | WorkBuddy 热点监测 Agent | 已接入自动接力 | 本机检测当天 JSON/Excel，严格校验后自动暂存、入库、AI分析、归档并刷新当日A级选题 |
 | 抖音创作者中心粉丝数据 | 已完成首次真实闭环 | Codex只读采集生成原始 JSON，经预览确认后写入粉丝批次、账号快照、增长记录和画像明细；V2.1 将在第二批真实数据进入后自动与上一批比较，缺失项保持 unavailable |
-| WorkBuddy 抖音作品 | 已完成首次真实闭环 | WorkBuddy 负责采集，系统对真实 JSON 预览确认后写入作品主表、历史快照、流量、观众、热词和评论；DOU+ 与自然流量分离 |
+| WorkBuddy 抖音作品 | 深度 V2.1 已完成首次真实闭环 | 系统只读扫描 `~/Desktop/新媒体内容监测/抖音/douyin_posts_deep_*.json`，按源采集时间和完整度选取未处理文件；真实 JSON 经预览确认后写入作品主表、快照、趋势、流量、独立 DOU+、作品观众、热词和评论，checksum 防止重复入库 |
 | Excel / 图片 | 已实现 | Excel 可导入作品；图片保存记录并人工确认，复杂 OCR 未实现 |
 | MediaCrawler | 未接入 | 仅完成评估和接口规划，未安装依赖、未运行采集任务 |
 | Agent-Reach | 未接入 | 仅完成全网趋势/新闻补充的技术评估 |
@@ -71,11 +71,11 @@ flowchart LR
 
 核心链路：
 
-- 账号/内容：`social_accounts`、`social_posts`、`social_post_snapshots`、`social_post_traffic`、`social_post_traffic_sources`、`content_audience_analysis`、`social_post_comment_keywords`、`social_comments`
+- 账号/内容：`social_accounts`、`social_posts`、`social_post_snapshots`、`social_post_metric_series`、`social_post_traffic`、`social_post_traffic_sources`、`social_post_paid_traffic`、`social_post_audience`、`social_post_comment_keywords`、`social_comments`、`social_comment_replies`
 - 粉丝：`fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`
 - 热点：`hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、`hot_topic_archive`
 - 策划/任务：`content_plans`、`content_plan_feedback`、`content_tasks`
-- 采集审计：`collection_logs`、`collection_staging_records`、`data_import_logs`
+- 采集审计：`content_collection_files`、`collection_logs`、`collection_staging_records`、`data_import_logs`
 
 字段、关系、来源和使用模块见 [docs/database-design.md](docs/database-design.md)。
 

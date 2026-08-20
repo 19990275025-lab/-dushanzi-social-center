@@ -8,6 +8,8 @@
 
 ### 新增
 
+- 新增 WorkBuddy 抖音深度作品 V2.1 接力：只读扫描固定目录，按真实采集时间、完整度和 checksum 选择尚未处理的最新批次，并完成预览、确认和重复拦截。
+- 新增作品真实时间序列、独立 DOU+ 付费流量、作品级通用观众画像、评论回复预留与原始文件处理记录；首批 4 条真实作品写入 648 个趋势点、161 条画像、106 条热词和 48 条评论。
 - 新增作品数据模型 V2.0：作品主表、指标快照、流量分析、流量来源、作品观众画像、评论热词和真实评论分层保存。
 - 新增 WorkBuddy 作品真实 JSON 预览/确认接口，首批 5 条作品完成入库；评论总览、页面加载数和 JSON 评论行数分别保存。
 - 新增粉丝跨批次分析 V2.1：自动比较同平台同账号最近两个已完成真实批次，覆盖粉丝总量、增长指标、六类画像和关注热词变化。
@@ -23,6 +25,8 @@
 
 ### 优化
 
+- 作品详情新增真实“数据趋势”页签；私密、partial、unavailable、failed 和评论点赞不可用均保留平台状态，不再显示假 0。
+- 内容监测的自然爆款排序排除私密/失败作品并独立展示 DOU+，不以付费播放冒充自然传播。
 - 内容监测和作品详情改为读取最新真实快照；DOU+ 付费流量单独标记并从自然爆款排序中剔除，超过 14 天的数据展示平台不可用状态而非 0。
 - 粉丝分析中心新增“本期概览、与上期对比、画像变化、期间内容表现”；只有一个真实批次时统一显示等待状态，不再把旧版无批次快照识别为上期。
 - 粉丝分析中心改为读取 `fan_profile_records` 真实画像，展示设备、活跃度和关注热词；自然月、活跃时间等缺失维度显示平台暂未提供，不再生成回退趋势。
@@ -39,12 +43,14 @@
 
 ### 数据库调整
 
+- 新增 `content_collection_files`、`social_post_metric_series`、`social_post_paid_traffic`、`social_post_audience`、`social_comment_replies`；作品快照与评论补充源记录状态和点赞可用性字段。
 - 新增 `social_post_snapshots`、`social_post_traffic`、`social_post_traffic_sources`、`social_post_comment_keywords`；扩展作品、作品观众、评论和采集日志结构。
 - 新增 `fan_collection_batches`、`fan_profile_records`；扩展 `social_fans` 与 `fan_growth_records` 支持历史快照、周期类型、回访粉丝和批次防重复。
 - 调整 `hot_topics` 唯一索引以落实自动接力的批次去重规则；不新增业务表，不删除历史数据。
 
 ### 接口调整
 
+- 新增 `POST /api/collections/posts-deep-v2-1` 与 `/confirm?confirmed=true`，由服务端重新计算 checksum，预览后分层入库，已完成 checksum 返回 409。
 - 新增 `POST /api/collections/posts-v2` 与 `POST /api/collections/posts-v2/confirm`，支持 WorkBuddy 真实作品数据的预览、人工确认、批次防重复和分层入库。
 - 新增 `GET/POST /api/workbuddy-relay`，支持自动接力启动、防重复预检、完成编排、失败记录与状态查询。
 - 统一接收 API 的采集日志新增来源文件名记录，便于跨批次追踪同一 WorkBuddy 文件。

@@ -53,6 +53,8 @@
 | `/api/collections/fans-v2/confirm` | POST | 粉丝真实数据 V2 确认入库 | `{ confirmed: true, payload }` | 批次 ID、四张表写入数、重复批次状态 |
 | `/api/collections/posts-v2` | POST | WorkBuddy 作品真实 JSON 预览、校验和字段映射 | `douyin_posts_YYYYMMDD.json` 原始对象 | 147 个实际字段路径、作品/快照/流量/画像/热词/评论预览、不可用项和警告 |
 | `/api/collections/posts-v2/confirm` | POST | WorkBuddy 作品 V2 人工确认入库 | `{ confirmed: true, payload }` | 主表新增/更新、快照和各明细表写入数、评论三个口径及批次日志 |
+| `/api/collections/posts-deep-v2-1` | POST | WorkBuddy 深度作品文件校验和无业务落库预览 | 原始 JSON 文本；文件名、编码完整路径、可选 checksum 请求头 | 服务端 checksum、源元数据、实际字段/完整度、作品状态及各分层记录数量 |
+| `/api/collections/posts-deep-v2-1/confirm?confirmed=true` | POST | 确认深度 V2.1 批次并分层写入 | 与预览相同的只读原始 JSON 和请求头 | 主表新增/更新、快照、趋势、流量、来源、DOU+、作品观众、热词、评论、回复和日志数量 |
 | `/api/collections/douyin-v2` | POST | 兼容 V2.1 预览 | V2.1 采集 JSON | 完整率和无落库预览 |
 | `/api/collections/douyin-v2/confirm` | POST | 兼容 V2.1 确认 | 确认标记与预览数据 | 写入与日志结果 |
 | `/api/collections/comments` | POST | 独立评论采集预览 | 按作品组织的评论数据 | 预览、校验与日志 |
@@ -65,6 +67,8 @@ V3 校验包括日期、抖音链接、非负指标、0–100 的完播/划走�
 粉丝 V2 接口按 `source_file + platform + account_id` 识别采集批次，同一批次不会重复写入。确认接口分别写入 `fan_collection_batches`、`social_fans`、`fan_growth_records` 和 `fan_profile_records`；平台未提供的指标保存为 `null / unavailable`，不会转换为 0。
 
 作品 V2 接口按来源文件生成批次键，同批次确认不会重复入库；相同 `platform_post_id` 更新作品主记录，但每个新采集时间新增 `social_post_snapshots`。流量、来源、作品观众、评论热词和真实评论分别写入明细表。评论总览、页面声明加载数和 JSON 实际行数独立返回；DOU+ 标记为 `paid`，不会进入自然播放排名。
+
+深度 V2.1 本地接力脚本 `npm run import:workbuddy-douyin-deep` 只读扫描 `~/Desktop/新媒体内容监测/抖音/douyin_posts_deep_*.json`。选择顺序是可解析、结构完整、实际采集时间最新、完整度更高、作品数更多；不使用 Finder 修改时间作为唯一依据。默认只预览，追加 `-- --confirm` 才入库。服务端重新计算 SHA-256，并以 `content_collection_files.checksum` 防重；已完成 checksum 返回 HTTP 409。该接口不启动抖音、不修改 WorkBuddy 原始文件，也不会补造缺失时间轴、评论回复或平台不可用指标。
 
 ### 2.3 人工数据导入
 

@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "import:workbuddy-hot-topics": "node scripts/import-workbuddy-hot-topics.mjs",
     "import:workbuddy-v2": "node scripts/import-workbuddy-v2.mjs",
+    "import:workbuddy-douyin-deep": "node scripts/import-workbuddy-douyin-deep.mjs",
     "automation:workbuddy": "node scripts/workbuddy-auto-relay.mjs",
     "automation:workbuddy:install": "node scripts/install-workbuddy-relay-launch-agent.mjs"
   },

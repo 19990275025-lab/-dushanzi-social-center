@@ -208,6 +208,50 @@ test("WorkBuddy content V2 keeps immutable post identity and snapshot-level real
   assert.match(collector, /确认入库/);
 });
 
+test("WorkBuddy deep content V2.1 preserves source files, real series and paid traffic separately", async () => {
+  const [parser, preview, confirm, importer, schema, bootstrap, migration, detailApi, detailPage, monitor] = await Promise.all([
+    readFile(new URL("lib/workbuddy-posts-deep-v2-1.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/posts-deep-v2-1/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/posts-deep-v2-1/confirm/route.ts", root), "utf8"),
+    readFile(new URL("scripts/import-workbuddy-douyin-deep.mjs", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0028_workbuddy_deep_posts_v2_1.sql", root), "utf8"),
+    readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
+    readFile(new URL("app/insights/content/detail/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/content-monitoring/route.ts", root), "utf8"),
+  ]);
+  for (const source of [schema, bootstrap, migration]) {
+    for (const table of ["content_collection_files", "social_post_metric_series", "social_post_paid_traffic", "social_post_audience", "social_comment_replies"]) {
+      assert.match(source, new RegExp(table));
+    }
+  }
+  assert.match(parser, /canonicalProfile/);
+  assert.match(parser, /sourceRecordStatus/);
+  assert.match(parser, /commentOverviewCount/);
+  assert.match(parser, /actualLoadedCount/);
+  assert.match(parser, /relationshipToOverview/);
+  assert.match(preview, /crypto\.subtle\.digest\("SHA-256"/);
+  assert.match(preview, /同一 checksum 已完成入库/);
+  assert.match(confirm, /status = 'processing'/);
+  assert.match(confirm, /INSERT INTO social_post_metric_series/);
+  assert.match(confirm, /INSERT INTO social_post_paid_traffic/);
+  assert.match(confirm, /INSERT INTO social_post_audience/);
+  assert.match(confirm, /INSERT INTO social_comment_replies/);
+  assert.match(importer, /Desktop.*新媒体内容监测.*抖音/);
+  assert.match(importer, /douyin_posts_deep_/);
+  assert.match(importer, /completeness/);
+  assert.doesNotMatch(importer, /writeFile|unlink|rename/);
+  assert.match(detailApi, /FROM social_post_metric_series/);
+  assert.match(detailApi, /FROM social_post_paid_traffic/);
+  assert.match(detailApi, /FROM social_post_audience/);
+  assert.match(detailPage, /数据趋势/);
+  assert.match(detailPage, /DOU\+ 独立保存/);
+  assert.match(detailPage, /平台未提供/);
+  assert.match(monitor, /source_record_status/);
+  assert.match(monitor, /social_post_paid_traffic/);
+});
+
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {
   const [collector, imports, shell] = await Promise.all([
     readFile(new URL("app/collector/page.tsx", root), "utf8"),
@@ -485,11 +529,11 @@ test("top content opens a real-data work analysis with separate tabs", async () 
   ]);
   assert.match(content, /\/insights\/content\/detail\?id=/);
   assert.match(content, /数据分析/);
-  for (const tab of ["流量分析", "观众分析", "评论热词", "评论管理"]) assert.match(detail, new RegExp(tab));
+  for (const tab of ["流量分析", "数据趋势", "观众分析", "评论热词", "评论管理"]) assert.match(detail, new RegExp(tab));
   assert.match(detail, /<h2>流量来源<\/h2>/);
   assert.match(detail, /评论热词/);
   assert.match(detail, /不会转换为 0，也不会由规则模型补齐/);
-  assert.match(api, /interactionRate: completeInteractions \? percent/);
+  assert.match(api, /interactionRate: completeInteractions && views !== null \? percent/);
   assert.doesNotMatch(api, /个人主页|推荐页|关注页/);
 });
 
