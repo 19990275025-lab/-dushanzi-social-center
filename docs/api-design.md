@@ -129,12 +129,14 @@ Excel 作品字段经过映射和校验后入库；图片当前只上传 R2 并�
 | `/api/content-monitoring` | GET | 内容监测驾驶舱 | `platform=douyin|kuaishou|weibo`、日期范围 | KPI、TOP10、爆款、低效诊断、热点关联 |
 | `/api/insights/content` | GET | 内容分析汇总 | 平台、日期范围 | 内容类型、作品、AI 建议和平台状态 |
 | `/api/insights/content/detail?id={postId}` | GET | 单作品详情 | 作品 ID | 流量/互动指标、观众画像、评论与热词 |
-| `/api/insights/fans` | GET | 粉丝分析 V2.0 | `trend=7d|30d|month|custom`、日期范围 | 真实快照、周期增长、画像明细、吸粉作品和周报；缺失维度返回不可用状态 |
+| `/api/insights/fans` | GET | 粉丝分析 V2.1 | `trend=7d|30d|month|custom`、日期范围 | 真实快照、周期增长、跨批次指标/画像/热词变化、期间作品、AI摘要和周报；缺失维度返回不可用状态 |
 | `/api/ai-analysis` | GET | 规则型内容分析 | 日期范围 | 作品五维评分、平台建议、选题、日报/周报 |
 | `/api/comment-insights` | GET | 查询评论洞察 | 日期范围 | 情绪、关键词、需求、建议 |
 | `/api/comment-insights` | POST | 执行并回写评论规则分析 | 日期范围 | 刷新后的洞察结果 |
 
 `/api/insights/fans` 返回的 `collectionApi` 指向 `/api/collections/fans-v2`。增长图只读取 `period_type=daily` 的真实时间点，7 天、30 天和自然月汇总记录仅参与对应周期指标，不会伪造成每日趋势。
+
+V2.1 的 `batchComparison` 只认 `status=completed` 且同平台、同账号的真实批次。响应提供当前/上期批次、指标差值、六类画像百分点变化、关注热词新增/消失/持续/排名升降、两次采集时间之间的作品汇总和规则 AI 摘要；不足两个批次时比较结果保持 `null` 并返回明确等待消息。
 
 ## 5. AI 内容策划 API
 

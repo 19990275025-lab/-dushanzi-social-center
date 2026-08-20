@@ -9,7 +9,7 @@ import { downloadFanReportPng, type FanReportExportData } from "@/lib/fan-report
 const platforms = ["all", "douyin", "kuaishou", "weibo"];
 const trendOptions = [{ value: "7d", label: "7天" }, { value: "30d", label: "30天" }, { value: "month", label: "自然月" }, { value: "custom", label: "自定义" }] as const;
 type TrendPeriod = typeof trendOptions[number]["value"];
-type Distribution = { label: string; value: number };
+type Distribution = { label: string; value: number; ranking?: number | null };
 type DistributionChange = Distribution & { previousValue: number; delta: number };
 type Trend = { record_date: string; fans_count: number; net_growth: number; new_fans: number; lost_fans: number; source_type: string };
 type Strategy = { positioning: string; actions: string[] };
@@ -19,7 +19,7 @@ type Profile = {
   followKeywords: Distribution[]; unavailableFields: string[]; sourceType: string; collectedAt: string;
   snapshotDate: string | null; displayFansCount: string | null;
 };
-type ProfileComparison = { currentDate: string; previousDate: string; gender: DistributionChange[]; ages: DistributionChange[]; regions: DistributionChange[]; interests: DistributionChange[]; activeTimes: DistributionChange[] };
+type ProfileComparison = { currentDate: string; previousDate: string; gender: DistributionChange[]; ages: DistributionChange[]; regions: DistributionChange[]; interests: DistributionChange[]; devices: DistributionChange[]; activityLevels: DistributionChange[] };
 type FanPlatform = {
   platform: string; fansCount: number | null; netGrowth: number | null; newFans: number | null; lostFans: number | null;
   returningFans: number | null; growthRate: number | null; metricsAvailable: boolean; metricsUnavailableReason: string | null;
@@ -27,6 +27,19 @@ type FanPlatform = {
   profileHistory: Profile[]; profileComparison: ProfileComparison | null;
 };
 type AttractionPost = { id: number; title: string; content_type: string; publish_time: string; views: number; likes: number; comments: number; favorites: number; shares: number; fans_growth: number; day_net_growth: number | null; interaction_rate: number };
+type PeriodPost = Omit<AttractionPost, "day_net_growth" | "interaction_rate">;
+type BatchGrowth = { periodType: string; periodStart: string | null; periodEnd: string | null; fansCount: number; newFollowers: number | null; lostFollowers: number | null; netGrowth: number; returningFollowers: number | null };
+type FanBatch = { batch_id: number; collection_date: string; source_file: string; profile: Profile | null; growth: BatchGrowth | null };
+type KeywordRankChange = { label: string; value: number; currentRank: number; previousRank: number; rankDelta: number };
+type BatchComparison = {
+  batchCount: number; canCompare: boolean; message: string | null; periodType: string;
+  current: FanBatch | null; previous: FanBatch | null;
+  changes: null | { followers: number | null; netGrowth: number | null; newFollowers: number | null; lostFollowers: number | null; returningFollowers: number | null };
+  profileChanges: ProfileComparison | null;
+  keywordChanges: null | { added: Distribution[]; disappeared: Distribution[]; continued: KeywordRankChange[]; rankUp: KeywordRankChange[]; rankDown: KeywordRankChange[] };
+  periodContentPerformance: null | { from: string; to: string; posts: PeriodPost[]; totals: { postCount: number; views: number; likes: number; comments: number; favorites: number; shares: number }; attributionNote: string };
+  aiAnalysis: null | { status: string; summary: string; profileInsight: string; contentInsight: string };
+};
 type WeeklyReport = {
   growthSummary: string; profileSummary: string; growthReason: string; lossReason: string;
   bestPost: null | { id: number; title: string; fansGrowth: number; views: number };
@@ -34,6 +47,7 @@ type WeeklyReport = {
 };
 type FanData = {
   platforms: FanPlatform[]; trendPeriod: string; trendRange: { from: string; to: string };
+  batchComparison: BatchComparison;
   contentAttraction: { platform: string; posts: AttractionPost[]; contentTypes: Array<{ contentType: string; label: string; posts: number; fansGrowth: number; views: number; averageFansGrowth: number }>; bestPost: AttractionPost | null; bestType: null | { label: string; fansGrowth: number; averageFansGrowth: number }; attributionNote: string };
   weeklyReport: WeeklyReport; sources: string[]; collectionApi: string; updatedAt: string;
 };
@@ -51,6 +65,19 @@ function KeywordBlock({ items }: { items: Distribution[] }) {
 
 function ProfileComparisonCard({ title, items, hasPrevious }: { title: string; items: DistributionChange[]; hasPrevious: boolean }) {
   return <article className="profile-comparison-card"><h3>{title}</h3>{items.length ? <div>{items.slice(0, 6).map((item) => <p key={item.label}><span>{item.label}</span><strong>{item.value}%</strong>{hasPrevious ? <em className={item.delta > 0 ? "delta-up" : item.delta < 0 ? "delta-down" : "delta-flat"}>{item.delta > 0 ? "+" : ""}{item.delta}pp</em> : <em>首次快照</em>}</p>)}</div> : <p className="profile-empty">暂无该维度数据</p>}</article>;
+}
+
+function signedMetric(value: number | null) {
+  if (value === null) return "—";
+  return `${value > 0 ? "+" : ""}${formatCompact(value)}`;
+}
+
+function BatchMetricCard({ label, current, previous, delta }: { label: string; current: number | null; previous: number | null; delta: number | null }) {
+  return <article className="batch-metric-card"><span>{label}</span><strong>{current === null ? "—" : formatCompact(current)}</strong><small>上期 {previous === null ? "—" : formatCompact(previous)}</small><em className={delta === null ? "" : delta > 0 ? "delta-up" : delta < 0 ? "delta-down" : "delta-flat"}>{delta === null ? "不可比较" : `${signedMetric(delta)} 变化`}</em></article>;
+}
+
+function KeywordChangeGroup({ title, items, empty }: { title: string; items: Array<Distribution | KeywordRankChange>; empty: string }) {
+  return <article className="keyword-change-group"><h3>{title}</h3>{items.length ? <div>{items.slice(0, 12).map((item) => <span key={item.label}>{item.label}{"currentRank" in item ? <small>{item.previousRank} → {item.currentRank}</small> : null}</span>)}</div> : <p>{empty}</p>}</article>;
 }
 
 function GrowthLineChart({ trend }: { trend: Trend[] }) {
@@ -142,6 +169,9 @@ export default function FanAnalysisCenterPage() {
   const profile = current.profile;
   const comparison = current.profileComparison;
   const report = data.weeklyReport;
+  const batchComparison = data.batchComparison;
+  const currentBatchGrowth = batchComparison.current?.growth ?? null;
+  const previousBatchGrowth = batchComparison.previous?.growth ?? null;
   const exportData: FanReportExportData = {
     period: `${data.trendRange.from} 至 ${data.trendRange.to}`,
     fansCount: current.fansCount ?? 0, newFans: current.newFans ?? 0, lostFans: current.lostFans ?? 0, growthRate: current.growthRate ?? 0,
@@ -170,7 +200,7 @@ export default function FanAnalysisCenterPage() {
 
   return <div className={`page-stack fan-analysis-center-page fan-insights-page platform-themed-page theme-${selected}`}>
     <header className="page-heading compact-heading fan-v2-heading">
-      <div><p className="eyebrow">FAN ANALYSIS CENTER · V2.0</p><h1>{selected === "all" ? "粉丝分析中心" : `${currentPlatformLabel}粉丝分析`}</h1><p>监测粉丝增长、画像变化与作品吸粉效果，形成可执行的下周运营策略。</p></div>
+      <div><p className="eyebrow">FAN ANALYSIS CENTER · V2.1</p><h1>{selected === "all" ? "粉丝分析中心" : `${currentPlatformLabel}粉丝分析`}</h1><p>监测真实粉丝批次、画像变化与期间作品表现，形成可验证的增长分析。</p></div>
       <div className="fan-v2-heading-actions"><span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span>{isDouyin && <div className="fan-export-actions"><button onClick={exportPdf} disabled={!current.metricsAvailable} title="在打印窗口中选择另存为PDF">导出PDF</button><button onClick={() => void exportPng()} disabled={exporting || !current.metricsAvailable}>{exporting ? "生成中…" : "导出PNG"}</button></div>}</div>
     </header>
 
@@ -179,6 +209,35 @@ export default function FanAnalysisCenterPage() {
     </section>
 
     <nav className="insight-platform-tabs fan-tabs" aria-label="粉丝分析平台筛选">{platforms.map((item) => <button aria-pressed={selected === item} className={`${selected === item ? "active" : ""} platform-tab-${item}`} key={item} onClick={() => setSelected(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}</nav>
+
+    {isDouyin && <>
+      {!batchComparison.canCompare && <section className="panel batch-waiting-banner"><div><span>REAL BATCH STATUS</span><h2>{batchComparison.message}</h2><p>当前已完成真实采集批次：{batchComparison.batchCount}。系统不会使用旧版无批次快照或模拟数据补足上期。</p></div></section>}
+
+      <section className="panel batch-current-overview">
+        <div className="panel-heading"><div><span className="section-kicker">CURRENT REAL BATCH</span><h2>本期概览</h2></div><span className="section-note">{batchComparison.current ? `${batchComparison.current.collection_date} · 批次 #${batchComparison.current.batch_id}` : "暂无真实采集批次"}</span></div>
+        {batchComparison.current ? <div className="batch-overview-grid">
+          <article><span>当前粉丝</span><strong>{batchComparison.current.profile ? formatCompact(batchComparison.current.profile.fansCount) : "—"}</strong><small>{batchComparison.current.profile ? "真实精确值" : "账号快照缺失"}</small></article>
+          <article><span>净增长</span><strong>{signedMetric(currentBatchGrowth?.netGrowth ?? null)}</strong><small>{currentBatchGrowth?.periodType ?? "平台暂未提供"}</small></article>
+          <article><span>吸粉</span><strong>{currentBatchGrowth?.newFollowers === null || currentBatchGrowth?.newFollowers === undefined ? "—" : formatCompact(currentBatchGrowth.newFollowers)}</strong><small>真实周期汇总</small></article>
+          <article><span>脱粉</span><strong>{currentBatchGrowth?.lostFollowers === null || currentBatchGrowth?.lostFollowers === undefined ? "—" : formatCompact(currentBatchGrowth.lostFollowers)}</strong><small>真实周期汇总</small></article>
+          <article><span>回访粉丝</span><strong>{currentBatchGrowth?.returningFollowers === null || currentBatchGrowth?.returningFollowers === undefined ? "—" : formatCompact(currentBatchGrowth.returningFollowers)}</strong><small>真实周期汇总</small></article>
+        </div> : <div className="fan-empty-state"><strong>暂无真实采集批次</strong><p>请先完成一次真实粉丝采集并确认入库。</p></div>}
+      </section>
+
+      <section className="panel batch-previous-comparison">
+        <div className="panel-heading"><div><span className="section-kicker">PREVIOUS BATCH COMPARISON</span><h2>与上期对比</h2></div><span className="section-note">{batchComparison.canCompare ? `${batchComparison.previous?.collection_date} → ${batchComparison.current?.collection_date}` : "暂无上期真实数据"}</span></div>
+        {batchComparison.canCompare && batchComparison.changes ? <>
+          <div className="batch-comparison-grid">
+            <BatchMetricCard label="粉丝总数" current={batchComparison.current?.profile?.fansCount ?? null} previous={batchComparison.previous?.profile?.fansCount ?? null} delta={batchComparison.changes.followers} />
+            <BatchMetricCard label="净增长" current={currentBatchGrowth?.netGrowth ?? null} previous={previousBatchGrowth?.netGrowth ?? null} delta={batchComparison.changes.netGrowth} />
+            <BatchMetricCard label="吸粉" current={currentBatchGrowth?.newFollowers ?? null} previous={previousBatchGrowth?.newFollowers ?? null} delta={batchComparison.changes.newFollowers} />
+            <BatchMetricCard label="脱粉" current={currentBatchGrowth?.lostFollowers ?? null} previous={previousBatchGrowth?.lostFollowers ?? null} delta={batchComparison.changes.lostFollowers} />
+            <BatchMetricCard label="回访粉丝" current={currentBatchGrowth?.returningFollowers ?? null} previous={previousBatchGrowth?.returningFollowers ?? null} delta={batchComparison.changes.returningFollowers} />
+          </div>
+          {batchComparison.aiAnalysis && <div className="batch-ai-summary"><span>AI CROSS-BATCH ANALYSIS</span><p>{batchComparison.aiAnalysis.summary}</p><p>{batchComparison.aiAnalysis.profileInsight}</p><p>{batchComparison.aiAnalysis.contentInsight}</p></div>}
+        </> : <div className="fan-empty-state"><strong>暂无上期真实数据。</strong><p>下一批真实数据入库后，系统将自动寻找上一批并计算变化。</p></div>}
+      </section>
+    </>}
 
     <section className="fan-summary-grid fan-overview-grid fan-v2-summary">
       <article><span>当前粉丝</span><strong>{current.fansCount === null ? "—" : formatCompact(current.fansCount)}</strong><small>{profile ? "最新真实快照" : "平台暂未提供该维度数据"}</small></article>
@@ -206,13 +265,40 @@ export default function FanAnalysisCenterPage() {
 
     {isDouyin ? <>
       <section className="panel profile-history-panel">
-        <div className="panel-heading"><div><span className="section-kicker">PROFILE HISTORY</span><h2>画像历史对比</h2></div><span className="section-note">{comparison ? `${formatDate(comparison.previousDate)} 对比 ${formatDate(comparison.currentDate)}` : "需要至少两次画像快照"}</span></div>
-        <div className="profile-comparison-grid">
-          <ProfileComparisonCard title="年龄变化" items={comparison?.ages ?? profile?.ages.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
-          <ProfileComparisonCard title="地域变化" items={comparison?.regions ?? profile?.regions.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
-          <ProfileComparisonCard title="兴趣变化" items={comparison?.interests ?? profile?.interests.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
-          <ProfileComparisonCard title="活跃时间变化" items={comparison?.activeTimes ?? profile?.activeTimes.map((item) => ({ ...item, previousValue: 0, delta: 0 })) ?? []} hasPrevious={Boolean(comparison)} />
-        </div>
+        <div className="panel-heading"><div><span className="section-kicker">PROFILE HISTORY</span><h2>画像变化</h2></div><span className="section-note">{comparison ? `${formatDate(comparison.previousDate)} 对比 ${formatDate(comparison.currentDate)}` : "等待下一次采集"}</span></div>
+        {comparison ? <>
+          <div className="profile-comparison-grid profile-comparison-grid-v21">
+            <ProfileComparisonCard title="性别变化" items={comparison.gender} hasPrevious />
+            <ProfileComparisonCard title="年龄变化" items={comparison.ages} hasPrevious />
+            <ProfileComparisonCard title="地域变化" items={comparison.regions} hasPrevious />
+            <ProfileComparisonCard title="兴趣变化" items={comparison.interests} hasPrevious />
+            <ProfileComparisonCard title="设备变化" items={comparison.devices} hasPrevious />
+            <ProfileComparisonCard title="活跃度变化" items={comparison.activityLevels} hasPrevious />
+          </div>
+          {batchComparison.keywordChanges ? <div className="keyword-change-grid">
+            <KeywordChangeGroup title="新增热词" items={batchComparison.keywordChanges.added} empty="本期没有新增热词" />
+            <KeywordChangeGroup title="消失热词" items={batchComparison.keywordChanges.disappeared} empty="本期没有消失热词" />
+            <KeywordChangeGroup title="持续热词" items={batchComparison.keywordChanges.continued} empty="暂无持续热词" />
+            <KeywordChangeGroup title="排名上升" items={batchComparison.keywordChanges.rankUp} empty="暂无排名上升热词" />
+            <KeywordChangeGroup title="排名下降" items={batchComparison.keywordChanges.rankDown} empty="暂无排名下降热词" />
+          </div> : <div className="fan-empty-state compact-empty-state"><strong>关注热词暂不可比较</strong><p>其中一个真实批次未提供关注热词，不以空列表推断热词消失。</p></div>}
+        </> : <div className="fan-empty-state"><strong>等待下一次采集。</strong><p>当前只有一个真实采集批次，不计算画像变化或热词排名变化。</p></div>}
+      </section>
+
+      <section className="panel batch-period-content-panel">
+        <div className="panel-heading"><div><span className="section-kicker">BETWEEN-BATCH CONTENT</span><h2>期间内容表现</h2></div><span className="section-note">{batchComparison.periodContentPerformance ? `${formatDate(batchComparison.periodContentPerformance.from)} 至 ${formatDate(batchComparison.periodContentPerformance.to)}` : "等待第二个真实批次"}</span></div>
+        {batchComparison.periodContentPerformance ? <>
+          <div className="period-content-metrics">
+            <article><span>作品数量</span><strong>{batchComparison.periodContentPerformance.totals.postCount}</strong></article>
+            <article><span>播放量</span><strong>{formatCompact(batchComparison.periodContentPerformance.totals.views)}</strong></article>
+            <article><span>点赞</span><strong>{formatCompact(batchComparison.periodContentPerformance.totals.likes)}</strong></article>
+            <article><span>评论</span><strong>{formatCompact(batchComparison.periodContentPerformance.totals.comments)}</strong></article>
+            <article><span>收藏</span><strong>{formatCompact(batchComparison.periodContentPerformance.totals.favorites)}</strong></article>
+            <article><span>分享</span><strong>{formatCompact(batchComparison.periodContentPerformance.totals.shares)}</strong></article>
+          </div>
+          <div className="content-fan-table-wrap"><table className="content-fan-table"><thead><tr><th>作品</th><th>发布时间</th><th>播放</th><th>点赞</th><th>评论</th><th>收藏</th><th>分享</th></tr></thead><tbody>{batchComparison.periodContentPerformance.posts.slice(0, 10).map((post) => <tr key={post.id}><td><a href={`/insights/content/detail?id=${post.id}`}>{post.title}</a></td><td>{formatDate(post.publish_time)}</td><td>{formatCompact(post.views)}</td><td>{formatCompact(post.likes)}</td><td>{formatCompact(post.comments)}</td><td>{formatCompact(post.favorites)}</td><td>{formatCompact(post.shares)}</td></tr>)}{!batchComparison.periodContentPerformance.posts.length && <tr><td colSpan={7}>两次采集之间没有已入库抖音作品。</td></tr>}</tbody></table></div>
+          <p className="fan-attribution-note">{batchComparison.periodContentPerformance.attributionNote}</p>
+        </> : <div className="fan-empty-state"><strong>等待形成第二个真实采集批次后启用。</strong><p>系统将在下一批入库后，自动读取两次采集时间之间发布的作品。</p></div>}
       </section>
 
       <section className="panel content-fan-attribution-panel">
@@ -225,12 +311,12 @@ export default function FanAnalysisCenterPage() {
       <section className="panel weekly-fan-report fan-v2-weekly-report">
         <div className="panel-heading light-heading"><div><span className="section-kicker">AI WEEKLY REPORT</span><h2>AI 粉丝运营周报</h2></div><div className="fan-export-actions"><button onClick={exportPdf} disabled={!current.metricsAvailable}>导出PDF</button><button onClick={() => void exportPng()} disabled={exporting || !current.metricsAvailable}>{exporting ? "生成中…" : "导出PNG"}</button></div></div>
         <div className="weekly-report-grid fan-v2-report-grid"><article><span>本周粉丝分析</span><p>{report.growthSummary}</p></article><article><span>画像变化</span><p>{report.profileSummary}</p></article><article><span>增长原因</span><p>{report.growthReason}</p></article><article><span>流失原因</span><p>{report.lossReason}</p></article><article><span>最佳作品</span><p>{report.bestPost ? `“${report.bestPost.title}”带来 ${report.bestPost.fansGrowth} 名涨粉。` : "暂无可归因作品。"}</p></article><article className="fan-next-week-card"><span>下周内容建议</span><ol>{report.nextWeekSuggestions.map((item) => <li key={item}>{item}</li>)}</ol></article></div>
-        <p className="fan-report-source">规则模型 V2.0 · 画像快照：{report.profileSnapshotDate ? formatDate(report.profileSnapshotDate) : "暂无"} · 数据缺失不生成模拟值</p>
+        <p className="fan-report-source">规则模型 V2.1 · 真实批次：{batchComparison.batchCount} · 画像快照：{report.profileSnapshotDate ? formatDate(report.profileSnapshotDate) : "暂无"} · 数据缺失不生成模拟值</p>
       </section>
     </> : <section className="panel fan-v2-platform-note"><span>V2.0 SCOPE</span><h2>深度分析当前优先支持抖音</h2><p>快手和微博继续保留原有粉丝总览、趋势与画像展示，本阶段不新增内容吸粉归因、AI周报或导出能力。</p></section>}
 
     <section className="fan-report-print-sheet" aria-hidden="true">
-      <header><span>FAN OPERATIONS WEEKLY REPORT · V2.0</span><h1>抖音粉丝运营周报</h1><p>{data.trendRange.from} 至 {data.trendRange.to}</p></header>
+      <header><span>FAN OPERATIONS WEEKLY REPORT · V2.1</span><h1>抖音粉丝运营周报</h1><p>{data.trendRange.from} 至 {data.trendRange.to}</p></header>
       <div className="print-metrics"><article>当前粉丝<strong>{current.fansCount === null ? "—" : formatCompact(current.fansCount)}</strong></article><article>新增粉丝<strong>{current.newFans === null ? "—" : `+${formatCompact(current.newFans)}`}</strong></article><article>流失粉丝<strong>{current.lostFans === null ? "—" : formatCompact(current.lostFans)}</strong></article><article>增长率<strong>{current.growthRate === null ? "—" : `${current.growthRate}%`}</strong></article></div>
       <section><h2>粉丝增长趋势</h2><GrowthLineChart trend={current.trend} /></section>
       <section className="print-insights"><article><h3>本周粉丝分析</h3><p>{report.growthSummary}</p></article><article><h3>画像变化</h3><p>{report.profileSummary}</p></article><article><h3>增长原因</h3><p>{report.growthReason}</p></article><article><h3>流失原因</h3><p>{report.lossReason}</p></article></section>
@@ -239,7 +325,7 @@ export default function FanAnalysisCenterPage() {
       <footer>数据来源：social_fans、fan_growth_records、social_posts · 生成时间：{formatDate(data.updatedAt)}</footer>
     </section>
 
-    <section className="panel future-collection-note"><div><span>FAN DATA MODEL · V2.0</span><h2>真实粉丝数据分层存储</h2></div><p>账号快照写入 <code>social_fans</code>，周期增长写入 <code>fan_growth_records</code>，画像明细写入 <code>fan_profile_records</code>；缺失维度保持 unavailable。</p><small>接入路径：{data.collectionApi}</small></section>
+    <section className="panel future-collection-note"><div><span>FAN DATA MODEL · V2.1</span><h2>真实粉丝批次自动比较</h2></div><p>新批次入库后自动寻找同平台、同账号的上一真实批次，并比较粉丝总量、增长、画像、关注热词及期间作品；缺失维度保持 unavailable。</p><small>接入路径：{data.collectionApi}</small></section>
     <p className="analysis-disclaimer">更新时间：{formatDate(data.updatedAt)} · 粉丝画像缺失时保持空状态，不生成模拟画像。</p>
   </div>;
 }

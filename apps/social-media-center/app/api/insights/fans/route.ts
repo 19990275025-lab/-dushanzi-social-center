@@ -18,6 +18,7 @@ type ProfileRow = {
   source_type: string; collected_at: string; collection_time: string | null;
 };
 type GrowthRow = {
+  batch_id: number | null;
   platform: string; record_date: string; period_type: string; period_start: string | null;
   period_end: string | null; fans_count: number; net_growth: number;
   new_followers: number | null; lost_followers: number | null;
@@ -31,9 +32,14 @@ type PostRow = {
   id: number; title: string; content_type: string; publish_time: string; views: number;
   likes: number; comments: number; favorites: number; shares: number; fans_growth: number;
 };
-type DistributionItem = { label: string; value: number };
+type BatchRow = {
+  batch_id: number; platform: string; account_id: number; collection_date: string;
+  source_file: string; data_period: string | null; raw_metric_count: number;
+  success_metric_count: number; unavailable_metric_count: number; created_at: string;
+};
+type DistributionItem = { label: string; value: number; ranking?: number | null };
 type ProfileSnapshot = {
-  id: number; fansCount: number; gender: DistributionItem[]; ages: DistributionItem[];
+  id: number; batchId: number | null; fansCount: number; gender: DistributionItem[]; ages: DistributionItem[];
   regions: DistributionItem[]; interests: DistributionItem[]; devices: DistributionItem[];
   activityLevels: DistributionItem[]; activeTimes: DistributionItem[]; followKeywords: DistributionItem[];
   unavailableFields: string[]; sourceType: string; collectedAt: string; snapshotDate: string | null;
@@ -59,13 +65,14 @@ function distribution(value: string): DistributionItem[] {
 function profileDimensions(details: ProfileDetailRow[], type: string) {
   return details.filter((item) => item.dimension_type === type && item.dimension_value !== null)
     .sort((a, b) => Number(a.ranking ?? 9999) - Number(b.ranking ?? 9999))
-    .map((item) => ({ label: item.dimension_name, value: Number(item.percentage ?? item.dimension_value) }));
+    .map((item) => ({ label: item.dimension_name, value: Number(item.percentage ?? item.dimension_value), ranking: item.ranking }));
 }
 
 function profileSnapshot(profile: ProfileRow, details: ProfileDetailRow[]): ProfileSnapshot {
   const detailGender = profileDimensions(details, "gender");
   return {
     id: profile.id,
+    batchId: profile.batch_id,
     fansCount: Number(profile.fans_count),
     gender: detailGender.length ? detailGender : distribution(profile.gender_distribution),
     ages: profileDimensions(details, "age").length ? profileDimensions(details, "age") : distribution(profile.age_distribution),
@@ -85,13 +92,55 @@ function profileSnapshot(profile: ProfileRow, details: ProfileDetailRow[]): Prof
 }
 
 function distributionChanges(current: DistributionItem[], previous: DistributionItem[]) {
+  const currentValues = new Map(current.map((item) => [item.label, item.value]));
   const previousValues = new Map(previous.map((item) => [item.label, item.value]));
-  return current.map((item) => ({
-    label: item.label,
-    value: item.value,
-    previousValue: previousValues.get(item.label) ?? 0,
-    delta: Number((item.value - (previousValues.get(item.label) ?? 0)).toFixed(2)),
+  const labels = [...new Set([...currentValues.keys(), ...previousValues.keys()])];
+  return labels.map((label) => ({
+    label,
+    value: currentValues.get(label) ?? 0,
+    previousValue: previousValues.get(label) ?? 0,
+    delta: Number(((currentValues.get(label) ?? 0) - (previousValues.get(label) ?? 0)).toFixed(2)),
   })).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+}
+
+function availableDistributionChanges(current: DistributionItem[], previous: DistributionItem[]) {
+  return current.length && previous.length ? distributionChanges(current, previous) : [];
+}
+
+function keywordChanges(current: DistributionItem[], previous: DistributionItem[]) {
+  const currentMap = new Map(current.map((item, index) => [item.label, { ...item, ranking: Number(item.ranking ?? index + 1) }]));
+  const previousMap = new Map(previous.map((item, index) => [item.label, { ...item, ranking: Number(item.ranking ?? index + 1) }]));
+  const added = [...currentMap.values()].filter((item) => !previousMap.has(item.label));
+  const disappeared = [...previousMap.values()].filter((item) => !currentMap.has(item.label));
+  const continued = [...currentMap.values()].filter((item) => previousMap.has(item.label)).map((item) => {
+    const previousItem = previousMap.get(item.label)!;
+    return { label: item.label, value: item.value, currentRank: item.ranking, previousRank: previousItem.ranking, rankDelta: previousItem.ranking - item.ranking };
+  });
+  return {
+    added,
+    disappeared,
+    continued,
+    rankUp: continued.filter((item) => item.rankDelta > 0).sort((a, b) => b.rankDelta - a.rankDelta),
+    rankDown: continued.filter((item) => item.rankDelta < 0).sort((a, b) => a.rankDelta - b.rankDelta),
+  };
+}
+
+function growthSummary(row: GrowthRow | null) {
+  if (!row) return null;
+  return {
+    periodType: row.period_type,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    fansCount: Number(row.fans_count),
+    newFollowers: row.new_followers === null ? null : Number(row.new_followers),
+    lostFollowers: row.lost_followers === null ? null : Number(row.lost_followers),
+    netGrowth: Number(row.net_growth),
+    returningFollowers: row.returning_followers === null ? null : Number(row.returning_followers),
+  };
+}
+
+function nullableDelta(current: number | null, previous: number | null) {
+  return current === null || previous === null ? null : current - previous;
 }
 
 function topLabel(items: DistributionItem[]) {
@@ -118,7 +167,11 @@ export async function GET(request: Request) {
       : new Date(endDate.getTime() - (trendPeriod === "30d" ? 29 : 6) * 86400000).toISOString().slice(0, 10);
   const summaryPeriodType = trendPeriod === "month" ? "natural_month" : trendPeriod;
 
-  const [profiles, profileDetails, growth, periodSummaries, posts] = await Promise.all([
+  const [batches, profiles, profileDetails, growth, periodSummaries, batchGrowth, posts] = await Promise.all([
+    d1.prepare(`SELECT batch_id, platform, account_id, collection_date, source_file,
+      data_period, raw_metric_count, success_metric_count, unavailable_metric_count, created_at
+      FROM fan_collection_batches WHERE status = 'completed'
+      ORDER BY platform, collection_date DESC, batch_id DESC LIMIT 200`).all<BatchRow>(),
     d1.prepare(`SELECT id, account_id, platform, fans_count, batch_id, snapshot_date,
       display_fans_count, male_ratio, female_ratio, gender_distribution,
       age_distribution, region_distribution, interest_distribution,
@@ -128,18 +181,22 @@ export async function GET(request: Request) {
     d1.prepare(`SELECT batch_id, dimension_type, dimension_name, dimension_value,
       percentage, ranking, raw_value FROM fan_profile_records
       ORDER BY batch_id DESC, dimension_type, ranking, id LIMIT 5000`).all<ProfileDetailRow>(),
-    d1.prepare(`SELECT platform, record_date, period_type, period_start, period_end,
+    d1.prepare(`SELECT batch_id, platform, record_date, period_type, period_start, period_end,
       fans_count, net_growth, new_followers, lost_followers, returning_followers, source_type
       FROM fan_growth_records WHERE period_type = 'daily'
       AND date(period_end) BETWEEN date(?) AND date(?)
       ORDER BY period_end ASC, id ASC LIMIT 1000`)
       .bind(trendFrom, range.to).all<GrowthRow>(),
-    d1.prepare(`SELECT platform, record_date, period_type, period_start, period_end,
+    d1.prepare(`SELECT batch_id, platform, record_date, period_type, period_start, period_end,
       fans_count, net_growth, new_followers, lost_followers, returning_followers, source_type
       FROM fan_growth_records WHERE period_type = ?
       AND date(period_start) = date(?) AND date(period_end) = date(?)
       ORDER BY snapshot_date DESC, id DESC LIMIT 20`)
       .bind(summaryPeriodType, trendFrom, range.to).all<GrowthRow>(),
+    d1.prepare(`SELECT batch_id, platform, record_date, period_type, period_start, period_end,
+      fans_count, net_growth, new_followers, lost_followers, returning_followers, source_type
+      FROM fan_growth_records WHERE batch_id IS NOT NULL
+      ORDER BY batch_id DESC, period_type, id DESC LIMIT 1000`).all<GrowthRow>(),
     d1.prepare(`SELECT id, title, content_type, publish_time, views, likes,
       comments, favorites, shares, fans_growth FROM social_posts
       WHERE platform = 'douyin' AND date(publish_time) BETWEEN date(?) AND date(?)
@@ -148,10 +205,27 @@ export async function GET(request: Request) {
   ]);
 
   const platformResult = platforms.map((platform) => {
-    const history = profiles.results.filter((item) => item.platform === platform).slice(0, 12).map((item) =>
-      profileSnapshot(item, item.batch_id === null ? [] : profileDetails.results.filter((detail) => detail.batch_id === item.batch_id)));
+    const latestBatch = batches.results.find((item) => item.platform === platform) ?? null;
+    const realBatches = batches.results.filter((item) => item.platform === platform && item.account_id === latestBatch?.account_id);
+    const profileByBatch = new Map(profiles.results
+      .filter((item) => item.platform === platform && item.batch_id !== null)
+      .map((item) => [Number(item.batch_id), item]));
+    const history = realBatches.flatMap((batch) => {
+      const row = profileByBatch.get(batch.batch_id);
+      return row ? [profileSnapshot(row, profileDetails.results.filter((detail) => detail.batch_id === batch.batch_id))] : [];
+    });
     const profile = history[0] ?? null;
     const previousProfile = history[1] ?? null;
+    const currentBatch = realBatches[0] ?? null;
+    const previousBatch = realBatches[1] ?? null;
+    const currentBatchGrowthRow = currentBatch
+      ? batchGrowth.results.find((item) => item.batch_id === currentBatch.batch_id && item.period_type === summaryPeriodType) ?? null
+      : null;
+    const previousBatchGrowthRow = previousBatch
+      ? batchGrowth.results.find((item) => item.batch_id === previousBatch.batch_id && item.period_type === summaryPeriodType) ?? null
+      : null;
+    const currentBatchGrowth = growthSummary(currentBatchGrowthRow);
+    const previousBatchGrowth = growthSummary(previousBatchGrowthRow);
     const realTrend = growth.results.filter((item) => item.platform === platform);
     const trend = realTrend.map((item) => ({
       ...item,
@@ -166,6 +240,18 @@ export async function GET(request: Request) {
     const returningFans = summary?.returning_followers === null || summary?.returning_followers === undefined ? null : Number(summary.returning_followers);
     const fansCount = profile?.fansCount ?? null;
     const baseFans = fansCount !== null && netGrowth !== null ? Math.max(0, fansCount - netGrowth) : null;
+    const profileComparison = profile && previousProfile ? {
+      currentDate: profile.collectedAt,
+      previousDate: previousProfile.collectedAt,
+      gender: availableDistributionChanges(profile.gender, previousProfile.gender),
+      ages: availableDistributionChanges(profile.ages, previousProfile.ages),
+      regions: availableDistributionChanges(profile.regions, previousProfile.regions),
+      interests: availableDistributionChanges(profile.interests, previousProfile.interests),
+      devices: availableDistributionChanges(profile.devices, previousProfile.devices),
+      activityLevels: availableDistributionChanges(profile.activityLevels, previousProfile.activityLevels),
+    } : null;
+    const currentFollowers = profile?.fansCount ?? null;
+    const previousFollowers = previousProfile?.fansCount ?? null;
     return {
       platform, fansCount, netGrowth, newFans, lostFans, returningFans,
       growthRate: baseFans !== null && baseFans > 0 && netGrowth !== null ? Number(((netGrowth / baseFans) * 100).toFixed(2)) : null,
@@ -173,18 +259,57 @@ export async function GET(request: Request) {
       metricsUnavailableReason: summary === null ? "平台暂未提供该统计周期数据" : null,
       trend, trendSource: realTrend.length ? "fan_growth_records.daily" : "unavailable",
       strategy: strategies[platform], profile, previousProfile, profileHistory: history,
-      profileComparison: profile && previousProfile ? {
-        currentDate: profile.collectedAt, previousDate: previousProfile.collectedAt,
-        gender: distributionChanges(profile.gender, previousProfile.gender),
-        ages: distributionChanges(profile.ages, previousProfile.ages),
-        regions: distributionChanges(profile.regions, previousProfile.regions),
-        interests: distributionChanges(profile.interests, previousProfile.interests),
-        activeTimes: distributionChanges(profile.activeTimes, previousProfile.activeTimes),
-      } : null,
+      profileComparison,
+      batchComparison: {
+        batchCount: realBatches.length,
+        canCompare: Boolean(currentBatch && previousBatch && profile && previousProfile),
+        message: realBatches.length < 2
+          ? "需要至少2个真实采集批次后才能进行趋势分析。"
+          : profile && previousProfile ? null : "真实批次缺少账号快照，暂时无法比较。",
+        periodType: summaryPeriodType,
+        current: currentBatch ? { ...currentBatch, profile, growth: currentBatchGrowth } : null,
+        previous: previousBatch ? { ...previousBatch, profile: previousProfile, growth: previousBatchGrowth } : null,
+        changes: profile && previousProfile ? {
+          followers: nullableDelta(currentFollowers, previousFollowers),
+          netGrowth: nullableDelta(currentBatchGrowth?.netGrowth ?? null, previousBatchGrowth?.netGrowth ?? null),
+          newFollowers: nullableDelta(currentBatchGrowth?.newFollowers ?? null, previousBatchGrowth?.newFollowers ?? null),
+          lostFollowers: nullableDelta(currentBatchGrowth?.lostFollowers ?? null, previousBatchGrowth?.lostFollowers ?? null),
+          returningFollowers: nullableDelta(currentBatchGrowth?.returningFollowers ?? null, previousBatchGrowth?.returningFollowers ?? null),
+        } : null,
+        profileChanges: profileComparison,
+        keywordChanges: profile && previousProfile && profile.followKeywords.length && previousProfile.followKeywords.length
+          ? keywordChanges(profile.followKeywords, previousProfile.followKeywords) : null,
+      },
     };
   });
 
   const douyin = platformResult.find((item) => item.platform === "douyin")!;
+  let betweenBatchPosts: PostRow[] = [];
+  const comparisonCurrent = douyin.batchComparison.current;
+  const comparisonPrevious = douyin.batchComparison.previous;
+  if (douyin.batchComparison.canCompare && comparisonCurrent && comparisonPrevious) {
+    const from = comparisonPrevious.profile?.collectedAt ?? `${comparisonPrevious.collection_date}T00:00:00Z`;
+    const to = comparisonCurrent.profile?.collectedAt ?? `${comparisonCurrent.collection_date}T23:59:59Z`;
+    const result = await d1.prepare(`SELECT id, title, content_type, publish_time, views, likes,
+      comments, favorites, shares, fans_growth FROM social_posts
+      WHERE platform = 'douyin' AND datetime(publish_time) > datetime(?) AND datetime(publish_time) <= datetime(?)
+      ORDER BY publish_time ASC, id ASC LIMIT 500`).bind(from, to).all<PostRow>();
+    betweenBatchPosts = result.results;
+  }
+  const periodContentPerformance = douyin.batchComparison.canCompare && comparisonCurrent && comparisonPrevious ? {
+    from: comparisonPrevious.profile?.collectedAt ?? comparisonPrevious.collection_date,
+    to: comparisonCurrent.profile?.collectedAt ?? comparisonCurrent.collection_date,
+    posts: betweenBatchPosts,
+    totals: {
+      postCount: betweenBatchPosts.length,
+      views: betweenBatchPosts.reduce((sum, item) => sum + Number(item.views), 0),
+      likes: betweenBatchPosts.reduce((sum, item) => sum + Number(item.likes), 0),
+      comments: betweenBatchPosts.reduce((sum, item) => sum + Number(item.comments), 0),
+      favorites: betweenBatchPosts.reduce((sum, item) => sum + Number(item.favorites), 0),
+      shares: betweenBatchPosts.reduce((sum, item) => sum + Number(item.shares), 0),
+    },
+    attributionNote: "作品按两次真实采集时间之间自动关联，仅表示同期关系，不直接证明粉丝增长因果。",
+  } : null;
   const dailyGrowth = new Map(douyin.trend.map((item) => [item.record_date, Number(item.net_growth)]));
   const contentPosts = posts.results.map((post) => ({
     ...post,
@@ -215,6 +340,19 @@ export async function GET(request: Request) {
     ? [...profileChange.ages, ...profileChange.regions, ...profileChange.interests]
       .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0] ?? null
     : null;
+  const batchChanges = douyin.batchComparison.changes;
+  const batchAiAnalysis = douyin.batchComparison.canCompare && batchChanges ? {
+    status: "generated_from_real_batches",
+    summary: batchChanges.followers === null
+      ? "两个真实批次已形成，但粉丝总量字段不足，无法计算总量变化。"
+      : `本期粉丝总量较上期${batchChanges.followers >= 0 ? "增加" : "减少"}${Math.abs(batchChanges.followers)}。`,
+    profileInsight: strongestChange
+      ? `${strongestChange.label}占比较上期${strongestChange.delta >= 0 ? "上升" : "下降"}${Math.abs(strongestChange.delta)}个百分点。`
+      : "两个批次暂无可比较的画像变化。",
+    contentInsight: periodContentPerformance
+      ? `两次采集之间发布${periodContentPerformance.totals.postCount}条作品，累计播放${periodContentPerformance.totals.views}；该关联仅用于后续验证内容与粉丝变化，不视为因果结论。`
+      : "等待形成两个完整真实批次后分析期间作品表现。",
+  } : null;
   const growthReason = bestPost && bestPost.fans_growth > 0
     ? `“${bestPost.title}”贡献 ${bestPost.fans_growth} 名涨粉，是当前周期最强内容信号。`
     : douyin.netGrowth === null ? "平台暂未提供该统计周期增长数据。"
@@ -233,6 +371,11 @@ export async function GET(request: Request) {
   return Response.json({
     platforms: platformResult,
     range, trendPeriod, trendRange: { from: trendFrom, to: range.to },
+    batchComparison: {
+      ...douyin.batchComparison,
+      periodContentPerformance,
+      aiAnalysis: batchAiAnalysis,
+    },
     contentAttraction: {
       platform: "douyin", posts: contentPosts, contentTypes, bestPost, bestType,
       attributionNote: "作品涨粉使用 social_posts.fans_growth；同日净增长仅作背景校验，不代表单一作品因果贡献。",

@@ -16,7 +16,7 @@
 |---|---:|---|---:|---|---|---|
 | 运营驾驶舱 | V1.0 | 已完成 | 90% | `social_accounts`、`social_posts`、`hot_topics`、`content_tasks` | 指标质量依赖当期真实数据；快手/微博数据稀疏 | 固化指标口径，增加数据新鲜度与空数据提示验收 |
 | 内容监测中心 | V1.0 | 待优化 | 85% | `social_posts`、`social_comments`、`hot_topic_feedback` | 抖音优先；快手/微博可筛选但真实样本不足；AI 为规则评分 | 用稳定的抖音连续周期数据校准爆款阈值和低效诊断 |
-| 粉丝分析中心 | V2.0 | 待优化 | 88% | `fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`、`social_posts.fans_growth` | 已接入 2026-08-20 抖音真实快照；连续每日增长点和历史画像批次仍不足，作品涨粉并非严格因果归因 | 按周采集新快照并持续校验后台口径，积累可比较的真实历史序列 |
+| 粉丝分析中心 | V2.1 | 待优化 | 90% | `fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`、`social_posts` | 跨批次、画像/热词变化和期间作品关联逻辑已完成；当前只有 2026-08-20 一个真实批次，尚不能产出真实对比结果 | 完成第二次人工真实采集，验证跨批次结果后再评估每周自动调度 |
 | 数据采集中心 | V2.2 / 抖音 V3.0 | 开发中 | 82% | WorkBuddy JSON/Excel、抖音 V3 JSON、Excel/图片人工导入 | 统一 API 不执行采集；图片 OCR 未实现；MediaCrawler/Agent-Reach 未接入 | 固化数据契约、接口鉴权和失败重试；完成生产样本验收 |
 | 热点监测中心 | V4.0 | 已完成 | 90% | `hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、WorkBuddy | 外部文件质量影响排序；规则分析不是大模型；历史兼容表并存 | 监控每日导入完整性，校准 A/B/C 与旅游转化评分 |
 | 热点效果复盘 | V3.0 | 已完成 | 88% | `hot_topic_feedback`、`social_posts` | 必须先建立热点与作品关联；未关联记录无法评价 | 建立发布后 7 日统一评价窗口和人工复核流程 |

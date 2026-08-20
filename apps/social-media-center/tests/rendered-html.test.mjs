@@ -101,7 +101,7 @@ test("content monitoring and fan insights retain platform themes", async () => {
   assert.doesNotMatch(styles, /platform-themed-page\.theme-wechat_channels/);
 });
 
-test("fan analysis V2.0 retains growth, profile history, content acquisition and export", async () => {
+test("fan analysis V2.1 retains growth, profile history, content acquisition and export", async () => {
   const [page, api, exporter, styles, readme] = await Promise.all([
     readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
     readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
@@ -109,7 +109,7 @@ test("fan analysis V2.0 retains growth, profile history, content acquisition and
     readFile(new URL("app/globals.css", root), "utf8"),
     readFile(new URL("README.md", root), "utf8"),
   ]);
-  for (const label of ["FAN ANALYSIS CENTER · V2.0", "当前粉丝", "新增粉丝", "流失粉丝", "增长率", "7天", "30天", "自然月", "自定义", "粉丝画像分析", "画像历史对比", "内容吸粉分析", "AI 粉丝运营周报", "本周粉丝分析", "增长原因", "流失原因", "下周内容建议", "导出PDF", "导出PNG"]) {
+  for (const label of ["FAN ANALYSIS CENTER · V2.1", "当前粉丝", "新增粉丝", "流失粉丝", "增长率", "7天", "30天", "自然月", "自定义", "粉丝画像分析", "画像变化", "内容吸粉分析", "AI 粉丝运营周报", "本周粉丝分析", "增长原因", "流失原因", "下周内容建议", "导出PDF", "导出PNG"]) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /GrowthLineChart/);
@@ -133,7 +133,7 @@ test("fan analysis V2.0 retains growth, profile history, content acquisition and
   assert.match(styles, /fan-growth-line-chart/);
   assert.match(styles, /profile-comparison-grid/);
   assert.match(styles, /printing-fan-report/);
-  assert.match(readme, /粉丝分析中心 V2\.0/);
+  assert.match(readme, /粉丝分析中心 V2\.1/);
   assert.match(readme, /另存为PDF/);
 });
 
@@ -498,6 +498,29 @@ test("fan data model v2 keeps batches, period summaries and normalized profile r
   assert.match(api, /FROM fan_profile_records/);
   assert.doesNotMatch(api, /social_posts\.fans_growth"/);
   assert.match(page, /平台暂未提供该维度数据/);
+});
+
+test("fan cross-batch analysis v2.1 compares only completed real batches", async () => {
+  const [api, page, styles, readme] = await Promise.all([
+    readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
+    readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+    readFile(new URL("README.md", root), "utf8"),
+  ]);
+  assert.match(api, /FROM fan_collection_batches WHERE status = 'completed'/);
+  assert.match(api, /item\.account_id === latestBatch\?\.account_id/);
+  assert.match(api, /keywordChanges/);
+  assert.match(api, /datetime\(publish_time\) > datetime\(\?\)/);
+  assert.match(api, /仅表示同期关系，不直接证明粉丝增长因果/);
+  assert.match(api, /需要至少2个真实采集批次后才能进行趋势分析。/);
+  for (const label of ["FAN ANALYSIS CENTER · V2.1", "本期概览", "与上期对比", "画像变化", "期间内容表现", "暂无上期真实数据。", "等待下一次采集。", "等待形成第二个真实采集批次后启用。"]) {
+    assert.match(page, new RegExp(label));
+  }
+  for (const dimension of ["性别变化", "年龄变化", "地域变化", "兴趣变化", "设备变化", "活跃度变化", "新增热词", "消失热词", "持续热词", "排名上升", "排名下降"]) {
+    assert.match(page, new RegExp(dimension));
+  }
+  assert.match(styles, /batch-comparison-grid/);
+  assert.match(readme, /粉丝分析中心 V2\.1/);
 });
 
 test("content monitoring competitor posts schema supports future collection", async () => {
