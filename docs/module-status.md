@@ -15,7 +15,7 @@
 | 模块名称 | 当前版本 | 状态 | 完成度 | 数据来源 | 当前问题 | 下一步计划 |
 |---|---:|---|---:|---|---|---|
 | 运营驾驶舱 | V1.0 | 已完成 | 90% | `social_accounts`、`social_posts`、`hot_topics`、`content_tasks` | 指标质量依赖当期真实数据；快手/微博数据稀疏 | 固化指标口径，增加数据新鲜度与空数据提示验收 |
-| 内容监测中心 | 作品数据 V2.1 | 待优化 | 93% | `social_posts`、快照、真实趋势、流量/DOU+/作品观众/热词明细、真实评论、`hot_topic_feedback` | 首批 WorkBuddy 深度 V2.1 真实批次已接入；跨采集批次趋势仍待形成，AI 为规则评分 | 连续接入新 checksum 批次，验证跨快照增长并校准自然爆款阈值 |
+| 内容监测中心 | 作品数据 V2.1 / 效果模型 V1.0 | 待优化 | 96% | `social_posts`、快照、真实趋势、流量/DOU+/作品观众/热词明细、最新快照真实评论、`hot_topic_feedback` | 已完成四维动态评分、缺失重加权、DOU+ 自然爆款保护和证据诊断；详细历史样本仅 4 条，当前为初步评价 | 连续接入新 checksum 批次，详细样本达到 10 条后回顾等级分布与阈值 |
 | 粉丝分析中心 | V2.1 | 待优化 | 90% | `fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`、`social_posts` | 跨批次、画像/热词变化和期间作品关联逻辑已完成；当前只有 2026-08-20 一个真实批次，尚不能产出真实对比结果 | 完成第二次人工真实采集，验证跨批次结果后再评估每周自动调度 |
 | 数据采集中心 | V2.2 / 作品 V2.1 | 开发中 | 89% | WorkBuddy 热点/深度作品 JSON、抖音粉丝 JSON、Excel/图片人工导入 | 已固定只读目录和 checksum 防重；仍不执行采集，MediaCrawler/Agent-Reach 未接入 | 连续验证 WorkBuddy 深度批次，补生产鉴权、失败重试和正式部署说明 |
 | 热点监测中心 | V4.0 | 已完成 | 90% | `hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、WorkBuddy | 外部文件质量影响排序；规则分析不是大模型；历史兼容表并存 | 监控每日导入完整性，校准 A/B/C 与旅游转化评分 |

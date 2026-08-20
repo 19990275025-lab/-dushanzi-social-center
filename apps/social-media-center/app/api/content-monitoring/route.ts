@@ -2,6 +2,7 @@ import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { chinaToday, resolveDateRange } from "@/lib/date-range";
 import { ruleBasedContentEngine, type AnalysisTopic } from "@/lib/content-analysis-engine";
+import { loadContentEffectEvaluations } from "@/lib/content-effect-evaluation-server";
 import {
   buildBreakoutAnalysis,
   buildLowEfficiencyDiagnosis,
@@ -15,7 +16,7 @@ type PostRow = MonitorPost & {
   platform: string;
   fans_growth: number;
   hashtags: string;
-  organic_views: number;
+  organic_views: number | null;
   paid_views: number;
   has_paid_traffic: number;
   data_availability_status: string;
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
   const today = chinaToday().iso;
   const d1 = getD1();
 
-  const [postResult, topicResult, commentResult, feedbackResult, todayResult] = await Promise.all([
+  const [postResult, topicResult, commentResult, feedbackResult, todayResult, effectResult] = await Promise.all([
     d1.prepare(`
       WITH ranked_snapshots AS (
         SELECT s.*, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY snapshot_time DESC, id DESC) AS snapshot_rank
@@ -95,10 +96,10 @@ export async function GET(request: Request) {
         CASE
           WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id AND pt.relationship_to_overview = 'additional')
             THEN COALESCE(s.play_count, p.views)
-          WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id AND pt.relationship_to_overview = 'included')
-            THEN MAX(0, COALESCE(s.play_count, p.views) - COALESCE((SELECT SUM(pt.play_count) FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id), 0))
-          ELSE MAX(0, COALESCE(s.play_count, p.views) - COALESCE((SELECT SUM(ts.traffic_value)
-            FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0))
+          WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id)
+            OR EXISTS (SELECT 1 FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid')
+            THEN NULL
+          ELSE COALESCE(s.play_count, p.views)
         END AS organic_views,
         CASE WHEN EXISTS (SELECT 1 FROM social_post_paid_traffic pt WHERE pt.snapshot_id = s.id)
           OR EXISTS (SELECT 1 FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid')
@@ -130,6 +131,11 @@ export async function GET(request: Request) {
       INNER JOIN social_accounts a ON a.id = p.account_id
       WHERE p.platform = ? AND a.account_id NOT LIKE 'test_%'
         AND date(p.publish_time) BETWEEN date(?) AND date(?)
+        AND ((c.snapshot_id IS NOT NULL AND c.snapshot_id = (
+          SELECT id FROM social_post_snapshots WHERE post_id = p.id ORDER BY snapshot_time DESC, id DESC LIMIT 1
+        )) OR (c.snapshot_id IS NULL AND NOT EXISTS (
+          SELECT 1 FROM social_post_snapshots WHERE post_id = p.id
+        )))
       GROUP BY c.post_id
     `).bind(platform, range.from, range.to).all<CommentRow>(),
     d1.prepare(`
@@ -145,19 +151,20 @@ export async function GET(request: Request) {
     d1.prepare(`SELECT COUNT(*) AS count FROM social_posts p JOIN social_accounts a ON a.id = p.account_id
       WHERE p.platform = ? AND a.account_id NOT LIKE 'test_%' AND date(p.publish_time) = date(?)`)
       .bind(platform, today).first<{ count: number }>(),
+    platform === "douyin" ? loadContentEffectEvaluations(d1, { platform, from: range.from, to: range.to }) : Promise.resolve(null),
   ]);
 
   const commentByPost = new Map(commentResult.results.map((row) => [row.post_id, row]));
   const analyticalRows = postResult.results.filter((post) => !["private", "failed", "unavailable"].includes(post.source_record_status));
   const analyzedPosts = ruleBasedContentEngine.analyzePosts(
-    analyticalRows.map((post) => ({
+    analyticalRows.filter((post) => post.organic_views !== null).map((post) => ({
       id: post.id,
       account_id: post.account_id,
       platform: post.platform,
       title: post.title,
       content_type: post.content_type,
       publish_time: post.publish_time,
-      views: post.organic_views,
+      views: post.organic_views as number,
       likes: post.likes,
       comments: post.comments,
       favorites: post.favorites,
@@ -169,6 +176,7 @@ export async function GET(request: Request) {
     topicResult.results,
   );
   const scoreById = new Map(analyzedPosts.map((post) => [post.id, post.overallScore]));
+  const effectById = new Map((effectResult?.evaluations ?? []).map((item) => [item.postId, item]));
 
   const posts = analyticalRows.map((post) => {
     const comment = commentByPost.get(post.id);
@@ -176,7 +184,8 @@ export async function GET(request: Request) {
       ...post,
       interactions: interactionCount(post),
       interactionRate: percentage(interactionCount(post), post.views),
-      aiScore: scoreById.get(post.id) ?? 0,
+      aiScore: effectById.get(post.id)?.overallScore ?? scoreById.get(post.id) ?? 0,
+      effectEvaluation: effectById.get(post.id) ?? null,
       capturedComments: Number(comment?.captured_comments ?? 0),
       positiveComments: Number(comment?.positive_comments ?? 0),
       negativeComments: Number(comment?.negative_comments ?? 0),
@@ -193,18 +202,20 @@ export async function GET(request: Request) {
     interactions: summary.interactions + post.interactions,
     capturedComments: summary.capturedComments + post.capturedComments,
   }), { views: 0, likes: 0, comments: 0, favorites: 0, shares: 0, interactions: 0, capturedComments: 0 });
-  const averageOrganicViews = posts.length ? posts.reduce((total, post) => total + post.organic_views, 0) / posts.length : 0;
+  const organicSamples = posts.map((post) => post.organic_views).filter((value): value is number => typeof value === "number");
+  const averageOrganicViews = organicSamples.length ? organicSamples.reduce((total, value) => total + value, 0) / organicSamples.length : 0;
   const rankedPosts = [...posts]
-    .sort((a, b) => b.organic_views - a.organic_views || b.interactions - a.interactions || b.aiScore - a.aiScore)
+    .sort((a, b) => (b.effectEvaluation?.overallScore ?? b.aiScore) - (a.effectEvaluation?.overallScore ?? a.aiScore)
+      || (b.organic_views ?? -1) - (a.organic_views ?? -1) || b.interactions - a.interactions)
     .slice(0, 10);
 
   const breakoutCandidates = rankedPosts
-    .filter((post, index) => index === 0 || post.organic_views >= averageOrganicViews || post.aiScore >= 70)
+    .filter((post, index) => index === 0 || (post.organic_views ?? 0) >= averageOrganicViews || post.aiScore >= 70)
     .slice(0, 3)
     .map((post) => buildBreakoutAnalysis(post, averageOrganicViews));
 
   const lowEfficiency = posts
-    .filter((post) => post.organic_views < averageOrganicViews * 0.7 || post.interactionRate < 2 || post.aiScore < 60)
+    .filter((post) => (post.organic_views !== null && post.organic_views < averageOrganicViews * 0.7) || post.interactionRate < 2 || post.aiScore < 60)
     .sort((a, b) => a.aiScore - b.aiScore || a.views - b.views)
     .slice(0, 5)
     .map((post) => buildLowEfficiencyDiagnosis(post, averageOrganicViews));
@@ -223,16 +234,17 @@ export async function GET(request: Request) {
       periodPublished: postResult.results.length,
       ...totals,
       paidViews: posts.reduce((total, post) => total + post.paid_views, 0),
-      organicViews: posts.reduce((total, post) => total + post.organic_views, 0),
+      organicViews: posts.reduce((total, post) => total + (post.organic_views ?? 0), 0),
       interactionRate: percentage(totals.interactions, totals.views),
     },
     topPosts: rankedPosts,
+    effectEvaluationSummary: effectResult?.summary ?? null,
     breakoutAnalysis: breakoutCandidates,
     lowEfficiency,
     hotLinks,
     sourceFreshness: { latestPost, capturedCommentCount: totals.capturedComments },
-    sources: ["social_posts", "social_post_snapshots", "social_post_traffic_sources", "social_post_paid_traffic", "social_comments", "hot_topic_feedback"],
-    engine: ruleBasedContentEngine.name,
+    sources: ["social_posts", "social_post_snapshots", "social_post_metric_series", "social_post_traffic", "social_post_traffic_sources", "social_post_paid_traffic", "social_post_audience", "social_post_comment_keywords", "social_comments", "hot_topic_feedback"],
+    engine: platform === "douyin" ? "douyin-content-effect-rules-v1" : ruleBasedContentEngine.name,
     updatedAt: new Date().toISOString(),
   });
 }

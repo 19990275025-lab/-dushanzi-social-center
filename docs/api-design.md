@@ -134,9 +134,9 @@ Excel 作品字段经过映射和校验后入库；图片当前只上传 R2 并�
 |---|---|---|---|---|
 | `/api/dashboard` | GET | 运营驾驶舱汇总 | 日期范围 | 平台 KPI、发布、排行、热点、任务和建议 |
 | `/api/posts` | GET | 作品列表 | 平台、日期、排序等 | `social_posts` 列表 |
-| `/api/content-monitoring` | GET | 内容监测驾驶舱 | `platform=douyin|kuaishou|weibo`、日期范围 | KPI、TOP10、爆款、低效诊断、热点关联 |
+| `/api/content-monitoring` | GET | 内容监测驾驶舱 | `platform=douyin|kuaishou|weibo`、日期范围 | KPI、内容效果排行、四维分/等级/完整度、DOU+ 标签、爆款、低效诊断和热点关联；抖音使用 `douyin-content-effect-rules-v1` |
 | `/api/insights/content` | GET | 内容分析汇总 | 平台、日期范围 | 内容类型、作品、AI 建议和平台状态 |
-| `/api/insights/content/detail?id={postId}` | GET | 单作品详情 | 作品 ID | 最新快照、基础表现、自然/付费流量、观众画像、评论热词和真实评论；过期维度返回可用状态而非 0 |
+| `/api/insights/content/detail?id={postId}` | GET | 单作品详情与效果评价 | 作品 ID | 最新真实快照、自然/付费流量、观众画像、热词/评论、账号动态基准、四维证据、DOU+ 影响和下一条优化建议；过期维度返回可用状态而非 0 |
 | `/api/insights/fans` | GET | 粉丝分析 V2.1 | `trend=7d|30d|month|custom`、日期范围 | 真实快照、周期增长、跨批次指标/画像/热词变化、期间作品、AI摘要和周报；缺失维度返回不可用状态 |
 | `/api/ai-analysis` | GET | 规则型内容分析 | 日期范围 | 作品五维评分、平台建议、选题、日报/周报 |
 | `/api/comment-insights` | GET | 查询评论洞察 | 日期范围 | 情绪、关键词、需求、建议 |

@@ -11,8 +11,9 @@ export type MonitorPost = {
   duration: number | null;
   completion_rate: number | null;
   skip_rate: number | null;
-  organic_views?: number;
+  organic_views?: number | null;
   paid_views?: number;
+  has_paid_traffic?: number;
 };
 
 export const interactionCount = (post: Pick<MonitorPost, "likes" | "comments" | "favorites" | "shares">) =>
@@ -21,7 +22,7 @@ export const interactionCount = (post: Pick<MonitorPost, "likes" | "comments" | 
 export const percentage = (value: number, denominator: number) =>
   denominator > 0 ? Number(((value / denominator) * 100).toFixed(2)) : 0;
 
-const analysisViews = (post: MonitorPost) => post.organic_views ?? post.views;
+const analysisViews = (post: MonitorPost) => post.organic_views === undefined ? post.views : post.organic_views;
 
 function titleTraits(title: string) {
   const traits: string[] = [];
@@ -59,8 +60,9 @@ export function buildBreakoutAnalysis(
   const rate = percentage(interactionCount(post), post.views);
   const reasons: string[] = [];
   const naturalViews = analysisViews(post);
-  if (naturalViews >= averageViews * 1.5 && averageViews > 0) reasons.push(`自然播放达到周期均值的 ${(naturalViews / averageViews).toFixed(1)} 倍`);
-  else if (naturalViews >= averageViews && averageViews > 0) reasons.push("自然播放高于周期均值");
+  if (naturalViews !== null && naturalViews >= averageViews * 1.5 && averageViews > 0) reasons.push(`自然播放达到周期均值的 ${(naturalViews / averageViews).toFixed(1)} 倍`);
+  else if (naturalViews !== null && naturalViews >= averageViews && averageViews > 0) reasons.push("自然播放高于周期均值");
+  else if (naturalViews === null) reasons.push("平台未明确自然/付费播放拆分，自然播放不参与爆款判断");
   if ((post.paid_views ?? 0) > 0) reasons.push(`含 ${post.paid_views} 次付费播放，已从自然爆款判断中剔除`);
   else if (rate >= 3) reasons.push(`互动率达到 ${rate}%`);
   if ((post.completion_rate ?? 0) >= 30) reasons.push(`完播率达到 ${post.completion_rate}%`);
@@ -91,7 +93,7 @@ export function buildLowEfficiencyDiagnosis(
   const suggestions: string[] = [];
 
   const naturalViews = analysisViews(post);
-  if (naturalViews < averageViews * 0.7) {
+  if (naturalViews !== null && naturalViews < averageViews * 0.7) {
     reasons.push("自然播放明显低于周期均值");
     suggestions.push("把峡谷强画面或游客结果前置到前三秒，减少铺垫");
   }

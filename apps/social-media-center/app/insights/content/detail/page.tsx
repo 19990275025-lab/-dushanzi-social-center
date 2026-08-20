@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
+import type { ContentEffectEvaluation, EvaluationDimension } from "@/lib/content-effect-evaluation";
 
-type Tab = "traffic" | "trend" | "audience" | "keywords" | "comments";
+type Tab = "effect" | "traffic" | "trend" | "audience" | "keywords" | "comments";
 type Availability = "available" | "partial" | "expired" | "unavailable";
 type Comment = { id: number; username: string; comment_text: string | null; comment_type: string; comment_time: string | null; comment_time_raw: string | null; likes: number | null; likes_availability_status: string; reply_count: number; is_author: number; author_replied: number | null; sentiment: string; keyword: string | null; user_need: string | null };
 type Distribution = { name: string; rate: number | null; value: number | null }[];
@@ -18,12 +19,14 @@ type DetailData = {
   audience: { gender: Distribution; age: Distribution; region: Distribution; interest: Distribution; device: Distribution; activity: Distribution; attentionKeyword: Distribution; other: Distribution };
   metricSeries: { metric_type: string; series_name: string; point_index: number; point_time: string | null; point_label: string | null; metric_value: number; unit: string | null }[];
   paidTraffic: { campaign_type: string; play_count: number | null; relationship_to_overview: string; detail_available: number | null; data_availability_status: string }[];
+  effectEvaluation: ContentEffectEvaluation | null;
   dataAvailability: { postAgeDays: number | null; overall: Availability; traffic: Availability; trafficSources: Availability; audience: Availability; commentKeywords: Availability; comments: Availability; notes: { traffic: string; trafficSources: string; audience: string; commentKeywords: string } };
   sources: string[];
   updatedAt: string;
 };
 
 const tabs: { id: Tab; label: string }[] = [
+  { id: "effect", label: "效果评价" },
   { id: "traffic", label: "流量分析" },
   { id: "trend", label: "数据趋势" },
   { id: "audience", label: "观众分析" },
@@ -46,6 +49,18 @@ function AvailabilityMessage({ text }: { text: string }) {
   return <div className="detail-empty-state tall"><strong>{text}</strong><p>缺失字段保持 null / unavailable，不会转换为 0，也不会由规则模型补齐。</p></div>;
 }
 
+const confidenceLabels = { high: "高", medium: "中", low: "低" } as const;
+
+function EffectDimensionCard({ label, dimension }: { label: string; dimension: EvaluationDimension }) {
+  const percent = dimension.score === null ? 0 : (dimension.score / dimension.maxScore) * 100;
+  return <article className="effect-dimension-card">
+    <div><span>{label}</span><strong>{dimension.score === null ? "暂无评分" : <>{dimension.score}<small>/{dimension.maxScore}</small></>}</strong></div>
+    <i><b style={{ width: `${percent}%` }} /></i>
+    <p>可用指标 {dimension.availableIndicators}/{dimension.totalIndicators} · 维度可信度 {dimension.confidence}%</p>
+    {dimension.evidence.length > 0 && <ul>{dimension.evidence.slice(0, 3).map((item) => <li key={item}>{item}</li>)}</ul>}
+  </article>;
+}
+
 function DistributionPanel({ title, values }: { title: string; values: Distribution }) {
   return <article className="audience-dimension-block"><h3>{title}</h3>{values.length ? <div className="traffic-source-list">{values.slice(0, 40).map((item, index) => <div key={`${item.name}-${index}`}><span>{item.name}</span>{typeof item.rate === "number" ? <><i><b style={{ width: `${Math.min(100, item.rate)}%` }} /></i><strong>{item.rate}%</strong></> : <strong>{typeof item.value === "number" ? formatCompact(item.value) : "平台未提供"}</strong>}</div>)}</div> : <p className="empty-list">平台暂未提供该维度数据</p>}</article>;
 }
@@ -63,7 +78,7 @@ function SeriesChart({ title, points, color = "#168661" }: { title: string; poin
 }
 
 export default function ContentDetailPage() {
-  const [activeTab, setActiveTab] = useState<Tab>("traffic");
+  const [activeTab, setActiveTab] = useState<Tab>("effect");
   const [data, setData] = useState<DetailData | null>(null);
   const [error, setError] = useState("");
 
@@ -103,6 +118,59 @@ export default function ContentDetailPage() {
     <nav className="detail-analysis-tabs" aria-label="作品数据分析">
       {tabs.map((tab) => <button className={activeTab === tab.id ? "active" : ""} key={tab.id} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>)}
     </nav>
+
+    {activeTab === "effect" && <section className="effect-evaluation-section">
+      {data.effectEvaluation ? <>
+        <article className="panel effect-score-hero">
+          <div className="effect-score-main">
+            <span className="section-kicker">CONTENT EFFECT EVALUATION · V1.0</span>
+            <div className="effect-score-line">
+              <strong>{data.effectEvaluation.overallScore ?? "—"}</strong><small>{data.effectEvaluation.overallScore === null ? "暂无综合评分" : "综合评分 / 100"}</small>
+              <span className={`effect-grade grade-${data.effectEvaluation.grade ?? "none"}`}>{data.effectEvaluation.grade ?? "—"}级</span>
+            </div>
+            <h2>{data.effectEvaluation.gradeLabel}</h2>
+            <p>{data.effectEvaluation.diagnosis.performanceConclusion}</p>
+          </div>
+          <div className="effect-trust-panel">
+            <div><span>数据完整度</span><strong>{data.effectEvaluation.dataCompleteness}%</strong></div>
+            <div><span>数据可信度</span><strong>{confidenceLabels[data.effectEvaluation.dataConfidence]}</strong></div>
+            <div><span>自然表现可信度</span><strong>{confidenceLabels[data.effectEvaluation.naturalPerformanceConfidence]}</strong></div>
+            <div><span>自然口径播放证据</span><strong>{data.effectEvaluation.naturalEvidenceViews === null ? "口径待确认" : formatCompact(data.effectEvaluation.naturalEvidenceViews)}</strong></div>
+          </div>
+          <div className="effect-label-row large">{data.effectEvaluation.labels.map((label) => <span className={`effect-label label-${label === "含付费流量" ? "paid" : label === "数据不足" ? "insufficient" : "result"}`} key={label}>{label}</span>)}</div>
+        </article>
+
+        <div className="effect-dimension-grid">
+          <EffectDimensionCard label="A · 内容传播力" dimension={data.effectEvaluation.dimensions.propagation} />
+          <EffectDimensionCard label="B · 互动质量" dimension={data.effectEvaluation.dimensions.interaction} />
+          <EffectDimensionCard label="C · 用户吸引力" dimension={data.effectEvaluation.dimensions.attraction} />
+          <EffectDimensionCard label="D · 内容效率" dimension={data.effectEvaluation.dimensions.efficiency} />
+        </div>
+
+        <article className="panel effect-baseline-panel">
+          <div className="detail-panel-heading"><div><span className="section-kicker">ACCOUNT BASELINE</span><h2>独山子大峡谷账号动态基准</h2></div><span className="source-chip">真实历史样本 {data.effectEvaluation.historicalBaseline.sampleSize}</span></div>
+          <div className="effect-baseline-grid">
+            <div><span>最近7天作品</span><strong>{data.effectEvaluation.historicalBaseline.last7Days}</strong></div>
+            <div><span>最近30天作品</span><strong>{data.effectEvaluation.historicalBaseline.last30Days}</strong></div>
+            <div><span>历史播放中位数</span><strong>{data.effectEvaluation.historicalBaseline.medianViews === null ? "暂无" : formatCompact(data.effectEvaluation.historicalBaseline.medianViews)}</strong></div>
+            <div><span>历史 TOP25% 门槛</span><strong>{data.effectEvaluation.historicalBaseline.top25Views === null ? "暂无" : formatCompact(data.effectEvaluation.historicalBaseline.top25Views)}</strong></div>
+            <div><span>历史 TOP10% 门槛</span><strong>{data.effectEvaluation.historicalBaseline.top10Views === null ? "暂无" : formatCompact(data.effectEvaluation.historicalBaseline.top10Views)}</strong></div>
+          </div>
+          {data.effectEvaluation.historicalBaseline.message && <p className="data-quality-notice">{data.effectEvaluation.historicalBaseline.message}</p>}
+        </article>
+
+        <div className="effect-diagnosis-grid">
+          <article><span>表现结论</span><p>{data.effectEvaluation.diagnosis.performanceConclusion}</p></article>
+          <article><span>做得好的地方</span><ul>{data.effectEvaluation.diagnosis.strengths.map((item) => <li key={item}>{item}</li>)}</ul></article>
+          <article><span>存在的问题</span>{data.effectEvaluation.diagnosis.problems.length ? <ul>{data.effectEvaluation.diagnosis.problems.map((item) => <li key={item}>{item}</li>)}</ul> : <p>当前真实指标未触发明确问题阈值。</p>}</article>
+          <article><span>流量结构判断</span><p>{data.effectEvaluation.diagnosis.trafficAssessment}</p></article>
+          <article><span>观众特征</span><p>{data.effectEvaluation.diagnosis.audienceFeatures}</p></article>
+          <article><span>评论反馈</span><p>{data.effectEvaluation.diagnosis.commentFeedback}</p></article>
+          <article className={post.hasPaidTraffic ? "paid-diagnosis" : ""}><span>DOU+ 影响</span><p>{data.effectEvaluation.diagnosis.paidImpact}</p></article>
+          <article className="next-optimization"><span>下一条优化建议</span><ol>{data.effectEvaluation.diagnosis.nextOptimization.map((item) => <li key={item}>{item}</li>)}</ol></article>
+        </div>
+      </> : <AvailabilityMessage text="当前作品暂无可用的内容效果评价" />}
+    </section>}
 
     {activeTab === "traffic" && <section className="detail-analysis-grid traffic-overview-grid">
       <div className="detail-column">

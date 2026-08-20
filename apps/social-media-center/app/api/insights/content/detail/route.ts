@@ -1,5 +1,6 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
+import { loadContentEffectEvaluations } from "@/lib/content-effect-evaluation-server";
 
 type PostRow = {
   id: number;
@@ -154,8 +155,13 @@ export async function GET(request: Request) {
       CASE WHEN likes_availability_status = 'available' THEN likes ELSE NULL END AS likes,
       likes_availability_status, reply_count, is_author, author_replied, sentiment, keyword, user_need
       FROM social_comments WHERE post_id = ?
+        AND ((snapshot_id IS NOT NULL AND snapshot_id = (
+          SELECT id FROM social_post_snapshots WHERE post_id = ? ORDER BY snapshot_time DESC, id DESC LIMIT 1
+        )) OR (snapshot_id IS NULL AND NOT EXISTS (
+          SELECT 1 FROM social_post_snapshots WHERE post_id = ?
+        )))
       ORDER BY likes DESC, COALESCE(comment_time, snapshot_time) DESC, id DESC LIMIT 100`
-    ).bind(id).all<CommentRow>(),
+    ).bind(id, id, id).all<CommentRow>(),
     d1.prepare(`SELECT dimension_type, dimension_name, dimension_value, percentage, ranking
       FROM social_post_audience WHERE snapshot_id = (
         SELECT id FROM social_post_snapshots WHERE post_id = ? ORDER BY snapshot_time DESC, id DESC LIMIT 1
@@ -173,6 +179,9 @@ export async function GET(request: Request) {
   ]);
 
   if (!post) return Response.json({ error: "未找到该作品" }, { status: 404 });
+  const effectEvaluation = post.platform === "douyin"
+    ? (await loadContentEffectEvaluations(d1, { platform: "douyin", postId: post.id })).evaluations[0] ?? null
+    : null;
   const unavailableRecord = ["private", "failed", "unavailable"].includes(snapshot?.source_record_status ?? "");
   const views = unavailableRecord ? null : snapshot?.play_count ?? post.views;
   const likes = unavailableRecord ? null : snapshot?.like_count ?? post.likes;
@@ -184,7 +193,7 @@ export async function GET(request: Request) {
   const paidViews = paidTraffic.results.reduce((total, row) => total + (row.play_count ?? 0), 0);
   const paidRelationship = paidTraffic.results.some((row) => row.relationship_to_overview === "included")
     ? "included" : paidTraffic.results.some((row) => row.relationship_to_overview === "additional") ? "additional" : "unknown";
-  const organicViews = views === null ? null : paidRelationship === "included" ? Math.max(0, views - paidViews) : paidRelationship === "additional" ? views : null;
+  const organicViews = views === null ? null : paidViews === 0 ? views : paidRelationship === "additional" ? views : null;
   const group = (type: string) => audienceResult.results.filter((item: AudienceRow) => item.dimension_type === type)
     .map((item: AudienceRow) => ({
       name: item.dimension_name,
@@ -242,6 +251,7 @@ export async function GET(request: Request) {
     trafficSources: sourceResult.results.map((item: SourceRow) => ({ name: item.source_name, value: item.traffic_value, rate: item.percentage, change: item.change_percentage, nature: item.traffic_nature })),
     audience,
     metricSeries: seriesResult.results,
+    effectEvaluation,
     paidTraffic: paidTraffic.results,
     dataAvailability: {
       postAgeDays: snapshot?.post_age_days ?? null,

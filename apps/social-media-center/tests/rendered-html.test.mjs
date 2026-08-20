@@ -144,7 +144,7 @@ test("content monitoring uses selected-platform posts, comments and hot-topic fe
     readFile(new URL("lib/content-monitoring.ts", root), "utf8"),
     readFile(new URL("app/globals.css", root), "utf8"),
   ]);
-  for (const label of ["今日发布", "播放量", "点赞", "评论", "收藏", "分享", "互动率", "作品排行榜 TOP10", "爆款分析", "爆款原因", "内容结构", "标题特点", "拍摄方式", "低效作品诊断", "播放低原因", "优化建议", "热点关联", "推荐是否有效"]) {
+  for (const label of ["今日发布", "播放量", "点赞", "评论", "收藏", "分享", "互动率", "内容效果排行榜", "爆款分析", "爆款原因", "内容结构", "标题特点", "拍摄方式", "低效作品诊断", "播放低原因", "优化建议", "热点关联", "推荐是否有效"]) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /\/api\/content-monitoring/);
@@ -250,6 +250,48 @@ test("WorkBuddy deep content V2.1 preserves source files, real series and paid t
   assert.match(detailPage, /平台未提供/);
   assert.match(monitor, /source_record_status/);
   assert.match(monitor, /social_post_paid_traffic/);
+});
+
+test("Douyin content effect V1.0 uses four weighted dimensions, dynamic baselines and paid-traffic protection", async () => {
+  const [model, loader, monitorApi, detailApi, monitorPage, detailPage, styles] = await Promise.all([
+    readFile(new URL("lib/content-effect-evaluation.ts", root), "utf8"),
+    readFile(new URL("lib/content-effect-evaluation-server.ts", root), "utf8"),
+    readFile(new URL("app/api/content-monitoring/route.ts", root), "utf8"),
+    readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/insights/content/detail/page.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+
+  assert.match(model, /weightedDimension\(\[[\s\S]+\], 30\)/);
+  assert.match(model, /weightedDimension\(\[[\s\S]+\], 25\)/);
+  assert.match(model, /postType\(post\) === "image" \? imageIndicators : videoIndicators, 20/);
+  assert.match(model, /availableWeight \? round/);
+  assert.match(model, /overallScore\(\[propagation, interaction, attraction, efficiency\]\)/);
+  assert.match(model, /medianViews: quantile\(historicalViews, 0\.5\)/);
+  assert.match(model, /top25Views: quantile\(historicalViews, 0\.75\)/);
+  assert.match(model, /top10Views: quantile\(historicalViews, 0\.9\)/);
+  assert.match(model, /历史样本不足，当前评分为初步评价/);
+  assert.match(model, /relationshipToOverview === "additional"/);
+  assert.doesNotMatch(model, /post\.views\s*-\s*paidViews|views\s*-\s*paid/);
+  assert.match(model, /natural\.paidViews > 0.*capGrade\(grade, "A"\)/);
+  assert.match(model, /grade === "S" && natural\.paidViews === 0/);
+  assert.match(model, /投流放大型高播放作品/);
+  assert.match(model, /sourceRecordStatus === "private"/);
+  assert.match(model, /私密作品不参与内容效果评价/);
+  assert.match(loader, /account_id NOT LIKE 'test_%'/);
+  assert.match(loader, /c\.snapshot_id = s\.id/);
+  assert.doesNotMatch(loader, /INSERT INTO|UPDATE social_|DELETE FROM/);
+  assert.match(monitorApi, /douyin-content-effect-rules-v1/);
+  assert.match(monitorApi, /effectEvaluationSummary/);
+  assert.match(detailApi, /loadContentEffectEvaluations/);
+  assert.match(detailApi, /paidRelationship === "additional" \? views : null/);
+  assert.doesNotMatch(detailApi, /views\s*-\s*paidViews/);
+  for (const label of ["综合表现", "自然传播", "互动质量", "完播表现", "涨粉能力", "DOU\\+作品", "数据完整度"]) assert.match(monitorPage, new RegExp(label));
+  for (const label of ["效果评价", "内容传播力", "互动质量", "用户吸引力", "内容效率", "表现结论", "做得好的地方", "存在的问题", "流量结构判断", "观众特征", "评论反馈", "DOU\\+ 影响", "下一条优化建议"]) assert.match(detailPage, new RegExp(label));
+  assert.match(styles, /effect-score-hero/);
+  assert.match(styles, /effect-dimension-grid/);
+  assert.match(styles, /effect-diagnosis-grid/);
 });
 
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {

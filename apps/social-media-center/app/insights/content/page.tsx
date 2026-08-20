@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useGlobalDateRange } from "@/components/GlobalDateFilter";
 import { dateRangeQuery } from "@/lib/date-range";
 import { formatCompact, formatDate, platformLabel } from "@/lib/format";
+import type { ContentEffectEvaluation } from "@/lib/content-effect-evaluation";
 
 type TopPost = {
   id: number;
@@ -14,10 +15,11 @@ type TopPost = {
   interactions: number;
   interactionRate: number;
   aiScore: number;
-  organic_views: number;
+  organic_views: number | null;
   paid_views: number;
   has_paid_traffic: number;
   data_availability_status: string;
+  effectEvaluation: ContentEffectEvaluation | null;
 };
 
 type BreakoutItem = {
@@ -72,6 +74,14 @@ type ContentMonitoringData = {
     organicViews: number;
   };
   topPosts: TopPost[];
+  effectEvaluationSummary: null | {
+    participating: number;
+    insufficient: number;
+    paid: number;
+    naturalBreakouts: number;
+    paidAmplified: number;
+    gradeCounts: Record<"S" | "A" | "B" | "C" | "D", number>;
+  };
   breakoutAnalysis: BreakoutItem[];
   lowEfficiency: LowEfficiencyItem[];
   hotLinks: HotLink[];
@@ -82,6 +92,7 @@ type ContentMonitoringData = {
 };
 
 type MonitoringPlatform = ContentMonitoringData["platform"];
+type RankingMode = "overall" | "natural" | "interaction" | "completion" | "followers" | "paid";
 
 const supportedPlatforms = new Set<MonitoringPlatform>(["douyin", "kuaishou", "weibo"]);
 
@@ -115,6 +126,7 @@ export default function ContentMonitoringPage() {
   const [data, setData] = useState<ContentMonitoringData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rankingMode, setRankingMode] = useState<RankingMode>("overall");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,6 +151,26 @@ export default function ContentMonitoringPage() {
 
   if (loading && !data) return <div className="loading-panel"><span className="loading-dot" />正在读取{currentPlatformLabel}作品监测数据…</div>;
   if (error || !data) return <div className="error-panel">{error || "暂无内容监测数据"}</div>;
+
+  const rankingModes: Array<{ id: RankingMode; label: string }> = [
+    { id: "overall", label: "综合表现" },
+    { id: "natural", label: "自然传播" },
+    { id: "interaction", label: "互动质量" },
+    { id: "completion", label: "完播表现" },
+    { id: "followers", label: "涨粉能力" },
+    { id: "paid", label: "DOU+作品" },
+  ];
+  const rankingValue = (post: TopPost) => {
+    const evaluation = post.effectEvaluation;
+    if (!evaluation) return -1;
+    if (rankingMode === "natural") return evaluation.rankingSignals.naturalPropagation ?? -1;
+    if (rankingMode === "interaction") return evaluation.rankingSignals.interactionQuality ?? -1;
+    if (rankingMode === "completion") return evaluation.rankingSignals.completionPerformance ?? -1;
+    if (rankingMode === "followers") return evaluation.rankingSignals.followerGrowth ?? -1;
+    return evaluation.overallScore ?? -1;
+  };
+  const rankedPosts = data.topPosts.filter((post) => rankingMode !== "paid" || post.has_paid_traffic === 1)
+    .sort((a, b) => rankingValue(b) - rankingValue(a) || (b.organic_views ?? -1) - (a.organic_views ?? -1));
 
   return <div className={`page-stack content-monitor-v1 platform-themed-page theme-${platform}`}>
     <header className="page-heading compact-heading">
@@ -172,24 +204,36 @@ export default function ContentMonitoringPage() {
 
     <section className="panel content-ranking-panel">
       <div className="panel-heading">
-        <div><span className="section-kicker">TOP CONTENT</span><h2>作品排行榜 TOP10</h2></div>
-        <span className="section-note">按自然播放优先；DOU+ 付费流量不计入爆款判断</span>
+        <div><span className="section-kicker">CONTENT EFFECT · V1.0</span><h2>内容效果排行榜</h2></div>
+        <span className="section-note">默认按综合效果评分；私密作品不参与排名</span>
       </div>
+      {data.effectEvaluationSummary && <div className="effect-summary-strip">
+        <div><span>参与评价</span><strong>{data.effectEvaluationSummary.participating}</strong></div>
+        <div><span>数据不足</span><strong>{data.effectEvaluationSummary.insufficient}</strong></div>
+        <div><span>含DOU+</span><strong>{data.effectEvaluationSummary.paid}</strong></div>
+        <div><span>自然爆款</span><strong>{data.effectEvaluationSummary.naturalBreakouts}</strong></div>
+        <div><span>投流放大型</span><strong>{data.effectEvaluationSummary.paidAmplified}</strong></div>
+      </div>}
+      <div className="effect-ranking-tabs" role="group" aria-label="内容效果排序方式">
+        {rankingModes.map((mode) => <button className={rankingMode === mode.id ? "active" : ""} key={mode.id} onClick={() => setRankingMode(mode.id)}>{mode.label}</button>)}
+      </div>
+      {data.topPosts[0]?.effectEvaluation?.historicalBaseline.message && <p className="data-quality-notice">{data.topPosts[0].effectEvaluation.historicalBaseline.message}</p>}
       <div className="table-wrap">
         <table className="content-table content-monitor-ranking">
-          <thead><tr><th>排名</th><th>标题</th><th>平台</th><th>播放</th><th>互动</th><th>互动率</th><th>AI评分</th><th>操作</th></tr></thead>
+          <thead><tr><th>排名</th><th>标题</th><th>综合评价</th><th>传播力</th><th>互动质量</th><th>用户吸引</th><th>内容效率</th><th>可信度</th><th>操作</th></tr></thead>
           <tbody>
-            {data.topPosts.map((post, index) => <tr key={post.id}>
+            {rankedPosts.map((post, index) => <tr key={post.id}>
               <td><span className={`rank-chip rank-${index + 1}`}>TOP {index + 1}</span></td>
-              <td><strong>{post.title}</strong>{post.has_paid_traffic === 1 && <span className="paid-traffic-badge compact">含付费流量</span>}<small className="table-subline">{formatDate(post.publish_time)} · 自然播放 {formatCompact(post.organic_views)}</small></td>
-              <td><span className={`platform-tag tag-${post.platform}`}>{platformLabel(post.platform)}</span></td>
-              <td className="metric-cell">{formatCompact(post.views)}</td>
-              <td>{formatCompact(post.interactions)}</td>
-              <td>{post.interactionRate}%</td>
-              <td><span className={`score-pill ${post.aiScore >= 75 ? "score-good" : post.aiScore >= 60 ? "score-mid" : "score-low"}`}>{post.aiScore}</span></td>
+              <td><strong>{post.title}</strong><div className="effect-label-row">{post.effectEvaluation?.labels.map((label) => <span className={`effect-label label-${label === "含付费流量" ? "paid" : label === "数据不足" ? "insufficient" : "result"}`} key={label}>{label}</span>)}</div><small className="table-subline">{formatDate(post.publish_time)} · 自然证据 {post.effectEvaluation?.naturalEvidenceViews === null ? "口径待确认" : formatCompact(post.effectEvaluation?.naturalEvidenceViews ?? 0)}</small></td>
+              <td><span className={`effect-grade grade-${post.effectEvaluation?.grade ?? "none"}`}>{post.effectEvaluation?.grade ?? "—"}</span><strong className="effect-score">{post.effectEvaluation?.overallScore ?? "—"}分</strong><small className="table-subline">{post.effectEvaluation?.gradeLabel ?? "待评价"}</small></td>
+              <td>{post.effectEvaluation?.dimensions.propagation.score ?? "—"}<small className="table-subline">/30</small></td>
+              <td>{post.effectEvaluation?.dimensions.interaction.score ?? "—"}<small className="table-subline">/25</small></td>
+              <td>{post.effectEvaluation?.dimensions.attraction.score ?? "—"}<small className="table-subline">/25</small></td>
+              <td>{post.effectEvaluation?.dimensions.efficiency.score ?? "—"}<small className="table-subline">/20</small></td>
+              <td><span className={`confidence-badge confidence-${post.effectEvaluation?.dataConfidence ?? "low"}`}>{post.effectEvaluation?.dataConfidence ?? "low"}</span><small className="table-subline">数据完整度 {post.effectEvaluation?.dataCompleteness ?? 0}%</small></td>
               <td><a className="content-analysis-link" href={`/insights/content/detail?id=${post.id}`}>数据分析</a></td>
             </tr>)}
-            {!data.topPosts.length && <tr><td className="empty-cell" colSpan={8}>筛选周期内暂无{currentPlatformLabel}作品</td></tr>}
+            {!rankedPosts.length && <tr><td className="empty-cell" colSpan={9}>{rankingMode === "paid" ? "筛选周期内没有DOU+作品" : `筛选周期内暂无${currentPlatformLabel}作品`}</td></tr>}
           </tbody>
         </table>
       </div>

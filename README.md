@@ -18,7 +18,7 @@
 | 模块 | 路径 | 当前能力 | 状态 |
 |---|---|---|---|
 | 运营驾驶舱 | `/` | 周期 KPI、发布、播放互动、作品排行、热点和运营建议 | 已完成 |
-| 内容监测中心 | `/insights/content` | WorkBuddy 深度作品快照、真实趋势、流量、DOU+、作品观众、热词、评论和内容诊断 | 待优化 |
+| 内容监测中心 | `/insights/content` | WorkBuddy 深度作品数据 + 内容效果 V1.0；四维评分、动态基准、DOU+ 保护、证据诊断和分类排行 | 待优化 |
 | 粉丝分析中心 | `/insights/fans` | 抖音真实总量、跨批次增长/画像/热词比较、期间作品关联、内容吸粉、周报和导出 | 待优化 |
 | 数据采集中心 | `/collector`、`/imports` | 抖音粉丝、WorkBuddy 深度作品 V2.1、统一 V2 API、热点自动接力、Excel/图片导入和采集日志 | 开发中 |
 | 热点监测中心 | `/hot-topics` | WorkBuddy 热点、关联分析、A/B/C 推荐、选题和效果复盘 | 已完成 |
@@ -107,6 +107,7 @@ pnpm test
 | [模块状态](docs/module-status.md) | 版本、完成度、数据来源、问题和计划 |
 | [数据库设计](docs/database-design.md) | 全部核心表、字段、关系与数据质量 |
 | [API 设计](docs/api-design.md) | 现有路由、输入、输出和安全约定 |
+| [抖音内容效果评价 V1.0](docs/content-effect-evaluation-v1.md) | 四维评分、账号动态基准、缺失值保护、DOU+ 隔离和真实数据验证 |
 | [数据流](docs/data-flow.md) | WorkBuddy、抖音及规划工具到复盘的 Mermaid 流程 |
 | [版本路线](docs/version-roadmap.md) | `social-v0.9.0` 至 `social-v3.0.0` 目标和验收 |
 | [开发与部署](docs/deployment.md) | 本地环境、D1/R2、Sites、GitHub 和回滚 |
