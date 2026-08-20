@@ -148,7 +148,7 @@ test("content monitoring uses selected-platform posts, comments and hot-topic fe
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /\/api\/content-monitoring/);
-  assert.match(page, /social_posts、social_comments、hot_topic_feedback/);
+  assert.match(page, /data\.sources\.join/);
   assert.match(api, /FROM social_posts/);
   assert.match(api, /supportedPlatforms/);
   assert.match(api, /searchParams\.get\("platform"\)/);
@@ -168,6 +168,44 @@ test("content monitoring uses selected-platform posts, comments and hot-topic fe
   assert.match(styles, /low-efficiency-list/);
   assert.match(styles, /content-hot-link-table/);
   assert.match(styles, /content-monitor-v1[^}]+--monitor-red: var\(--insight-primary\)/);
+});
+
+test("WorkBuddy content V2 keeps immutable post identity and snapshot-level real metrics", async () => {
+  const [parser, preview, confirm, detail, monitor, collector, schema, migration, docs] = await Promise.all([
+    readFile(new URL("lib/workbuddy-posts-v2.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/posts-v2/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/posts-v2/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
+    readFile(new URL("app/api/content-monitoring/route.ts", root), "utf8"),
+    readFile(new URL("app/collector/page.tsx", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("drizzle/0027_content_data_model_v2.sql", root), "utf8"),
+    readProjectMigration("009_create_content_data_model_v2.sql"),
+  ]);
+  for (const source of [schema, migration, docs]) {
+    for (const table of ["social_post_snapshots", "social_post_traffic", "social_post_traffic_sources", "social_post_comment_keywords"]) {
+      assert.match(source, new RegExp(table));
+    }
+  }
+  assert.match(parser, /commentOverviewCount/);
+  assert.match(parser, /actualLoadedCount/);
+  assert.match(parser, /commentRowsCount/);
+  assert.match(parser, /trafficNature/);
+  assert.match(parser, /DOU\+/);
+  assert.match(parser, /expired/);
+  assert.match(parser, /commentType/);
+  assert.match(preview, /normalizeWorkBuddyPostsV2/);
+  assert.match(confirm, /confirmed !== true/);
+  assert.match(confirm, /INSERT INTO social_post_snapshots/);
+  assert.match(confirm, /INSERT INTO social_post_traffic_sources/);
+  assert.match(confirm, /INSERT INTO social_post_comment_keywords/);
+  assert.match(detail, /commentOverviewCount/);
+  assert.match(detail, /actualLoadedCount/);
+  assert.match(detail, /trafficSources/);
+  assert.match(monitor, /traffic_nature = 'paid'/);
+  assert.match(monitor, /organic_views/);
+  assert.match(collector, /WorkBuddy 作品 JSON/);
+  assert.match(collector, /确认入库/);
 });
 
 test("data collection center combines automatic collection and imports without removing compatibility page", async () => {
@@ -303,7 +341,8 @@ test("pages use database-backed API routes", async () => {
   assert.doesNotMatch(contentInsights, /"wechat_channels"/);
   assert.match(contentDetail, /FROM social_posts/);
   assert.match(contentDetail, /FROM social_comments/);
-  assert.match(contentDetail, /trafficSources: parseDistribution/);
+  assert.match(contentDetail, /FROM social_post_traffic_sources/);
+  assert.match(contentDetail, /FROM social_post_snapshots/);
   assert.match(contentDetail, /FROM content_audience_analysis/);
   assert.match(fanInsights, /FROM social_fans/);
   assert.match(fanInsights, /FROM fan_growth_records/);
@@ -447,10 +486,10 @@ test("top content opens a real-data work analysis with separate tabs", async () 
   assert.match(content, /\/insights\/content\/detail\?id=/);
   assert.match(content, /数据分析/);
   for (const tab of ["流量分析", "观众分析", "评论热词", "评论管理"]) assert.match(detail, new RegExp(tab));
-  assert.doesNotMatch(detail, /<h2>流量来源<\/h2>/);
-  assert.doesNotMatch(detail, /搜索与评论关键词/);
-  assert.match(detail, /未采集指标不会生成模拟数据/);
-  assert.match(api, /interactionRate: percent/);
+  assert.match(detail, /<h2>流量来源<\/h2>/);
+  assert.match(detail, /评论热词/);
+  assert.match(detail, /不会转换为 0，也不会由规则模型补齐/);
+  assert.match(api, /interactionRate: completeInteractions \? percent/);
   assert.doesNotMatch(api, /个人主页|推荐页|关注页/);
 });
 

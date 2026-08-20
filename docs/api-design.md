@@ -1,6 +1,6 @@
 # 新媒体运营中心 API 设计与现状
 
-> 核对范围：`apps/social-media-center/app/api/**/route.ts`，2026-08-18。
+> 核对范围：`apps/social-media-center/app/api/**/route.ts`，2026-08-20。
 > 本文记录现有接口，不在本次文档工作中新增或修改 API。
 
 ## 1. 通用约定
@@ -51,6 +51,8 @@
 | `/api/collections/douyin-v3/confirm` | POST | 明确确认后批量写入 | `{ confirmed: true, payload }` | 日志 ID、粉丝/增长/作品/观众/评论写入数 |
 | `/api/collections/fans-v2` | POST | 粉丝真实数据 V2 预览、校验和分层映射 | 抖音粉丝原始 JSON | 账号快照、周期增长、画像明细、不可用字段和数量摘要 |
 | `/api/collections/fans-v2/confirm` | POST | 粉丝真实数据 V2 确认入库 | `{ confirmed: true, payload }` | 批次 ID、四张表写入数、重复批次状态 |
+| `/api/collections/posts-v2` | POST | WorkBuddy 作品真实 JSON 预览、校验和字段映射 | `douyin_posts_YYYYMMDD.json` 原始对象 | 147 个实际字段路径、作品/快照/流量/画像/热词/评论预览、不可用项和警告 |
+| `/api/collections/posts-v2/confirm` | POST | WorkBuddy 作品 V2 人工确认入库 | `{ confirmed: true, payload }` | 主表新增/更新、快照和各明细表写入数、评论三个口径及批次日志 |
 | `/api/collections/douyin-v2` | POST | 兼容 V2.1 预览 | V2.1 采集 JSON | 完整率和无落库预览 |
 | `/api/collections/douyin-v2/confirm` | POST | 兼容 V2.1 确认 | 确认标记与预览数据 | 写入与日志结果 |
 | `/api/collections/comments` | POST | 独立评论采集预览 | 按作品组织的评论数据 | 预览、校验与日志 |
@@ -61,6 +63,8 @@
 V3 校验包括日期、抖音链接、非负指标、0–100 的完播/划走率、观众分布和评论字段；每个作品最多接收 50 条评论。该 API **接收采集结果，不在服务器内启动或控制抖音 App**。
 
 粉丝 V2 接口按 `source_file + platform + account_id` 识别采集批次，同一批次不会重复写入。确认接口分别写入 `fan_collection_batches`、`social_fans`、`fan_growth_records` 和 `fan_profile_records`；平台未提供的指标保存为 `null / unavailable`，不会转换为 0。
+
+作品 V2 接口按来源文件生成批次键，同批次确认不会重复入库；相同 `platform_post_id` 更新作品主记录，但每个新采集时间新增 `social_post_snapshots`。流量、来源、作品观众、评论热词和真实评论分别写入明细表。评论总览、页面声明加载数和 JSON 实际行数独立返回；DOU+ 标记为 `paid`，不会进入自然播放排名。
 
 ### 2.3 人工数据导入
 
@@ -128,7 +132,7 @@ Excel 作品字段经过映射和校验后入库；图片当前只上传 R2 并�
 | `/api/posts` | GET | 作品列表 | 平台、日期、排序等 | `social_posts` 列表 |
 | `/api/content-monitoring` | GET | 内容监测驾驶舱 | `platform=douyin|kuaishou|weibo`、日期范围 | KPI、TOP10、爆款、低效诊断、热点关联 |
 | `/api/insights/content` | GET | 内容分析汇总 | 平台、日期范围 | 内容类型、作品、AI 建议和平台状态 |
-| `/api/insights/content/detail?id={postId}` | GET | 单作品详情 | 作品 ID | 流量/互动指标、观众画像、评论与热词 |
+| `/api/insights/content/detail?id={postId}` | GET | 单作品详情 | 作品 ID | 最新快照、基础表现、自然/付费流量、观众画像、评论热词和真实评论；过期维度返回可用状态而非 0 |
 | `/api/insights/fans` | GET | 粉丝分析 V2.1 | `trend=7d|30d|month|custom`、日期范围 | 真实快照、周期增长、跨批次指标/画像/热词变化、期间作品、AI摘要和周报；缺失维度返回不可用状态 |
 | `/api/ai-analysis` | GET | 规则型内容分析 | 日期范围 | 作品五维评分、平台建议、选题、日报/周报 |
 | `/api/comment-insights` | GET | 查询评论洞察 | 日期范围 | 情绪、关键词、需求、建议 |

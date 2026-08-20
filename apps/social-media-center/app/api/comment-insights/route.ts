@@ -17,8 +17,8 @@ type CommentRow = {
   post_id: number;
   platform: string;
   username: string;
-  comment_text: string;
-  comment_time: string;
+  comment_text: string | null;
+  comment_time: string | null;
   likes: number;
   sentiment: string;
   keyword: string | null;

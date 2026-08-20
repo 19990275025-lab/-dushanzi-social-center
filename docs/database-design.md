@@ -15,8 +15,12 @@ erDiagram
   fan_collection_batches ||--o| social_fans : creates
   fan_collection_batches ||--o{ fan_growth_records : contains
   fan_collection_batches ||--o{ fan_profile_records : contains
+  social_posts ||--o{ social_post_snapshots : snapshots
+  social_post_snapshots ||--o| social_post_traffic : traffic
+  social_post_snapshots ||--o{ social_post_traffic_sources : sources
+  social_post_snapshots ||--o{ content_audience_analysis : audience
+  social_post_snapshots ||--o{ social_post_comment_keywords : keywords
   social_posts ||--o{ social_comments : has
-  social_posts ||--o| content_audience_analysis : has
   data_import_logs ||--o{ social_posts : imports
   collection_logs ||--o{ collection_staging_records : stages
   collection_logs ||--o{ social_posts : collects
@@ -56,31 +60,47 @@ erDiagram
 
 ### 2.2 `social_posts`
 
-用途：统一保存作品基础指标和抖音流量指标，是内容分析、任务关联与效果复盘的核心事实表。
+用途：作品主表，只保存平台作品标识和相对稳定的内容元数据。每次采集的播放、互动与分析指标写入快照及明细表，避免覆盖历史。
 
 | 字段 | 类型 | 作用 |
 |---|---|---|
 | `id` | INTEGER PK | 作品编号 |
 | `account_id` | INTEGER FK | 关联 `social_accounts.id` |
 | `platform` / `source` | TEXT | 平台与数据来源 |
+| `platform_post_id` | TEXT NULL | 平台作品唯一标识；`platform + platform_post_id` 唯一 |
 | `title` / `content_type` | TEXT | 标题与内容类型 |
 | `publish_time` | TEXT | 平台发布时间 |
-| `video_url` / `cover_url` | TEXT NULL | 作品和封面地址 |
-| `views` | INTEGER | 播放量 |
-| `likes` / `comments` | INTEGER | 点赞量、平台显示评论量 |
-| `favorites` / `shares` | INTEGER | 收藏量、分享量 |
-| `fans_growth` | INTEGER | 作品级涨粉字段；是否可归因取决于来源口径 |
+| `post_url` / `video_url` / `cover_url` | TEXT NULL | 作品详情、作品和封面地址 |
+| `post_type` / `post_status` / `is_pinned` | TEXT / INTEGER | 平台原始类型、状态和置顶标记 |
 | `hashtags` | TEXT(JSON) | 标签数组 |
-| `duration` | INTEGER NULL | 时长 |
-| `completion_rate` / `skip_rate` | REAL NULL | 完播率、划走率 |
-| `average_play_duration` | REAL NULL | 平均播放时长 |
-| `traffic_sources` | TEXT(JSON) | 流量来源分布；当前页面不强制展示 |
+| `duration` / `duration_seconds` | INTEGER / REAL NULL | 时长兼容字段与秒数 |
+| `content_metadata` | TEXT(JSON) NULL | WorkBuddy 实际内容元数据原文 |
+| `data_availability_status` | TEXT | `available / partial / expired / unavailable` |
+| `views` 等旧指标字段 | INTEGER | 兼容旧接口的最新值缓存；历史分析以快照表为准 |
 | `ai_analysis` | TEXT(JSON) NULL | 作品分析扩展结果 |
 | `import_log_id` | INTEGER FK NULL | Excel/图片导入日志 |
 | `collection_log_id` | INTEGER FK NULL | 自动/API 采集日志 |
 | `created_at` / `updated_at` | TEXT | 创建和更新时间 |
 
-约束：`account_id + title` 唯一。来源包括抖音 V3、统一内容接口和 Excel 导入。主要供驾驶舱、内容监测、粉丝分析、AI 分析、策划、任务和复盘使用。
+约束：保留旧的 `account_id + title` 唯一约束，同时增加 `platform + platform_post_id` 唯一约束。相同平台作品再次采集时更新主记录并新增快照，不创建重复作品。
+
+#### 2.2.1 `social_post_snapshots`
+
+用途：每次采集的作品表现快照，保存播放、点赞、平台评论总数、收藏、分享、涨粉以及各详情模块可用状态。`post_id + snapshot_time` 唯一。
+
+关键字段包括 `play_count`、`like_count`、`comment_overview_count`、`actual_loaded_count`、`comment_rows_count`、`favorite_count`、`share_count`、`follower_gain`、`post_age_days`、六类 `*_availability_status`、`source_file` 和 `raw_payload`。`comment_overview_count` 是平台累计评论数，`actual_loaded_count` 是页面本次声明的实际加载数，`comment_rows_count` 是 JSON 中实际评论行数，三个口径分别保存。
+
+#### 2.2.2 `social_post_traffic`
+
+用途：作品每个快照的流量分析。保存完播率、平均播放时长、2 秒跳出率、5 秒完播率、划走率以及图文详情页实际出现的点击、展开、互动等指标。缺失或超过抖音有效期的字段保持 `NULL`，状态保存为 `partial / expired / unavailable`，禁止写 0。
+
+#### 2.2.3 `social_post_traffic_sources`
+
+用途：保存每个快照的流量来源明细。`traffic_nature` 区分 `organic`（自然）、`paid`（付费）和 `other`。DOU+ 记录为 `paid`，内容监测和 AI 排名使用自然播放，不把付费播放直接判断为爆款。
+
+#### 2.2.4 `social_post_comment_keywords`
+
+用途：保存平台真实提供的作品评论热词及排名。包含 `keyword`、`ranking`、`occurrence_count`、`sentiment`、`category` 和可用状态。没有热词页的作品仅在快照表标记不可用，不生成空热词或模拟热词。
 
 ### 2.3 `social_comments`
 
@@ -91,10 +111,14 @@ erDiagram
 | `id` | INTEGER PK | 评论编号 |
 | `post_id` | INTEGER FK | 关联 `social_posts.id`，作品删除时级联 |
 | `platform` / `source` | TEXT | 平台与来源 |
+| `source_comment_id` / `comment_fingerprint` | TEXT NULL | 平台 ID 或稳定去重指纹 |
+| `snapshot_id` / `snapshot_time` | FK / TEXT NULL | 首次读取该评论的作品快照 |
 | `username` | TEXT | 评论用户显示名 |
-| `comment_text` | TEXT | 评论正文 |
-| `comment_time` | TEXT | 评论时间 |
-| `likes` | INTEGER | 评论点赞数 |
+| `comment_text` | TEXT NULL | 评论正文；图片/表情无文字时允许为空 |
+| `comment_type` | TEXT | `text / image / emoji / mixed / other` |
+| `comment_time` / `comment_time_raw` | TEXT NULL | 标准时间和平台相对时间原文 |
+| `likes` / `reply_count` | INTEGER | 评论点赞和回复数量 |
+| `is_author` / `author_replied` | INTEGER NULL | 作者身份和作者是否回复；未知保持 NULL |
 | `sentiment` | TEXT | 情绪标签，初始可为 `unknown` |
 | `keyword` | TEXT NULL | 提取关键词 |
 | `user_need` | TEXT NULL | 游客需求分类 |
@@ -103,7 +127,7 @@ erDiagram
 | `collection_log_id` | INTEGER FK NULL | 采集批次 |
 | `created_at` | TEXT | 入库时间 |
 
-来源：抖音评论确认或统一评论接口。主要供游客评论洞察、内容监测和作品详情使用。平台显示评论数在 `social_posts.comments`，已采集评论明细数需对本表计数，两者不一定相等。
+来源：WorkBuddy 作品详情、抖音评论确认或统一评论接口。主要供游客评论洞察、内容监测和作品详情使用。平台评论总量和页面实际加载量保存在快照表，本表只保存 JSON 中真实存在的评论明细。
 
 ### 2.4 `content_audience_analysis`
 
@@ -112,18 +136,20 @@ erDiagram
 | 字段 | 类型 | 作用 |
 |---|---|---|
 | `id` | INTEGER PK | 分析编号 |
-| `post_id` | INTEGER FK UNIQUE | 每个作品一条当前画像 |
+| `post_id` | INTEGER FK | 作品编号，同一作品可有多个采集快照 |
 | `platform` | TEXT | 平台 |
-| `gender_distribution` | TEXT(JSON) | 性别分布 |
-| `age_distribution` | TEXT(JSON) | 年龄分布 |
-| `region_distribution` | TEXT(JSON) | 地域分布 |
+| `snapshot_id` / `snapshot_time` | FK / TEXT | 作品采集快照 |
+| `dimension_type` / `dimension_name` | TEXT | 性别、年龄、地域、兴趣、设备、粉丝关系、新老观众等实际维度 |
+| `dimension_value` / `percentage` / `ranking` | REAL / INTEGER NULL | 原始指标、占比和排名 |
+| `gender_distribution` 等旧字段 | TEXT(JSON) | V1 兼容字段，V2 新数据采用通用维度行 |
+| `data_availability_status` | TEXT | 数据可用状态 |
 | `source_type` / `source_record_id` | TEXT | 来源类型与来源记录标识 |
 | `raw_payload` | TEXT(JSON) NULL | 原始数据留存 |
 | `collection_log_id` | INTEGER FK NULL | 采集批次 |
 | `collected_at` | TEXT | 源数据采集时间 |
 | `created_at` / `updated_at` | TEXT | 创建和更新时间 |
 
-来源：抖音 V3 作品详情。主要供作品详情观众分析使用。
+来源：WorkBuddy 抖音作品详情。该表只表示作品级观众画像，不与账号粉丝画像 `fan_profile_records` 混用；同一作品不同采集时间可以保存不同快照。
 
 ### 2.5 `social_fans`
 

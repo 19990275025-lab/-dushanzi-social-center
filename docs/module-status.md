@@ -15,9 +15,9 @@
 | 模块名称 | 当前版本 | 状态 | 完成度 | 数据来源 | 当前问题 | 下一步计划 |
 |---|---:|---|---:|---|---|---|
 | 运营驾驶舱 | V1.0 | 已完成 | 90% | `social_accounts`、`social_posts`、`hot_topics`、`content_tasks` | 指标质量依赖当期真实数据；快手/微博数据稀疏 | 固化指标口径，增加数据新鲜度与空数据提示验收 |
-| 内容监测中心 | V1.0 | 待优化 | 85% | `social_posts`、`social_comments`、`hot_topic_feedback` | 抖音优先；快手/微博可筛选但真实样本不足；AI 为规则评分 | 用稳定的抖音连续周期数据校准爆款阈值和低效诊断 |
+| 内容监测中心 | V2.0 数据层 | 待优化 | 90% | `social_posts`、`social_post_snapshots`、流量/观众/热词明细、`social_comments`、`hot_topic_feedback` | 首批 WorkBuddy 真实作品已接入；跨日快照仍只有一个批次，AI 为规则评分 | 连续采集真实快照，验证增长曲线并校准自然爆款阈值 |
 | 粉丝分析中心 | V2.1 | 待优化 | 90% | `fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`、`social_posts` | 跨批次、画像/热词变化和期间作品关联逻辑已完成；当前只有 2026-08-20 一个真实批次，尚不能产出真实对比结果 | 完成第二次人工真实采集，验证跨批次结果后再评估每周自动调度 |
-| 数据采集中心 | V2.2 / 抖音 V3.0 | 开发中 | 82% | WorkBuddy JSON/Excel、抖音 V3 JSON、Excel/图片人工导入 | 统一 API 不执行采集；图片 OCR 未实现；MediaCrawler/Agent-Reach 未接入 | 固化数据契约、接口鉴权和失败重试；完成生产样本验收 |
+| 数据采集中心 | V2.2 / 作品 V2.0 | 开发中 | 86% | WorkBuddy 热点/作品 JSON、抖音粉丝 JSON、Excel/图片人工导入 | 统一 API 不执行采集；作品仍需人工确认；MediaCrawler/Agent-Reach 未接入 | 连续验证 WorkBuddy 作品批次，补生产鉴权和失败重试 |
 | 热点监测中心 | V4.0 | 已完成 | 90% | `hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、WorkBuddy | 外部文件质量影响排序；规则分析不是大模型；历史兼容表并存 | 监控每日导入完整性，校准 A/B/C 与旅游转化评分 |
 | 热点效果复盘 | V3.0 | 已完成 | 88% | `hot_topic_feedback`、`social_posts` | 必须先建立热点与作品关联；未关联记录无法评价 | 建立发布后 7 日统一评价窗口和人工复核流程 |
 | 热点档案库 | V4.0 | 已完成 | 90% | 热点原始、分析、反馈聚合；R2 Excel | 定时执行依赖 Worker Cron 与 R2 绑定正常 | 增加定时任务监控、失败补生成和文件留存策略 |
@@ -35,7 +35,7 @@
 
 | 平台 | 页面与查询 | 统一接收 | 真实采集闭环 | 结论 |
 |---|---|---|---|---|
-| 抖音 | 已实现 | 已实现 | 已有 V3 预览/确认接口和历史测试数据链路 | 当前主平台 |
+| 抖音 | 已实现 | 已实现 | 粉丝 V2 与 WorkBuddy 作品 V2 均完成首次真实预览、确认和业务页面联动 | 当前主平台 |
 | 快手 | 已实现平台筛选 | 已实现标准字段 | 未发现生产采集任务 | 数据准备阶段 |
 | 微博 | 已实现平台筛选 | 已实现标准字段 | WorkBuddy 热点可接入，内容/粉丝采集未闭环 | 热点可用，内容待补齐 |
 | 视频号 | 当前未纳入 | 未纳入平台枚举 | 未开发 | 仅列入远期路线，不是当前能力 |
@@ -52,6 +52,6 @@
 
 | 检查 | 结果 | 说明 |
 |---|---|---|
-| 生产构建与页面测试 | 通过 | Vinext 构建完成，45 项 `rendered-html` 测试全部通过 |
+| 生产构建与页面测试 | 通过 | Vinext 构建完成，49 项 `rendered-html` 测试全部通过 |
 | Markdown/补丁格式 | 通过 | `git diff --check` 无错误；文档文件均非空 |
-| ESLint | 未通过（既有问题） | `app/api/data-collection/v2/confirm/route.ts:110` 的 `aiRecommendedCount` 触发 `prefer-const`；本阶段只改文档，未修改业务代码 |
+| ESLint | 通过 | 当前业务代码检查为 0 错误、0 警告 |

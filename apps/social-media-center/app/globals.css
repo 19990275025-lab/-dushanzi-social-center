@@ -1188,3 +1188,17 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* WorkBuddy 作品数据模型 V2.0：真实快照、可用性与付费流量标识 */
+.detail-work-tags { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.paid-traffic-badge { display: inline-flex; align-items: center; width: fit-content; padding: 7px 12px; border: 1px solid #f0cf85; border-radius: 999px; background: #fff3d8; color: #9a6200; font-size: 12px; font-weight: 800; }
+.paid-traffic-badge.compact { margin-left: 8px; padding: 4px 8px; font-size: 10px; vertical-align: middle; }
+.paid-traffic-summary { display: grid; gap: 5px; margin-top: 18px; padding: 16px 18px; border: 1px solid #f3d79b; border-radius: 16px; background: #fff8e9; color: #75501a; }
+.paid-traffic-summary strong { color: #9a6200; font-size: 16px; }.paid-traffic-summary p { margin: 0; font-size: 12px; }
+.availability-chip { display: inline-flex; padding: 6px 10px; border-radius: 999px; background: #e8f7f1; color: #167c5c; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.availability-chip.status-expired,.availability-chip.status-unavailable { background: #f1f2f2; color: #7d8582; }.availability-chip.status-partial { background: #fff4db; color: #946313; }
+.paid-source-row { margin: 2px 0; padding: 10px 12px; border-radius: 12px; background: #fff8e8; }.paid-source-row span,.paid-source-row strong { color: #9a6200 !important; }.paid-source-row i b { background: #e4a62a !important; }
+.audience-dimension-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }.audience-dimension-block { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 18px; background: #fbfcfb; }.audience-dimension-block h3 { margin: 0 0 14px; font-size: 16px; }
+.data-quality-notice { margin-bottom: 16px; padding: 12px 14px; border: 1px solid #f1d79b; border-radius: 12px; background: #fff8e8; color: #795517; font-size: 13px; line-height: 1.7; }
+.comment-type-badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; background: #eef4f1; color: #46625a; font-size: 11px; white-space: nowrap; }
+@media (max-width: 900px) { .audience-dimension-grid { grid-template-columns: 1fr; } }

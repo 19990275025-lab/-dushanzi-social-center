@@ -14,6 +14,10 @@ type TopPost = {
   interactions: number;
   interactionRate: number;
   aiScore: number;
+  organic_views: number;
+  paid_views: number;
+  has_paid_traffic: number;
+  data_availability_status: string;
 };
 
 type BreakoutItem = {
@@ -64,6 +68,8 @@ type ContentMonitoringData = {
     interactions: number;
     capturedComments: number;
     interactionRate: number;
+    paidViews: number;
+    organicViews: number;
   };
   topPosts: TopPost[];
   breakoutAnalysis: BreakoutItem[];
@@ -167,7 +173,7 @@ export default function ContentMonitoringPage() {
     <section className="panel content-ranking-panel">
       <div className="panel-heading">
         <div><span className="section-kicker">TOP CONTENT</span><h2>作品排行榜 TOP10</h2></div>
-        <span className="section-note">按播放量优先，互动量与 AI 评分辅助排序</span>
+        <span className="section-note">按自然播放优先；DOU+ 付费流量不计入爆款判断</span>
       </div>
       <div className="table-wrap">
         <table className="content-table content-monitor-ranking">
@@ -175,7 +181,7 @@ export default function ContentMonitoringPage() {
           <tbody>
             {data.topPosts.map((post, index) => <tr key={post.id}>
               <td><span className={`rank-chip rank-${index + 1}`}>TOP {index + 1}</span></td>
-              <td><strong>{post.title}</strong><small className="table-subline">{formatDate(post.publish_time)}</small></td>
+              <td><strong>{post.title}</strong>{post.has_paid_traffic === 1 && <span className="paid-traffic-badge compact">含付费流量</span>}<small className="table-subline">{formatDate(post.publish_time)} · 自然播放 {formatCompact(post.organic_views)}</small></td>
               <td><span className={`platform-tag tag-${post.platform}`}>{platformLabel(post.platform)}</span></td>
               <td className="metric-cell">{formatCompact(post.views)}</td>
               <td>{formatCompact(post.interactions)}</td>
@@ -253,7 +259,7 @@ export default function ContentMonitoringPage() {
     </section>
 
     <p className="analysis-disclaimer">
-      数据来源：social_posts、social_comments、hot_topic_feedback · 规则模型：{data.engine} · 更新时间：{formatDate(data.updatedAt)} · 未采集数据不会生成模拟值。
+      数据来源：{data.sources.join("、")} · 规则模型：{data.engine} · 更新时间：{formatDate(data.updatedAt)} · 未采集数据不会生成模拟值。
     </p>
   </div>;
 }

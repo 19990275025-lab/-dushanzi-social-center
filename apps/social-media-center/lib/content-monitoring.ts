@@ -11,6 +11,8 @@ export type MonitorPost = {
   duration: number | null;
   completion_rate: number | null;
   skip_rate: number | null;
+  organic_views?: number;
+  paid_views?: number;
 };
 
 export const interactionCount = (post: Pick<MonitorPost, "likes" | "comments" | "favorites" | "shares">) =>
@@ -18,6 +20,8 @@ export const interactionCount = (post: Pick<MonitorPost, "likes" | "comments" | 
 
 export const percentage = (value: number, denominator: number) =>
   denominator > 0 ? Number(((value / denominator) * 100).toFixed(2)) : 0;
+
+const analysisViews = (post: MonitorPost) => post.organic_views ?? post.views;
 
 function titleTraits(title: string) {
   const traits: string[] = [];
@@ -54,9 +58,11 @@ export function buildBreakoutAnalysis(
 ) {
   const rate = percentage(interactionCount(post), post.views);
   const reasons: string[] = [];
-  if (post.views >= averageViews * 1.5 && averageViews > 0) reasons.push(`播放达到周期均值的 ${(post.views / averageViews).toFixed(1)} 倍`);
-  else if (post.views >= averageViews && averageViews > 0) reasons.push("播放高于周期均值");
-  if (rate >= 3) reasons.push(`互动率达到 ${rate}%`);
+  const naturalViews = analysisViews(post);
+  if (naturalViews >= averageViews * 1.5 && averageViews > 0) reasons.push(`自然播放达到周期均值的 ${(naturalViews / averageViews).toFixed(1)} 倍`);
+  else if (naturalViews >= averageViews && averageViews > 0) reasons.push("自然播放高于周期均值");
+  if ((post.paid_views ?? 0) > 0) reasons.push(`含 ${post.paid_views} 次付费播放，已从自然爆款判断中剔除`);
+  else if (rate >= 3) reasons.push(`互动率达到 ${rate}%`);
   if ((post.completion_rate ?? 0) >= 30) reasons.push(`完播率达到 ${post.completion_rate}%`);
   if (post.capturedComments > 0) reasons.push(`已有 ${post.capturedComments} 条真实评论样本`);
   if (!reasons.length) reasons.push("当前周期内综合表现相对领先，仍需更多样本验证爆款稳定性");
@@ -65,6 +71,8 @@ export function buildBreakoutAnalysis(
     postId: post.id,
     title: post.title,
     views: post.views,
+    organicViews: naturalViews,
+    paidViews: post.paid_views ?? 0,
     aiScore: post.aiScore,
     reason: reasons.join("；"),
     structure: contentStructure(post),
@@ -82,8 +90,9 @@ export function buildLowEfficiencyDiagnosis(
   const reasons: string[] = [];
   const suggestions: string[] = [];
 
-  if (post.views < averageViews * 0.7) {
-    reasons.push("播放明显低于周期均值");
+  const naturalViews = analysisViews(post);
+  if (naturalViews < averageViews * 0.7) {
+    reasons.push("自然播放明显低于周期均值");
     suggestions.push("把峡谷强画面或游客结果前置到前三秒，减少铺垫");
   }
   if (rate < 2) {
@@ -105,6 +114,8 @@ export function buildLowEfficiencyDiagnosis(
     title: post.title,
     publishTime: post.publish_time,
     views: post.views,
+    organicViews: naturalViews,
+    paidViews: post.paid_views ?? 0,
     interactionRate: rate,
     aiScore: post.aiScore,
     reasons: [...new Set(reasons)],

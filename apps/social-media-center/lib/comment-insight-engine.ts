@@ -14,7 +14,7 @@ export type Sentiment = "positive" | "negative" | "neutral";
 
 export type CommentForAnalysis = {
   id: number;
-  comment_text: string;
+  comment_text: string | null;
   post_title: string;
 };
 
@@ -56,7 +56,7 @@ function includesTerm(text: string, term: string) {
 }
 
 export function analyzeComment(comment: CommentForAnalysis): CommentAnalysis {
-  const text = comment.comment_text.toLowerCase();
+  const text = (comment.comment_text ?? "").toLowerCase();
   const positive = positiveTerms.filter((term) => includesTerm(text, term));
   const negative = negativeTerms.filter((term) => includesTerm(text, term));
   const sentimentScore = Math.max(-100, Math.min(100, (positive.length - negative.length) * 35));

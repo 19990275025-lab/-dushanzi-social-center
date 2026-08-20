@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import type { CollectionPayload, CollectionValidationError } from "@/lib/collections";
 import type { CommentCollectionPayload } from "@/lib/comment-collections";
 import type { DouyinCollectionV2Payload } from "@/lib/douyin-collection-v2";
+import type { WorkBuddyPostsV2Payload, WorkBuddyPostsV2Summary } from "@/lib/workbuddy-posts-v2";
 import { formatCompact, formatDateTime } from "@/lib/format";
 import { DataImportPanel } from "@/app/imports/page";
 
@@ -13,7 +14,7 @@ type CollectionLog = {
   source_type: string;
   source_name: string;
   source_url: string | null;
-  entity_type: "post" | "comment" | "douyin_v2" | "workbuddy_relay";
+  entity_type: "post" | "comment" | "douyin_v2" | "workbuddy_relay" | "workbuddy_posts_v2";
   status: string;
   total_count: number;
   success_count: number;
@@ -73,6 +74,8 @@ export default function CollectorPage() {
   const [commentPayload, setCommentPayload] = useState<CommentCollectionPayload | null>(null);
   const [v2Payload, setV2Payload] = useState<DouyinCollectionV2Payload | null>(null);
   const [v2Summary, setV2Summary] = useState<{ fanSnapshots: number; fanGrowthRecords: number; posts: number; comments: number; completePosts: number; failures: number; successRate: number; completeness: { fans: number; posts: number; comments: number; overall: number; threshold: number }; eligibleForConfirmation: boolean; failedFields: string[] } | null>(null);
+  const [workBuddyPostsPayload, setWorkBuddyPostsPayload] = useState<WorkBuddyPostsV2Payload | null>(null);
+  const [workBuddyPostsSummary, setWorkBuddyPostsSummary] = useState<WorkBuddyPostsV2Summary | null>(null);
   const [logId, setLogId] = useState<number | null>(null);
   const [commentLogId, setCommentLogId] = useState<number | null>(null);
   const [logs, setLogs] = useState<CollectionLog[]>([]);
@@ -116,6 +119,67 @@ export default function CollectorPage() {
     setV2Summary(null);
     setErrors([]);
     setMessage(null);
+  }
+
+  function resetWorkBuddyPostsPreview() {
+    setWorkBuddyPostsPayload(null);
+    setWorkBuddyPostsSummary(null);
+    setErrors([]);
+    setMessage(null);
+  }
+
+  async function uploadWorkBuddyPosts(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    resetWorkBuddyPostsPreview();
+    if (!file.name.toLowerCase().endsWith(".json") || file.size > 8 * 1024 * 1024) {
+      setMessage({ type: "error", text: "仅支持 8MB 以内的 WorkBuddy 抖音作品 JSON 文件。" });
+      event.target.value = "";
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/collections/posts-v2", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-source-file": file.name },
+        body: await file.text(),
+      });
+      const result = await response.json() as { error?: string; errors?: CollectionValidationError[]; payload?: WorkBuddyPostsV2Payload; summary?: WorkBuddyPostsV2Summary; completedBatch?: unknown };
+      setErrors(result.errors ?? []);
+      if (!response.ok || !result.payload || !result.summary) {
+        setMessage({ type: "error", text: result.error ?? "WorkBuddy 作品文件校验失败" });
+      } else {
+        setWorkBuddyPostsPayload(result.payload);
+        setWorkBuddyPostsSummary(result.summary);
+        setMessage({ type: result.completedBatch ? "error" : "success", text: result.completedBatch ? "该采集批次已入库，禁止重复写入。" : "作品 V2.0 无落库预览已生成；确认前数据库写入为 0。" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "WorkBuddy 作品 JSON 无法解析。" });
+    } finally {
+      setBusy(false);
+      event.target.value = "";
+    }
+  }
+
+  async function confirmWorkBuddyPosts() {
+    if (!workBuddyPostsPayload) return;
+    if (!window.confirm(`确认写入 ${workBuddyPostsPayload.posts.length} 个作品主记录、历史快照和真实评论？`)) return;
+    setBusy(true);
+    const response = await fetch("/api/collections/posts-v2/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ payload: workBuddyPostsPayload, confirmed: true }),
+    });
+    const result = await response.json() as { message?: string; error?: string; errors?: CollectionValidationError[] };
+    setBusy(false);
+    setErrors(result.errors ?? []);
+    if (!response.ok) setMessage({ type: "error", text: result.error ?? "作品 V2.0 入库失败" });
+    else {
+      setMessage({ type: "success", text: result.message ?? "作品 V2.0 已入库" });
+      setWorkBuddyPostsPayload(null);
+      setWorkBuddyPostsSummary(null);
+    }
+    loadLogs();
   }
 
   async function uploadV2Collection(event: ChangeEvent<HTMLInputElement>) {
@@ -309,7 +373,8 @@ export default function CollectorPage() {
     loadLogs();
   }
 
-  async function rollbackCollection(id: number, entityType: "post" | "comment" | "douyin_v2" | "workbuddy_relay") {
+  async function rollbackCollection(id: number, entityType: "post" | "comment" | "douyin_v2" | "workbuddy_relay" | "workbuddy_posts_v2") {
+    if (entityType === "workbuddy_posts_v2") return;
     const label = entityType === "douyin_v2" ? "粉丝、作品、观众和评论数据" : entityType === "comment" ? "评论" : "作品";
     if (!window.confirm(`确认回滚该采集批次写入的${label}？采集日志仍会保留。`)) return;
     const response = await fetch(`/api/collections?id=${id}`, { method: "DELETE" });
@@ -368,6 +433,44 @@ export default function CollectorPage() {
         <article><span>采集批次</span><strong>{formatCompact(summary?.total_logs ?? 0)}</strong><small>含失败与回滚记录</small></article>
         <article><span>已入库作品</span><strong>{formatCompact(summary?.imported_posts ?? 0)}</strong><small>评论 {formatCompact(summary?.imported_comments ?? 0)} 条</small></article>
         <article><span>最近采集</span><strong className="summary-time">{summary?.latest_collection ? formatDateTime(summary.latest_collection) : "暂无"}</strong><small>Chrome / 人工确认</small></article>
+      </section>
+
+      <section className="panel collector-workflow collector-v2-workflow">
+        <div className="panel-heading">
+          <div><span>WORKBUDDY DOUYIN POSTS · DATA MODEL V2.0</span><h2>作品真实数据预览与入库</h2></div>
+          <small>作品主表 + 指标快照 + 流量/观众/评论明细</small>
+        </div>
+        <ol className="collector-steps">
+          <li><span>1</span><div><strong>读取真实 JSON</strong><small>以 WorkBuddy 实际字段为准</small></div></li>
+          <li><span>2</span><div><strong>数据质量校验</strong><small>post_id、时间、指标与可用性</small></div></li>
+          <li><span>3</span><div><strong>无落库预览</strong><small>确认 DOU+、14天阈值和评论差额</small></div></li>
+          <li><span>4</span><div><strong>人工确认入库</strong><small>主记录去重，新增历史快照</small></div></li>
+        </ol>
+        <label className="collector-dropzone">
+          <input accept="application/json,.json" disabled={busy} onChange={uploadWorkBuddyPosts} type="file" />
+          <span>WB</span>
+          <div><strong>{busy ? "正在校验 WorkBuddy 作品文件……" : "上传 douyin_posts_YYYYMMDD.json"}</strong><small>缺失字段保存为 null / unavailable，不补造评论或分析指标</small></div>
+          <b>选择文件</b>
+        </label>
+        {message && <div className={`collector-message ${message.type}`}>{message.text}</div>}
+        {errors.length > 0 && <div className="collector-errors"><strong>校验错误 · {errors.length}</strong><ul>{errors.slice(0, 12).map((error, index) => <li key={`workbuddy-posts-${error.rowNumber}-${error.field}-${index}`}>第 {error.rowNumber || "文件"} 行 · {error.message}</li>)}</ul></div>}
+        {workBuddyPostsPayload && workBuddyPostsSummary && <div className="collector-preview douyin-v2-preview">
+          <div className="collector-preview-head"><div><strong>作品 V2.0 待确认预览</strong><small>{workBuddyPostsPayload.sourceFile} · 快照 {formatDateTime(workBuddyPostsPayload.snapshotTime)}</small></div><button className="primary-button" disabled={busy} onClick={confirmWorkBuddyPosts} type="button">人工确认并入库</button></div>
+          <div className="collector-summary-strip v2-preview-summary">
+            <article><span>作品主记录</span><strong>{workBuddyPostsSummary.posts}</strong><small>新增 {workBuddyPostsSummary.newPosts} · 更新 {workBuddyPostsSummary.existingPosts}</small></article>
+            <article><span>流量分析</span><strong>{workBuddyPostsSummary.trafficAvailable} / {workBuddyPostsSummary.trafficRows}</strong><small>来源明细 {workBuddyPostsSummary.trafficSources} 条</small></article>
+            <article><span>观众 / 热词</span><strong>{workBuddyPostsSummary.audienceRecords} / {workBuddyPostsSummary.commentKeywords}</strong><small>作品级真实维度</small></article>
+            <article><span>评论明细</span><strong>{workBuddyPostsSummary.commentRows} / {workBuddyPostsSummary.actualLoadedCount}</strong><small>总览累计 {workBuddyPostsSummary.overviewCommentCount}</small></article>
+          </div>
+          <div className="collector-summary-strip v2-preview-summary">
+            <article><span>实际字段</span><strong>{workBuddyPostsSummary.schemaFieldCount}</strong><small>标量值 {workBuddyPostsSummary.scalarValueCount}</small></article>
+            <article><span>DOU+作品</span><strong>{workBuddyPostsSummary.paidTrafficPosts}</strong><small>自然/付费分表保存</small></article>
+            <article><span>超过14天</span><strong>{workBuddyPostsSummary.olderThan14Days}</strong><small>过期模块不显示 0</small></article>
+            <article><span>unavailable</span><strong>{workBuddyPostsSummary.unavailableValues}</strong><small>原始明确缺失标记</small></article>
+          </div>
+          {workBuddyPostsPayload.qualityWarnings.length > 0 && <div className="data-quality-notice">{workBuddyPostsPayload.qualityWarnings.join("；")}</div>}
+          <div className="table-wrap"><table><thead><tr><th>作品</th><th>年龄</th><th>播放</th><th>评论总览 / 读取 / 明细</th><th>流量</th><th>观众</th><th>热词</th></tr></thead><tbody>{workBuddyPostsPayload.posts.map((post) => <tr key={post.platformPostId}><td><a href={post.postUrl} rel="noreferrer" target="_blank">{post.title}</a><small>{post.platformPostId}</small></td><td>{post.postAgeDays} 天</td><td>{formatCompact(post.snapshot.playCount ?? 0)}{post.trafficSources.some((source) => source.trafficNature === "paid") && <small className="paid-traffic-badge compact">含付费流量</small>}</td><td>{post.snapshot.commentOverviewCount ?? "—"} / {post.snapshot.actualLoadedCount ?? "—"} / {post.comments.length}</td><td>{post.traffic.dataAvailabilityStatus}</td><td>{post.audience.records.length}</td><td>{post.commentKeywords.records.length}</td></tr>)}</tbody></table></div>
+        </div>}
       </section>
 
       <section className="panel collector-workflow collector-v2-workflow">
@@ -571,10 +674,10 @@ export default function CollectorPage() {
               {logs.map((log) => (
                 <tr key={log.id}>
                   <td><strong>#{log.id}</strong><small>{log.source_name}</small></td>
-                  <td>抖音<small>{log.entity_type === "workbuddy_relay" ? "WorkBuddy热点自动接力" : log.entity_type === "douyin_v2" ? "粉丝与内容分析 V2.1" : log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
+                  <td>抖音<small>{log.entity_type === "workbuddy_relay" ? "WorkBuddy热点自动接力" : log.entity_type === "workbuddy_posts_v2" ? "WorkBuddy作品数据 V2.0" : log.entity_type === "douyin_v2" ? "粉丝与内容分析 V2.1" : log.entity_type === "comment" ? "评论详情采集" : "作品基础采集"}</small></td>
                   <td><span className={`collection-status status-${log.status}`}>{statusNames[log.status] ?? log.status}</span></td>
                   <td>{log.total_count}</td><td>{log.success_count} / {log.error_count}{log.entity_type === "comment" && <small>评论 {log.comment_count}</small>}{log.error_message && <small className="log-error-summary" title={log.error_message}>含失败明细</small>}</td><td>{formatDateTime(log.created_at)}</td>
-                  <td>{log.status === "completed" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id, log.entity_type)} type="button">回滚数据</button> : "—"}</td>
+                  <td>{log.status === "completed" && log.entity_type !== "workbuddy_posts_v2" ? <button className="text-button danger-text" onClick={() => rollbackCollection(log.id, log.entity_type)} type="button">回滚数据</button> : log.entity_type === "workbuddy_posts_v2" ? "历史快照" : "—"}</td>
                 </tr>
               ))}
               {!logs.length && <tr><td className="empty-cell" colSpan={7}>暂无采集记录</td></tr>}

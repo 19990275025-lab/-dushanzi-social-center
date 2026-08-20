@@ -54,7 +54,7 @@ flowchart LR
 |---|---|---|
 | WorkBuddy 热点监测 Agent | 已接入自动接力 | 本机检测当天 JSON/Excel，严格校验后自动暂存、入库、AI分析、归档并刷新当日A级选题 |
 | 抖音创作者中心粉丝数据 | 已完成首次真实闭环 | Codex只读采集生成原始 JSON，经预览确认后写入粉丝批次、账号快照、增长记录和画像明细；V2.1 将在第二批真实数据进入后自动与上一批比较，缺失项保持 unavailable |
-| WorkBuddy 抖音作品 | 接口保持独立 | 作品及作品详情继续由 WorkBuddy 负责，本次粉丝模型不修改其流程 |
+| WorkBuddy 抖音作品 | 已完成首次真实闭环 | WorkBuddy 负责采集，系统对真实 JSON 预览确认后写入作品主表、历史快照、流量、观众、热词和评论；DOU+ 与自然流量分离 |
 | Excel / 图片 | 已实现 | Excel 可导入作品；图片保存记录并人工确认，复杂 OCR 未实现 |
 | MediaCrawler | 未接入 | 仅完成评估和接口规划，未安装依赖、未运行采集任务 |
 | Agent-Reach | 未接入 | 仅完成全网趋势/新闻补充的技术评估 |
@@ -71,7 +71,7 @@ flowchart LR
 
 核心链路：
 
-- 账号/内容：`social_accounts`、`social_posts`、`social_comments`、`content_audience_analysis`
+- 账号/内容：`social_accounts`、`social_posts`、`social_post_snapshots`、`social_post_traffic`、`social_post_traffic_sources`、`content_audience_analysis`、`social_post_comment_keywords`、`social_comments`
 - 粉丝：`fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`
 - 热点：`hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、`hot_topic_archive`
 - 策划/任务：`content_plans`、`content_plan_feedback`、`content_tasks`

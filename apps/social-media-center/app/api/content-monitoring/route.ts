@@ -15,6 +15,10 @@ type PostRow = MonitorPost & {
   platform: string;
   fans_growth: number;
   hashtags: string;
+  organic_views: number;
+  paid_views: number;
+  has_paid_traffic: number;
+  data_availability_status: string;
 };
 
 type CommentRow = {
@@ -70,11 +74,34 @@ export async function GET(request: Request) {
 
   const [postResult, topicResult, commentResult, feedbackResult, todayResult] = await Promise.all([
     d1.prepare(`
-      SELECT id, account_id, platform, title, content_type, publish_time, views, likes,
-        comments, favorites, shares, fans_growth, hashtags, duration, completion_rate, skip_rate
-      FROM social_posts
-      WHERE platform = ? AND date(publish_time) BETWEEN date(?) AND date(?)
-      ORDER BY publish_time DESC, id DESC
+      WITH ranked_snapshots AS (
+        SELECT s.*, ROW_NUMBER() OVER (PARTITION BY post_id ORDER BY snapshot_time DESC, id DESC) AS snapshot_rank
+        FROM social_post_snapshots s
+      )
+      SELECT p.id, p.account_id, p.platform, p.title, p.content_type, p.publish_time,
+        COALESCE(s.play_count, p.views) AS views,
+        COALESCE(s.like_count, p.likes) AS likes,
+        COALESCE(s.comment_overview_count, p.comments) AS comments,
+        COALESCE(s.favorite_count, p.favorites) AS favorites,
+        COALESCE(s.share_count, p.shares) AS shares,
+        COALESCE(s.follower_gain, p.fans_growth) AS fans_growth,
+        p.hashtags, COALESCE(p.duration_seconds, p.duration) AS duration,
+        COALESCE(t.completion_rate, p.completion_rate) AS completion_rate,
+        COALESCE(t.swipe_away_rate, p.skip_rate) AS skip_rate,
+        COALESCE((SELECT SUM(ts.traffic_value) FROM social_post_traffic_sources ts
+          WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0) AS paid_views,
+        MAX(0, COALESCE(s.play_count, p.views) - COALESCE((SELECT SUM(ts.traffic_value)
+          FROM social_post_traffic_sources ts WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid'), 0)) AS organic_views,
+        CASE WHEN EXISTS (SELECT 1 FROM social_post_traffic_sources ts
+          WHERE ts.snapshot_id = s.id AND ts.traffic_nature = 'paid') THEN 1 ELSE 0 END AS has_paid_traffic,
+        COALESCE(s.data_availability_status, p.data_availability_status, 'unavailable') AS data_availability_status
+      FROM social_posts p
+      INNER JOIN social_accounts a ON a.id = p.account_id
+      LEFT JOIN ranked_snapshots s ON s.post_id = p.id AND s.snapshot_rank = 1
+      LEFT JOIN social_post_traffic t ON t.snapshot_id = s.id
+      WHERE p.platform = ? AND a.account_id NOT LIKE 'test_%'
+        AND date(p.publish_time) BETWEEN date(?) AND date(?)
+      ORDER BY p.publish_time DESC, p.id DESC
       LIMIT 500
     `).bind(platform, range.from, range.to).all<PostRow>(),
     d1.prepare(`
@@ -90,7 +117,9 @@ export async function GET(request: Request) {
         GROUP_CONCAT(NULLIF(TRIM(c.keyword), ''), '、') AS keyword_text
       FROM social_comments c
       INNER JOIN social_posts p ON p.id = c.post_id
-      WHERE p.platform = ? AND date(p.publish_time) BETWEEN date(?) AND date(?)
+      INNER JOIN social_accounts a ON a.id = p.account_id
+      WHERE p.platform = ? AND a.account_id NOT LIKE 'test_%'
+        AND date(p.publish_time) BETWEEN date(?) AND date(?)
       GROUP BY c.post_id
     `).bind(platform, range.from, range.to).all<CommentRow>(),
     d1.prepare(`
@@ -103,7 +132,8 @@ export async function GET(request: Request) {
       WHERE p.platform = ? AND date(p.publish_time) BETWEEN date(?) AND date(?)
       ORDER BY f.recommended_at DESC, f.id DESC
     `).bind(platform, range.from, range.to).all<FeedbackRow>(),
-    d1.prepare("SELECT COUNT(*) AS count FROM social_posts WHERE platform = ? AND date(publish_time) = date(?)")
+    d1.prepare(`SELECT COUNT(*) AS count FROM social_posts p JOIN social_accounts a ON a.id = p.account_id
+      WHERE p.platform = ? AND a.account_id NOT LIKE 'test_%' AND date(p.publish_time) = date(?)`)
       .bind(platform, today).first<{ count: number }>(),
   ]);
 
@@ -116,7 +146,7 @@ export async function GET(request: Request) {
       title: post.title,
       content_type: post.content_type,
       publish_time: post.publish_time,
-      views: post.views,
+      views: post.organic_views,
       likes: post.likes,
       comments: post.comments,
       favorites: post.favorites,
@@ -152,21 +182,21 @@ export async function GET(request: Request) {
     interactions: summary.interactions + post.interactions,
     capturedComments: summary.capturedComments + post.capturedComments,
   }), { views: 0, likes: 0, comments: 0, favorites: 0, shares: 0, interactions: 0, capturedComments: 0 });
-  const averageViews = posts.length ? totals.views / posts.length : 0;
+  const averageOrganicViews = posts.length ? posts.reduce((total, post) => total + post.organic_views, 0) / posts.length : 0;
   const rankedPosts = [...posts]
-    .sort((a, b) => b.views - a.views || b.interactions - a.interactions || b.aiScore - a.aiScore)
+    .sort((a, b) => b.organic_views - a.organic_views || b.interactions - a.interactions || b.aiScore - a.aiScore)
     .slice(0, 10);
 
   const breakoutCandidates = rankedPosts
-    .filter((post, index) => index === 0 || post.views >= averageViews || post.aiScore >= 70)
+    .filter((post, index) => index === 0 || post.organic_views >= averageOrganicViews || post.aiScore >= 70)
     .slice(0, 3)
-    .map((post) => buildBreakoutAnalysis(post, averageViews));
+    .map((post) => buildBreakoutAnalysis(post, averageOrganicViews));
 
   const lowEfficiency = posts
-    .filter((post) => post.views < averageViews * 0.7 || post.interactionRate < 2 || post.aiScore < 60)
+    .filter((post) => post.organic_views < averageOrganicViews * 0.7 || post.interactionRate < 2 || post.aiScore < 60)
     .sort((a, b) => a.aiScore - b.aiScore || a.views - b.views)
     .slice(0, 5)
-    .map((post) => buildLowEfficiencyDiagnosis(post, averageViews));
+    .map((post) => buildLowEfficiencyDiagnosis(post, averageOrganicViews));
 
   const latestPost = posts.map((post) => post.publish_time).sort().at(-1) ?? null;
   const hotLinks = feedbackResult.results.map((row) => ({
@@ -181,6 +211,8 @@ export async function GET(request: Request) {
       todayPublished: Number(todayResult?.count ?? 0),
       periodPublished: posts.length,
       ...totals,
+      paidViews: posts.reduce((total, post) => total + post.paid_views, 0),
+      organicViews: posts.reduce((total, post) => total + post.organic_views, 0),
       interactionRate: percentage(totals.interactions, totals.views),
     },
     topPosts: rankedPosts,
@@ -188,7 +220,7 @@ export async function GET(request: Request) {
     lowEfficiency,
     hotLinks,
     sourceFreshness: { latestPost, capturedCommentCount: totals.capturedComments },
-    sources: ["social_posts", "social_comments", "hot_topic_feedback"],
+    sources: ["social_posts", "social_post_snapshots", "social_post_traffic_sources", "social_comments", "hot_topic_feedback"],
     engine: ruleBasedContentEngine.name,
     updatedAt: new Date().toISOString(),
   });

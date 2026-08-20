@@ -46,6 +46,10 @@ const schemaStatements = [
     success_count INTEGER NOT NULL DEFAULT 0 CHECK (success_count >= 0),
     error_count INTEGER NOT NULL DEFAULT 0 CHECK (error_count >= 0),
     comment_count INTEGER NOT NULL DEFAULT 0 CHECK (comment_count >= 0),
+    source_file TEXT,
+    batch_key TEXT,
+    unavailable_count INTEGER NOT NULL DEFAULT 0 CHECK (unavailable_count >= 0),
+    raw_payload TEXT,
     error_message TEXT,
     collected_at TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -176,10 +180,12 @@ const schemaStatements = [
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     source TEXT NOT NULL DEFAULT 'system',
+    platform_post_id TEXT,
     title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     publish_time TEXT NOT NULL,
     video_url TEXT,
+    post_url TEXT,
     cover_url TEXT,
     views INTEGER NOT NULL DEFAULT 0 CHECK (views >= 0),
     likes INTEGER NOT NULL DEFAULT 0 CHECK (likes >= 0),
@@ -189,6 +195,13 @@ const schemaStatements = [
     fans_growth INTEGER NOT NULL DEFAULT 0,
     hashtags TEXT NOT NULL DEFAULT '[]',
     duration INTEGER,
+    duration_seconds REAL,
+    post_type TEXT,
+    post_status TEXT,
+    is_pinned INTEGER NOT NULL DEFAULT 0 CHECK (is_pinned IN (0, 1)),
+    content_metadata TEXT,
+    data_availability_status TEXT NOT NULL DEFAULT 'unavailable'
+      CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
     completion_rate REAL,
     skip_rate REAL,
     average_play_duration REAL,
@@ -207,6 +220,90 @@ const schemaStatements = [
     ON social_posts(platform, publish_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_social_posts_collection_log_id
     ON social_posts(collection_log_id)`,
+  `CREATE TABLE IF NOT EXISTS social_post_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    snapshot_time TEXT NOT NULL,
+    collection_time TEXT NOT NULL,
+    play_count INTEGER CHECK (play_count IS NULL OR play_count >= 0),
+    like_count INTEGER CHECK (like_count IS NULL OR like_count >= 0),
+    comment_overview_count INTEGER CHECK (comment_overview_count IS NULL OR comment_overview_count >= 0),
+    actual_loaded_count INTEGER CHECK (actual_loaded_count IS NULL OR actual_loaded_count >= 0),
+    comment_rows_count INTEGER NOT NULL DEFAULT 0 CHECK (comment_rows_count >= 0),
+    favorite_count INTEGER CHECK (favorite_count IS NULL OR favorite_count >= 0),
+    share_count INTEGER CHECK (share_count IS NULL OR share_count >= 0),
+    danmaku_count INTEGER CHECK (danmaku_count IS NULL OR danmaku_count >= 0),
+    follower_gain INTEGER CHECK (follower_gain IS NULL OR follower_gain >= 0),
+    follower_loss INTEGER CHECK (follower_loss IS NULL OR follower_loss >= 0),
+    follower_play_ratio REAL,
+    page_entry_rate REAL,
+    data_availability_status TEXT NOT NULL CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
+    traffic_availability_status TEXT NOT NULL CHECK (traffic_availability_status IN ('available','partial','expired','unavailable')),
+    traffic_sources_availability_status TEXT NOT NULL CHECK (traffic_sources_availability_status IN ('available','partial','expired','unavailable')),
+    audience_availability_status TEXT NOT NULL CHECK (audience_availability_status IN ('available','partial','expired','unavailable')),
+    comment_keywords_availability_status TEXT NOT NULL CHECK (comment_keywords_availability_status IN ('available','partial','expired','unavailable')),
+    comments_availability_status TEXT NOT NULL CHECK (comments_availability_status IN ('available','partial','expired','unavailable')),
+    post_age_days INTEGER NOT NULL CHECK (post_age_days >= 0),
+    source_file TEXT NOT NULL,
+    raw_payload TEXT NOT NULL,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_snapshots_post_time
+    ON social_post_snapshots(post_id, snapshot_time)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_snapshots_platform_time
+    ON social_post_snapshots(platform, snapshot_time DESC)`,
+  `CREATE TABLE IF NOT EXISTS social_post_traffic (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT NOT NULL,
+    completion_rate REAL,
+    average_play_duration_seconds REAL,
+    two_sec_bounce_rate REAL,
+    five_sec_completion_rate REAL,
+    average_play_ratio REAL,
+    cover_click_rate REAL,
+    swipe_away_rate REAL,
+    page_entry_rate REAL,
+    comment_entry_rate REAL,
+    text_expand_rate REAL,
+    text_completion_rate REAL,
+    average_images_viewed REAL,
+    like_rate REAL,
+    comment_rate REAL,
+    share_rate REAL,
+    favorite_rate REAL,
+    not_interested_rate REAL,
+    data_availability_status TEXT NOT NULL CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
+    raw_payload TEXT NOT NULL,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_traffic_snapshot
+    ON social_post_traffic(snapshot_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_traffic_post_time
+    ON social_post_traffic(post_id, snapshot_time DESC)`,
+  `CREATE TABLE IF NOT EXISTS social_post_traffic_sources (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    source_name TEXT NOT NULL,
+    traffic_value REAL,
+    percentage REAL,
+    change_percentage REAL,
+    traffic_nature TEXT NOT NULL CHECK (traffic_nature IN ('organic','paid','other')),
+    raw_value TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_traffic_source_snapshot
+    ON social_post_traffic_sources(snapshot_id, source_name, traffic_nature)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_traffic_source_nature
+    ON social_post_traffic_sources(post_id, traffic_nature, snapshot_time DESC)`,
   `CREATE TABLE IF NOT EXISTS content_audience_analysis (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -214,6 +311,16 @@ const schemaStatements = [
     gender_distribution TEXT NOT NULL DEFAULT '[]',
     age_distribution TEXT NOT NULL DEFAULT '[]',
     region_distribution TEXT NOT NULL DEFAULT '[]',
+    snapshot_id INTEGER REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT,
+    dimension_type TEXT,
+    dimension_name TEXT,
+    dimension_value REAL,
+    percentage REAL,
+    ranking INTEGER,
+    raw_value TEXT,
+    data_availability_status TEXT NOT NULL DEFAULT 'available'
+      CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
     source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual','douyin_app')),
     source_record_id TEXT,
     raw_payload TEXT,
@@ -222,26 +329,58 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_audience_post
+  `CREATE INDEX IF NOT EXISTS idx_content_audience_post
     ON content_audience_analysis(post_id)`,
   `CREATE INDEX IF NOT EXISTS idx_content_audience_platform_collected_at
     ON content_audience_analysis(platform, collected_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_audience_source_record
     ON content_audience_analysis(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS social_post_comment_keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_time TEXT NOT NULL,
+    keyword TEXT NOT NULL,
+    ranking INTEGER,
+    occurrence_count INTEGER,
+    sentiment TEXT,
+    category TEXT,
+    data_availability_status TEXT NOT NULL DEFAULT 'available'
+      CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
+    raw_value TEXT,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_comment_keyword_snapshot
+    ON social_post_comment_keywords(snapshot_id, keyword, ranking)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_comment_keyword_post_time
+    ON social_post_comment_keywords(post_id, snapshot_time DESC)`,
   `CREATE TABLE IF NOT EXISTS social_comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     source TEXT NOT NULL DEFAULT 'system',
+    source_comment_id TEXT,
+    comment_fingerprint TEXT,
+    snapshot_id INTEGER REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE SET NULL,
+    snapshot_time TEXT,
     username TEXT NOT NULL,
-    comment_text TEXT NOT NULL,
-    comment_time TEXT NOT NULL,
+    comment_text TEXT,
+    comment_type TEXT NOT NULL DEFAULT 'text' CHECK (comment_type IN ('text','image','emoji','mixed','other')),
+    comment_time TEXT,
+    comment_time_raw TEXT,
     likes INTEGER NOT NULL DEFAULT 0,
+    reply_count INTEGER NOT NULL DEFAULT 0 CHECK (reply_count >= 0),
+    is_author INTEGER NOT NULL DEFAULT 0 CHECK (is_author IN (0, 1)),
+    author_replied INTEGER CHECK (author_replied IS NULL OR author_replied IN (0, 1)),
     sentiment TEXT NOT NULL DEFAULT 'unknown',
     keyword TEXT,
     user_need TEXT,
     ai_analysis TEXT,
     ai_reply TEXT,
+    raw_payload TEXT,
+    data_availability_status TEXT NOT NULL DEFAULT 'available'
+      CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
@@ -562,6 +701,24 @@ async function initialize() {
   if (!postColumns.results.some((column) => column.name === "source")) {
     await d1.prepare("ALTER TABLE social_posts ADD COLUMN source TEXT NOT NULL DEFAULT 'system'").run();
   }
+  const postColumnNames = new Set(postColumns.results.map((column) => column.name));
+  const missingPostV2Columns = [
+    ["platform_post_id", "ALTER TABLE social_posts ADD COLUMN platform_post_id TEXT"],
+    ["post_url", "ALTER TABLE social_posts ADD COLUMN post_url TEXT"],
+    ["duration_seconds", "ALTER TABLE social_posts ADD COLUMN duration_seconds REAL"],
+    ["post_type", "ALTER TABLE social_posts ADD COLUMN post_type TEXT"],
+    ["post_status", "ALTER TABLE social_posts ADD COLUMN post_status TEXT"],
+    ["is_pinned", "ALTER TABLE social_posts ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0"],
+    ["content_metadata", "ALTER TABLE social_posts ADD COLUMN content_metadata TEXT"],
+    ["data_availability_status", "ALTER TABLE social_posts ADD COLUMN data_availability_status TEXT NOT NULL DEFAULT 'unavailable'"],
+  ] as const;
+  for (const [name, statement] of missingPostV2Columns) {
+    if (!postColumnNames.has(name)) await d1.prepare(statement).run();
+  }
+  await d1.batch([
+    d1.prepare("UPDATE social_posts SET post_url = COALESCE(post_url, video_url), duration_seconds = COALESCE(duration_seconds, duration)"),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_social_posts_platform_post_id ON social_posts(platform, platform_post_id) WHERE platform_post_id IS NOT NULL"),
+  ]);
   await d1
     .prepare(
       "CREATE INDEX IF NOT EXISTS idx_social_posts_import_log_id ON social_posts(import_log_id)",
@@ -578,6 +735,16 @@ async function initialize() {
   if (!collectionColumnNames.has("comment_count")) {
     await d1.prepare("ALTER TABLE collection_logs ADD COLUMN comment_count INTEGER NOT NULL DEFAULT 0").run();
   }
+  const missingCollectionV2Columns = [
+    ["source_file", "ALTER TABLE collection_logs ADD COLUMN source_file TEXT"],
+    ["batch_key", "ALTER TABLE collection_logs ADD COLUMN batch_key TEXT"],
+    ["unavailable_count", "ALTER TABLE collection_logs ADD COLUMN unavailable_count INTEGER NOT NULL DEFAULT 0"],
+    ["raw_payload", "ALTER TABLE collection_logs ADD COLUMN raw_payload TEXT"],
+  ] as const;
+  for (const [name, statement] of missingCollectionV2Columns) {
+    if (!collectionColumnNames.has(name)) await d1.prepare(statement).run();
+  }
+  await d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_logs_batch_key ON collection_logs(batch_key) WHERE batch_key IS NOT NULL").run();
 
   const socialFanColumns = await d1.prepare("PRAGMA table_info(social_fans)").all<{ name: string }>();
   const socialFanColumnNames = new Set(socialFanColumns.results.map((column) => column.name));
@@ -641,9 +808,33 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_fan_growth_platform_period ON fan_growth_records(platform, period_type, period_end DESC)"),
   ]);
 
-  const commentColumns = await d1
+  const audienceColumns = await d1.prepare("PRAGMA table_info(content_audience_analysis)").all<{ name: string }>();
+  const audienceColumnNames = new Set(audienceColumns.results.map((column) => column.name));
+  const missingAudienceV2Columns = [
+    ["snapshot_id", "ALTER TABLE content_audience_analysis ADD COLUMN snapshot_id INTEGER REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE"],
+    ["snapshot_time", "ALTER TABLE content_audience_analysis ADD COLUMN snapshot_time TEXT"],
+    ["dimension_type", "ALTER TABLE content_audience_analysis ADD COLUMN dimension_type TEXT"],
+    ["dimension_name", "ALTER TABLE content_audience_analysis ADD COLUMN dimension_name TEXT"],
+    ["dimension_value", "ALTER TABLE content_audience_analysis ADD COLUMN dimension_value REAL"],
+    ["percentage", "ALTER TABLE content_audience_analysis ADD COLUMN percentage REAL"],
+    ["ranking", "ALTER TABLE content_audience_analysis ADD COLUMN ranking INTEGER"],
+    ["raw_value", "ALTER TABLE content_audience_analysis ADD COLUMN raw_value TEXT"],
+    ["data_availability_status", "ALTER TABLE content_audience_analysis ADD COLUMN data_availability_status TEXT NOT NULL DEFAULT 'available'"],
+  ] as const;
+  for (const [name, statement] of missingAudienceV2Columns) {
+    if (!audienceColumnNames.has(name)) await d1.prepare(statement).run();
+  }
+  await d1.batch([
+    d1.prepare("DROP INDEX IF EXISTS uq_content_audience_post"),
+    d1.prepare("DROP INDEX IF EXISTS uq_content_audience_dimension_snapshot"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_content_audience_post ON content_audience_analysis(post_id)"),
+    d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uq_content_audience_dimension_snapshot
+      ON content_audience_analysis(snapshot_id, dimension_type, dimension_name)`),
+  ]);
+
+  let commentColumns = await d1
     .prepare("PRAGMA table_info(social_comments)")
-    .all<{ name: string }>();
+    .all<{ name: string; notnull: number }>();
   if (!commentColumns.results.some((column) => column.name === "collection_log_id")) {
     await d1
       .prepare("ALTER TABLE social_comments ADD COLUMN collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL")
@@ -655,11 +846,83 @@ async function initialize() {
   if (!commentColumns.results.some((column) => column.name === "source")) {
     await d1.prepare("ALTER TABLE social_comments ADD COLUMN source TEXT NOT NULL DEFAULT 'system'").run();
   }
+  commentColumns = await d1.prepare("PRAGMA table_info(social_comments)").all<{ name: string; notnull: number }>();
+  const requiresNullableCommentMigration = commentColumns.results.some((column) =>
+    (column.name === "comment_text" || column.name === "comment_time") && column.notnull === 1,
+  );
+  if (requiresNullableCommentMigration) {
+    await d1.batch([
+      d1.prepare("DROP INDEX IF EXISTS idx_social_comments_post_comment_time"),
+      d1.prepare("DROP INDEX IF EXISTS idx_social_comments_sentiment"),
+      d1.prepare("DROP INDEX IF EXISTS idx_social_comments_user_need"),
+      d1.prepare("DROP INDEX IF EXISTS idx_social_comments_collection_log_id"),
+      d1.prepare("ALTER TABLE social_comments RENAME TO social_comments_legacy_v2"),
+      d1.prepare(`CREATE TABLE social_comments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+        platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+        source TEXT NOT NULL DEFAULT 'system',
+        source_comment_id TEXT,
+        comment_fingerprint TEXT,
+        snapshot_id INTEGER REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE SET NULL,
+        snapshot_time TEXT,
+        username TEXT NOT NULL,
+        comment_text TEXT,
+        comment_type TEXT NOT NULL DEFAULT 'text' CHECK (comment_type IN ('text','image','emoji','mixed','other')),
+        comment_time TEXT,
+        comment_time_raw TEXT,
+        likes INTEGER NOT NULL DEFAULT 0,
+        reply_count INTEGER NOT NULL DEFAULT 0 CHECK (reply_count >= 0),
+        is_author INTEGER NOT NULL DEFAULT 0 CHECK (is_author IN (0, 1)),
+        author_replied INTEGER CHECK (author_replied IS NULL OR author_replied IN (0, 1)),
+        sentiment TEXT NOT NULL DEFAULT 'unknown',
+        keyword TEXT,
+        user_need TEXT,
+        ai_analysis TEXT,
+        ai_reply TEXT,
+        raw_payload TEXT,
+        data_availability_status TEXT NOT NULL DEFAULT 'available'
+          CHECK (data_availability_status IN ('available','partial','expired','unavailable')),
+        collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`),
+      d1.prepare(`INSERT INTO social_comments
+        (id, post_id, platform, source, username, comment_text, comment_type, comment_time,
+         comment_time_raw, likes, sentiment, keyword, user_need, ai_analysis, ai_reply,
+         collection_log_id, created_at)
+        SELECT id, post_id, platform, source, username, comment_text, 'text', comment_time,
+          comment_time, likes, sentiment, keyword, user_need, ai_analysis, ai_reply,
+          collection_log_id, created_at
+        FROM social_comments_legacy_v2`),
+      d1.prepare("DROP TABLE social_comments_legacy_v2"),
+    ]);
+  }
+  const refreshedCommentColumns = await d1.prepare("PRAGMA table_info(social_comments)").all<{ name: string }>();
+  const commentColumnNames = new Set(refreshedCommentColumns.results.map((column) => column.name));
+  const missingCommentV2Columns = [
+    ["source_comment_id", "ALTER TABLE social_comments ADD COLUMN source_comment_id TEXT"],
+    ["comment_fingerprint", "ALTER TABLE social_comments ADD COLUMN comment_fingerprint TEXT"],
+    ["snapshot_id", "ALTER TABLE social_comments ADD COLUMN snapshot_id INTEGER REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE SET NULL"],
+    ["snapshot_time", "ALTER TABLE social_comments ADD COLUMN snapshot_time TEXT"],
+    ["comment_type", "ALTER TABLE social_comments ADD COLUMN comment_type TEXT NOT NULL DEFAULT 'text'"],
+    ["comment_time_raw", "ALTER TABLE social_comments ADD COLUMN comment_time_raw TEXT"],
+    ["reply_count", "ALTER TABLE social_comments ADD COLUMN reply_count INTEGER NOT NULL DEFAULT 0"],
+    ["is_author", "ALTER TABLE social_comments ADD COLUMN is_author INTEGER NOT NULL DEFAULT 0"],
+    ["author_replied", "ALTER TABLE social_comments ADD COLUMN author_replied INTEGER"],
+    ["raw_payload", "ALTER TABLE social_comments ADD COLUMN raw_payload TEXT"],
+    ["data_availability_status", "ALTER TABLE social_comments ADD COLUMN data_availability_status TEXT NOT NULL DEFAULT 'available'"],
+  ] as const;
+  for (const [name, statement] of missingCommentV2Columns) {
+    if (!commentColumnNames.has(name)) await d1.prepare(statement).run();
+  }
   await d1
     .prepare("CREATE INDEX IF NOT EXISTS idx_social_comments_collection_log_id ON social_comments(collection_log_id)")
     .run();
   await d1
     .prepare("CREATE INDEX IF NOT EXISTS idx_social_comments_user_need ON social_comments(user_need)")
+    .run();
+  await d1
+    .prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_social_comments_fingerprint ON social_comments(post_id, comment_fingerprint) WHERE comment_fingerprint IS NOT NULL")
     .run();
   await d1
     .prepare(
