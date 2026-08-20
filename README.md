@@ -19,7 +19,7 @@
 |---|---|---|---|
 | 运营驾驶舱 | `/` | 周期 KPI、发布、播放互动、作品排行、热点和运营建议 | 已完成 |
 | 内容监测中心 | `/insights/content` | 分平台作品监测、TOP10、爆款分析、低效诊断、热点关联 | 待优化 |
-| 粉丝分析中心 | `/insights/fans` | 总量、增长、流失、画像、内容吸粉、周报和导出 | 待优化 |
+| 粉丝分析中心 | `/insights/fans` | 抖音真实总量、周期增长、历史画像、设备/活跃度/热词、内容吸粉、周报和导出 | 待优化 |
 | 数据采集中心 | `/collector`、`/imports` | 抖音 V3 预览确认、统一 V2 API、WorkBuddy热点自动接力、Excel/图片导入和采集日志 | 开发中 |
 | 热点监测中心 | `/hot-topics` | WorkBuddy 热点、关联分析、A/B/C 推荐、选题和效果复盘 | 已完成 |
 | 热点档案库 | `/hot-topic-archive` | 历史查询、每日快照和 Excel 下载 | 已完成 |
@@ -53,7 +53,8 @@ flowchart LR
 | 来源 | 当前状态 | 说明 |
 |---|---|---|
 | WorkBuddy 热点监测 Agent | 已接入自动接力 | 本机检测当天 JSON/Excel，严格校验后自动暂存、入库、AI分析、归档并刷新当日A级选题 |
-| 抖音创作者中心 | 已有接收闭环 | V3 JSON 支持粉丝、增长、作品、观众和评论的预览确认；主站不保证云端直接控制本机 App |
+| 抖音创作者中心粉丝数据 | 已完成首次真实闭环 | Codex只读采集生成原始 JSON，经预览确认后写入粉丝批次、账号快照、增长记录和画像明细；缺失项保持 unavailable |
+| WorkBuddy 抖音作品 | 接口保持独立 | 作品及作品详情继续由 WorkBuddy 负责，本次粉丝模型不修改其流程 |
 | Excel / 图片 | 已实现 | Excel 可导入作品；图片保存记录并人工确认，复杂 OCR 未实现 |
 | MediaCrawler | 未接入 | 仅完成评估和接口规划，未安装依赖、未运行采集任务 |
 | Agent-Reach | 未接入 | 仅完成全网趋势/新闻补充的技术评估 |
@@ -71,7 +72,7 @@ flowchart LR
 核心链路：
 
 - 账号/内容：`social_accounts`、`social_posts`、`social_comments`、`content_audience_analysis`
-- 粉丝：`social_fans`、`fan_growth_records`
+- 粉丝：`fan_collection_batches`、`social_fans`、`fan_growth_records`、`fan_profile_records`
 - 热点：`hot_topics`、`hot_topic_analysis`、`hot_topic_feedback`、`hot_topic_archive`
 - 策划/任务：`content_plans`、`content_plan_feedback`、`content_tasks`
 - 采集审计：`collection_logs`、`collection_staging_records`、`data_import_logs`

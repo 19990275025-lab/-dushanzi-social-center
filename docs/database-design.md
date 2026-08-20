@@ -1,6 +1,6 @@
 # 新媒体运营中心数据库设计
 
-> 核对基线：`apps/social-media-center/db/schema.ts` 与 `db/bootstrap.ts`，2026-08-18。
+> 核对基线：`apps/social-media-center/db/schema.ts` 与 `db/bootstrap.ts`，2026-08-20。
 > 数据库：Cloudflare D1（SQLite 语义）；JSON/数组字段以 `TEXT` 存储序列化 JSON。
 > 本文只记录现有结构，不代表本次文档工作修改了数据库。
 
@@ -11,6 +11,10 @@ erDiagram
   social_accounts ||--o{ social_posts : publishes
   social_accounts ||--o{ social_fans : snapshots
   social_accounts ||--o{ fan_growth_records : grows
+  social_accounts ||--o{ fan_collection_batches : collects
+  fan_collection_batches ||--o| social_fans : creates
+  fan_collection_batches ||--o{ fan_growth_records : contains
+  fan_collection_batches ||--o{ fan_profile_records : contains
   social_posts ||--o{ social_comments : has
   social_posts ||--o| content_audience_analysis : has
   data_import_logs ||--o{ social_posts : imports
@@ -123,45 +127,82 @@ erDiagram
 
 ### 2.5 `social_fans`
 
-用途：保存账号粉丝总量和画像快照。
+用途：保存账号级粉丝快照。V2.0 后画像明细不再写入本表 JSON 字段；旧字段仅为历史兼容。
 
 | 字段 | 类型 | 作用 |
 |---|---|---|
 | `id` | INTEGER PK | 快照编号 |
 | `account_id` | INTEGER FK | 关联账号 |
 | `platform` | TEXT | 平台 |
+| `account_name` / `snapshot_date` | TEXT | 快照账号名称和日期 |
 | `fans_count` | INTEGER | 快照时粉丝总量 |
-| `gender_distribution` | TEXT(JSON) | 性别画像 |
-| `age_distribution` | TEXT(JSON) | 年龄画像 |
-| `region_distribution` | TEXT(JSON) | 地域画像 |
-| `interest_distribution` | TEXT(JSON) | 兴趣画像 |
-| `active_time_distribution` | TEXT(JSON) | 活跃时间分布 |
+| `display_fans_count` | TEXT NULL | 平台缩写展示值，不覆盖精确粉丝数 |
+| `male_ratio` / `female_ratio` | REAL NULL | 账号快照的性别比例 |
+| `collection_time` / `data_period` | TEXT | 采集时间和原始周期集合 |
+| `gender_distribution` 等旧字段 | TEXT(JSON) | V1历史兼容；V2新画像写入明细表 |
 | `source_type` / `source_record_id` | TEXT | 来源类型和外部唯一标识 |
 | `raw_payload` | TEXT(JSON) NULL | 原始快照 |
+| `batch_id` | INTEGER FK NULL | 关联粉丝采集批次 |
 | `collection_log_id` | INTEGER FK NULL | 采集批次 |
 | `collected_at` / `created_at` | TEXT | 采集与入库时间 |
 
-来源：抖音 V3、API 或人工数据。主要供粉丝分析、运营驾驶舱使用。
+来源：抖音创作者中心真实采集、V3、API 或人工数据。主要供粉丝分析、运营驾驶舱使用。
 
 ### 2.6 `fan_growth_records`
 
-用途：保存日粒度粉丝变化。
+用途：保存 daily、7d、30d、natural_month、custom 五类真实增长记录；区间汇总不会伪装成每日趋势。
 
 | 字段 | 类型 | 作用 |
 |---|---|---|
 | `id` | INTEGER PK | 记录编号 |
 | `account_id` | INTEGER FK | 关联账号 |
 | `platform` | TEXT | 平台 |
-| `record_date` | TEXT | 统计日期 |
-| `fans_count` | INTEGER | 当日粉丝总数 |
+| `record_date` | TEXT | V1兼容日期，V2查询以 `period_end` 为准 |
+| `batch_id` / `snapshot_date` | INTEGER FK / TEXT | 采集批次和账号快照日期 |
+| `period_type` | TEXT | `daily` / `7d` / `30d` / `natural_month` / `custom` |
+| `period_start` / `period_end` | TEXT NULL | 平台实际提供的统计起止日期 |
+| `fans_count` | INTEGER | 本次采集的精确账号粉丝数 |
 | `net_growth` | INTEGER | 净增，可为负 |
-| `new_fans` / `lost_fans` | INTEGER | 新增与流失 |
+| `new_fans` / `lost_fans` | INTEGER | V1兼容字段 |
+| `new_followers` / `lost_followers` | INTEGER NULL | V2吸粉与脱粉 |
+| `returning_followers` | INTEGER NULL | 回访粉丝量 |
+| `collection_time` | TEXT NULL | 实际采集时间 |
 | `source_type` / `source_record_id` | TEXT | 来源与外部标识 |
 | `raw_payload` | TEXT(JSON) NULL | 原始记录 |
 | `collection_log_id` | INTEGER FK NULL | 采集批次 |
 | `created_at` / `updated_at` | TEXT | 创建和更新时间 |
 
-约束：`account_id + record_date` 唯一。主要供 7 天、30 天、自然月和自定义粉丝趋势使用。
+约束：同一非空 `batch_id + period_type` 唯一。粉丝中心只用 `daily` 记录绘制折线，周期卡读取完全匹配的区间记录。
+
+### 2.7 `fan_collection_batches`
+
+用途：记录每次粉丝采集批次，按 `platform + account_id + source_file` 防止同一文件重复入库。
+
+| 字段 | 类型 | 作用 |
+|---|---|---|
+| `batch_id` | INTEGER PK | 批次编号 |
+| `platform` / `account_id` | TEXT / INTEGER FK | 平台和账号 |
+| `collection_date` / `source_file` | TEXT | 采集日期和来源文件 |
+| `data_period` | TEXT(JSON) NULL | 本批次包含的真实周期 |
+| `raw_metric_count` / `success_metric_count` | INTEGER | 原始与成功指标数 |
+| `unavailable_metric_count` | INTEGER | 平台未提供的指标数 |
+| `status` / `created_at` | TEXT | pending、completed、failed及创建时间 |
+
+### 2.8 `fan_profile_records`
+
+用途：以通用维度明细保存历史画像，每次采集新增记录，不覆盖旧快照。
+
+| 字段 | 类型 | 作用 |
+|---|---|---|
+| `id` / `batch_id` | INTEGER PK / FK | 明细和采集批次 |
+| `platform` / `account_id` / `snapshot_date` | TEXT / FK / TEXT | 平台、账号、快照日期 |
+| `dimension_type` | TEXT | gender、age、region、interest、device、activity、follow_keyword、other |
+| `dimension_name` | TEXT | 平台原始维度名称 |
+| `dimension_value` / `percentage` | REAL NULL | 原始数值和百分比；不可用时为 NULL |
+| `ranking` / `raw_value` | INTEGER / TEXT NULL | 平台顺序和原始显示值 |
+| `collection_time` / `created_at` | TEXT | 采集与入库时间 |
+
+缺失字段以 `dimension_type=other`、数值 NULL、`raw_value` 以 `unavailable` 开头保存，不转换为0。
 
 ## 3. 采集、暂存与导入日志
 

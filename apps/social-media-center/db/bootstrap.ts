@@ -73,11 +73,35 @@ const schemaStatements = [
     ON collection_staging_records(collection_log_id, record_index)`,
   `CREATE INDEX IF NOT EXISTS idx_collection_staging_log_status
     ON collection_staging_records(collection_log_id, validation_status)`,
+  `CREATE TABLE IF NOT EXISTS fan_collection_batches (
+    batch_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    collection_date TEXT NOT NULL,
+    source_file TEXT NOT NULL,
+    data_period TEXT,
+    raw_metric_count INTEGER NOT NULL DEFAULT 0 CHECK (raw_metric_count >= 0),
+    success_metric_count INTEGER NOT NULL DEFAULT 0 CHECK (success_metric_count >= 0),
+    unavailable_metric_count INTEGER NOT NULL DEFAULT 0 CHECK (unavailable_metric_count >= 0),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','completed','failed')),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_collection_batch_source
+    ON fan_collection_batches(platform, account_id, source_file)`,
+  `CREATE INDEX IF NOT EXISTS idx_fan_collection_batch_date
+    ON fan_collection_batches(platform, collection_date DESC)`,
   `CREATE TABLE IF NOT EXISTS social_fans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    account_name TEXT,
+    snapshot_date TEXT,
     fans_count INTEGER NOT NULL DEFAULT 0 CHECK (fans_count >= 0),
+    display_fans_count TEXT,
+    male_ratio REAL,
+    female_ratio REAL,
+    collection_time TEXT,
+    data_period TEXT,
     gender_distribution TEXT NOT NULL DEFAULT '[]',
     age_distribution TEXT NOT NULL DEFAULT '[]',
     region_distribution TEXT NOT NULL DEFAULT '[]',
@@ -86,6 +110,7 @@ const schemaStatements = [
     source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual')),
     source_record_id TEXT,
     raw_payload TEXT,
+    batch_id INTEGER REFERENCES fan_collection_batches(batch_id) ON DELETE SET NULL,
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     collected_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -96,15 +121,45 @@ const schemaStatements = [
     ON social_fans(platform, collected_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_fans_source_record
     ON social_fans(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS fan_profile_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id INTEGER NOT NULL REFERENCES fan_collection_batches(batch_id) ON UPDATE CASCADE ON DELETE CASCADE,
+    platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
+    account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    snapshot_date TEXT NOT NULL,
+    dimension_type TEXT NOT NULL CHECK (dimension_type IN ('gender','age','region','interest','device','activity','follow_keyword','other')),
+    dimension_name TEXT NOT NULL,
+    dimension_value REAL,
+    percentage REAL,
+    ranking INTEGER,
+    raw_value TEXT,
+    collection_time TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_profile_batch_dimension
+    ON fan_profile_records(batch_id, dimension_type, dimension_name)`,
+  `CREATE INDEX IF NOT EXISTS idx_fan_profile_account_snapshot
+    ON fan_profile_records(account_id, snapshot_date DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_fan_profile_type_snapshot
+    ON fan_profile_records(platform, dimension_type, snapshot_date DESC)`,
   `CREATE TABLE IF NOT EXISTS fan_growth_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     record_date TEXT NOT NULL,
+    batch_id INTEGER REFERENCES fan_collection_batches(batch_id) ON DELETE SET NULL,
+    snapshot_date TEXT,
+    period_type TEXT NOT NULL DEFAULT 'daily' CHECK (period_type IN ('daily','7d','30d','natural_month','custom')),
+    period_start TEXT,
+    period_end TEXT,
     fans_count INTEGER NOT NULL DEFAULT 0 CHECK (fans_count >= 0),
     net_growth INTEGER NOT NULL DEFAULT 0,
     new_fans INTEGER NOT NULL DEFAULT 0 CHECK (new_fans >= 0),
     lost_fans INTEGER NOT NULL DEFAULT 0 CHECK (lost_fans >= 0),
+    new_followers INTEGER,
+    lost_followers INTEGER,
+    returning_followers INTEGER,
+    collection_time TEXT,
     source_type TEXT NOT NULL DEFAULT 'api' CHECK (source_type IN ('chrome','excel','api','manual')),
     source_record_id TEXT,
     raw_payload TEXT,
@@ -112,8 +167,6 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_growth_account_date
-    ON fan_growth_records(account_id, record_date)`,
   `CREATE INDEX IF NOT EXISTS idx_fan_growth_platform_date
     ON fan_growth_records(platform, record_date DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_growth_source_record
@@ -525,6 +578,68 @@ async function initialize() {
   if (!collectionColumnNames.has("comment_count")) {
     await d1.prepare("ALTER TABLE collection_logs ADD COLUMN comment_count INTEGER NOT NULL DEFAULT 0").run();
   }
+
+  const socialFanColumns = await d1.prepare("PRAGMA table_info(social_fans)").all<{ name: string }>();
+  const socialFanColumnNames = new Set(socialFanColumns.results.map((column) => column.name));
+  const missingSocialFanColumns = [
+    ["account_name", "ALTER TABLE social_fans ADD COLUMN account_name TEXT"],
+    ["snapshot_date", "ALTER TABLE social_fans ADD COLUMN snapshot_date TEXT"],
+    ["display_fans_count", "ALTER TABLE social_fans ADD COLUMN display_fans_count TEXT"],
+    ["male_ratio", "ALTER TABLE social_fans ADD COLUMN male_ratio REAL"],
+    ["female_ratio", "ALTER TABLE social_fans ADD COLUMN female_ratio REAL"],
+    ["collection_time", "ALTER TABLE social_fans ADD COLUMN collection_time TEXT"],
+    ["data_period", "ALTER TABLE social_fans ADD COLUMN data_period TEXT"],
+    ["batch_id", "ALTER TABLE social_fans ADD COLUMN batch_id INTEGER REFERENCES fan_collection_batches(batch_id) ON DELETE SET NULL"],
+  ] as const;
+  for (const [name, statement] of missingSocialFanColumns) {
+    if (!socialFanColumnNames.has(name)) await d1.prepare(statement).run();
+  }
+  await d1.batch([
+    d1.prepare(`UPDATE social_fans SET
+      account_name = COALESCE(account_name, (SELECT account_name FROM social_accounts WHERE social_accounts.id = social_fans.account_id)),
+      snapshot_date = COALESCE(snapshot_date, date(collected_at)),
+      collection_time = COALESCE(collection_time, collected_at),
+      data_period = COALESCE(data_period, '["legacy"]'),
+      male_ratio = COALESCE(male_ratio, (
+        SELECT CAST(json_extract(value, '$.value') AS REAL) FROM json_each(social_fans.gender_distribution)
+        WHERE json_extract(value, '$.label') = '男性' LIMIT 1
+      )),
+      female_ratio = COALESCE(female_ratio, (
+        SELECT CAST(json_extract(value, '$.value') AS REAL) FROM json_each(social_fans.gender_distribution)
+        WHERE json_extract(value, '$.label') = '女性' LIMIT 1
+      ))`),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_social_fans_batch ON social_fans(batch_id) WHERE batch_id IS NOT NULL"),
+  ]);
+
+  const fanGrowthColumns = await d1.prepare("PRAGMA table_info(fan_growth_records)").all<{ name: string }>();
+  const fanGrowthColumnNames = new Set(fanGrowthColumns.results.map((column) => column.name));
+  const missingFanGrowthColumns = [
+    ["batch_id", "ALTER TABLE fan_growth_records ADD COLUMN batch_id INTEGER REFERENCES fan_collection_batches(batch_id) ON DELETE SET NULL"],
+    ["snapshot_date", "ALTER TABLE fan_growth_records ADD COLUMN snapshot_date TEXT"],
+    ["period_type", "ALTER TABLE fan_growth_records ADD COLUMN period_type TEXT NOT NULL DEFAULT 'daily'"],
+    ["period_start", "ALTER TABLE fan_growth_records ADD COLUMN period_start TEXT"],
+    ["period_end", "ALTER TABLE fan_growth_records ADD COLUMN period_end TEXT"],
+    ["new_followers", "ALTER TABLE fan_growth_records ADD COLUMN new_followers INTEGER"],
+    ["lost_followers", "ALTER TABLE fan_growth_records ADD COLUMN lost_followers INTEGER"],
+    ["returning_followers", "ALTER TABLE fan_growth_records ADD COLUMN returning_followers INTEGER"],
+    ["collection_time", "ALTER TABLE fan_growth_records ADD COLUMN collection_time TEXT"],
+  ] as const;
+  for (const [name, statement] of missingFanGrowthColumns) {
+    if (!fanGrowthColumnNames.has(name)) await d1.prepare(statement).run();
+  }
+  await d1.batch([
+    d1.prepare(`UPDATE fan_growth_records SET
+      snapshot_date = COALESCE(snapshot_date, record_date),
+      period_type = CASE WHEN json_extract(raw_payload, '$.granularity') = 'period_summary' THEN 'custom' ELSE COALESCE(period_type, 'daily') END,
+      period_end = COALESCE(period_end, record_date),
+      new_followers = COALESCE(new_followers, new_fans),
+      lost_followers = COALESCE(lost_followers, lost_fans),
+      returning_followers = COALESCE(returning_followers, json_extract(raw_payload, '$.returningFans')),
+      collection_time = COALESCE(collection_time, updated_at, created_at)`),
+    d1.prepare("DROP INDEX IF EXISTS uq_fan_growth_account_date"),
+    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_growth_batch_period ON fan_growth_records(batch_id, period_type) WHERE batch_id IS NOT NULL"),
+    d1.prepare("CREATE INDEX IF NOT EXISTS idx_fan_growth_platform_period ON fan_growth_records(platform, period_type, period_end DESC)"),
+  ]);
 
   const commentColumns = await d1
     .prepare("PRAGMA table_info(social_comments)")

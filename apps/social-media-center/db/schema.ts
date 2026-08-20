@@ -92,6 +92,29 @@ export const collectionStagingRecords = sqliteTable(
   ],
 );
 
+export const fanCollectionBatches = sqliteTable(
+  "fan_collection_batches",
+  {
+    batchId: integer("batch_id").primaryKey({ autoIncrement: true }),
+    platform: text("platform").notNull(),
+    accountId: integer("account_id")
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    collectionDate: text("collection_date").notNull(),
+    sourceFile: text("source_file").notNull(),
+    dataPeriod: text("data_period", { mode: "json" }).$type<string[] | null>(),
+    rawMetricCount: integer("raw_metric_count").notNull().default(0),
+    successMetricCount: integer("success_metric_count").notNull().default(0),
+    unavailableMetricCount: integer("unavailable_metric_count").notNull().default(0),
+    status: text("status").notNull().default("pending"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_fan_collection_batch_source").on(table.platform, table.accountId, table.sourceFile),
+    index("idx_fan_collection_batch_date").on(table.platform, table.collectionDate),
+  ],
+);
+
 export const socialFans = sqliteTable(
   "social_fans",
   {
@@ -100,7 +123,14 @@ export const socialFans = sqliteTable(
       .notNull()
       .references(() => socialAccounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
     platform: text("platform").notNull(),
+    accountName: text("account_name"),
+    snapshotDate: text("snapshot_date"),
     fansCount: integer("fans_count").notNull().default(0),
+    displayFansCount: text("display_fans_count"),
+    maleRatio: real("male_ratio"),
+    femaleRatio: real("female_ratio"),
+    collectionTime: text("collection_time"),
+    dataPeriod: text("data_period", { mode: "json" }).$type<string[] | null>(),
     genderDistribution: text("gender_distribution", { mode: "json" })
       .$type<Array<{ label: string; value: number }>>()
       .notNull()
@@ -124,6 +154,7 @@ export const socialFans = sqliteTable(
     sourceType: text("source_type").notNull().default("api"),
     sourceRecordId: text("source_record_id"),
     rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
+    batchId: integer("batch_id").references(() => fanCollectionBatches.batchId, { onDelete: "set null" }),
     collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, {
       onDelete: "set null",
     }),
@@ -134,6 +165,35 @@ export const socialFans = sqliteTable(
     index("idx_social_fans_account_collected_at").on(table.accountId, table.collectedAt),
     index("idx_social_fans_platform_collected_at").on(table.platform, table.collectedAt),
     uniqueIndex("uq_social_fans_source_record").on(table.platform, table.sourceRecordId),
+    uniqueIndex("uq_social_fans_batch").on(table.batchId),
+  ],
+);
+
+export const fanProfileRecords = sqliteTable(
+  "fan_profile_records",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    batchId: integer("batch_id")
+      .notNull()
+      .references(() => fanCollectionBatches.batchId, { onDelete: "cascade", onUpdate: "cascade" }),
+    platform: text("platform").notNull(),
+    accountId: integer("account_id")
+      .notNull()
+      .references(() => socialAccounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    snapshotDate: text("snapshot_date").notNull(),
+    dimensionType: text("dimension_type").notNull(),
+    dimensionName: text("dimension_name").notNull(),
+    dimensionValue: real("dimension_value"),
+    percentage: real("percentage"),
+    ranking: integer("ranking"),
+    rawValue: text("raw_value"),
+    collectionTime: text("collection_time").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_fan_profile_batch_dimension").on(table.batchId, table.dimensionType, table.dimensionName),
+    index("idx_fan_profile_account_snapshot").on(table.accountId, table.snapshotDate),
+    index("idx_fan_profile_type_snapshot").on(table.platform, table.dimensionType, table.snapshotDate),
   ],
 );
 
@@ -146,10 +206,19 @@ export const fanGrowthRecords = sqliteTable(
       .references(() => socialAccounts.id, { onDelete: "cascade", onUpdate: "cascade" }),
     platform: text("platform").notNull(),
     recordDate: text("record_date").notNull(),
+    batchId: integer("batch_id").references(() => fanCollectionBatches.batchId, { onDelete: "set null" }),
+    snapshotDate: text("snapshot_date"),
+    periodType: text("period_type").notNull().default("daily"),
+    periodStart: text("period_start"),
+    periodEnd: text("period_end"),
     fansCount: integer("fans_count").notNull().default(0),
     netGrowth: integer("net_growth").notNull().default(0),
     newFans: integer("new_fans").notNull().default(0),
     lostFans: integer("lost_fans").notNull().default(0),
+    newFollowers: integer("new_followers"),
+    lostFollowers: integer("lost_followers"),
+    returningFollowers: integer("returning_followers"),
+    collectionTime: text("collection_time"),
     sourceType: text("source_type").notNull().default("api"),
     sourceRecordId: text("source_record_id"),
     rawPayload: text("raw_payload", { mode: "json" }).$type<Record<string, unknown> | null>(),
@@ -160,8 +229,9 @@ export const fanGrowthRecords = sqliteTable(
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
-    uniqueIndex("uq_fan_growth_account_date").on(table.accountId, table.recordDate),
     index("idx_fan_growth_platform_date").on(table.platform, table.recordDate),
+    uniqueIndex("uq_fan_growth_batch_period").on(table.batchId, table.periodType),
+    index("idx_fan_growth_platform_period").on(table.platform, table.periodType, table.periodEnd),
     uniqueIndex("uq_fan_growth_source_record").on(table.platform, table.sourceRecordId),
   ],
 );

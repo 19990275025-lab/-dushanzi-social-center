@@ -101,7 +101,7 @@ test("content monitoring and fan insights retain platform themes", async () => {
   assert.doesNotMatch(styles, /platform-themed-page\.theme-wechat_channels/);
 });
 
-test("fan analysis V2.0 adds growth, profile history, content acquisition and export without new schema", async () => {
+test("fan analysis V2.0 retains growth, profile history, content acquisition and export", async () => {
   const [page, api, exporter, styles, readme] = await Promise.all([
     readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
     readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
@@ -467,6 +467,37 @@ test("content and user insight tables are generated for both databases", async (
   }
   assert.match(schema, /rawPayload/);
   assert.match(postgresMigration, /raw_payload/);
+});
+
+test("fan data model v2 keeps batches, period summaries and normalized profile records", async () => {
+  const [migration, postgresMigration, schema, bootstrap, parser, preview, confirm, api, page] = await Promise.all([
+    readFile(new URL("drizzle/0026_fan_data_model_v2.sql", root), "utf8"),
+    readProjectMigration("008_create_fan_data_model_v2.sql"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("lib/douyin-fans-v2.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/fans-v2/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/fans-v2/confirm/route.ts", root), "utf8"),
+    readFile(new URL("app/api/insights/fans/route.ts", root), "utf8"),
+    readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
+  ]);
+  for (const source of [migration, postgresMigration, schema, bootstrap]) {
+    assert.match(source, /fan_collection_batches/);
+    assert.match(source, /fan_profile_records/);
+    assert.match(source, /period_type/);
+    assert.match(source, /returning_followers/);
+  }
+  assert.match(parser, /follow_keyword/);
+  assert.match(parser, /unavailable/);
+  assert.match(parser, /successful_metric_values/);
+  assert.match(preview, /databaseWritten: false/);
+  assert.match(confirm, /同一粉丝采集批次已存在/);
+  assert.match(confirm, /INSERT INTO fan_profile_records/);
+  assert.match(confirm, /INSERT INTO fan_growth_records/);
+  assert.match(api, /period_type = 'daily'/);
+  assert.match(api, /FROM fan_profile_records/);
+  assert.doesNotMatch(api, /social_posts\.fans_growth"/);
+  assert.match(page, /平台暂未提供该维度数据/);
 });
 
 test("content monitoring competitor posts schema supports future collection", async () => {

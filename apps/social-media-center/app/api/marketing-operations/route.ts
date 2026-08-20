@@ -86,7 +86,8 @@ export async function GET(request: Request) {
       WHERE date(task_date) BETWEEN date(?) AND date(?) GROUP BY content_type, status
     `).bind(monthStart, monthEnd).all<{ content_type: string; status: string; count: number }>(),
     d1.prepare(`SELECT COUNT(*) AS records, COALESCE(SUM(net_growth), 0) AS actual FROM fan_growth_records
-      WHERE date(record_date) BETWEEN date(?) AND date(?)`).bind(monthStart, monthEnd).first<{ records: number; actual: number }>(),
+      WHERE period_type = 'daily' AND date(period_end) BETWEEN date(?) AND date(?)`)
+      .bind(monthStart, monthEnd).first<{ records: number; actual: number }>(),
     d1.prepare(`SELECT COALESCE(SUM(target_views), 0) AS target_views,
       COALESCE(SUM(target_fans_growth), 0) AS target_fans
       FROM content_plans WHERE date(publish_time) BETWEEN date(?) AND date(?)`)

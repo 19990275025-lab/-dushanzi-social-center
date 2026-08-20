@@ -49,6 +49,8 @@
 |---|---|---|---|---|
 | `/api/collections/douyin-v3` | POST | V3 粉丝、作品、观众、评论数据无落库预览 | `schemaVersion=3.0` 的抖音标准 JSON | 标准化 `payload`、数量摘要、失败数 |
 | `/api/collections/douyin-v3/confirm` | POST | 明确确认后批量写入 | `{ confirmed: true, payload }` | 日志 ID、粉丝/增长/作品/观众/评论写入数 |
+| `/api/collections/fans-v2` | POST | 粉丝真实数据 V2 预览、校验和分层映射 | 抖音粉丝原始 JSON | 账号快照、周期增长、画像明细、不可用字段和数量摘要 |
+| `/api/collections/fans-v2/confirm` | POST | 粉丝真实数据 V2 确认入库 | `{ confirmed: true, payload }` | 批次 ID、四张表写入数、重复批次状态 |
 | `/api/collections/douyin-v2` | POST | 兼容 V2.1 预览 | V2.1 采集 JSON | 完整率和无落库预览 |
 | `/api/collections/douyin-v2/confirm` | POST | 兼容 V2.1 确认 | 确认标记与预览数据 | 写入与日志结果 |
 | `/api/collections/comments` | POST | 独立评论采集预览 | 按作品组织的评论数据 | 预览、校验与日志 |
@@ -57,6 +59,8 @@
 | `/api/collections/confirm` | POST | 旧版作品确认入口 | 确认数据 | 作品写入结果 |
 
 V3 校验包括日期、抖音链接、非负指标、0–100 的完播/划走率、观众分布和评论字段；每个作品最多接收 50 条评论。该 API **接收采集结果，不在服务器内启动或控制抖音 App**。
+
+粉丝 V2 接口按 `source_file + platform + account_id` 识别采集批次，同一批次不会重复写入。确认接口分别写入 `fan_collection_batches`、`social_fans`、`fan_growth_records` 和 `fan_profile_records`；平台未提供的指标保存为 `null / unavailable`，不会转换为 0。
 
 ### 2.3 人工数据导入
 
@@ -125,12 +129,12 @@ Excel 作品字段经过映射和校验后入库；图片当前只上传 R2 并�
 | `/api/content-monitoring` | GET | 内容监测驾驶舱 | `platform=douyin|kuaishou|weibo`、日期范围 | KPI、TOP10、爆款、低效诊断、热点关联 |
 | `/api/insights/content` | GET | 内容分析汇总 | 平台、日期范围 | 内容类型、作品、AI 建议和平台状态 |
 | `/api/insights/content/detail?id={postId}` | GET | 单作品详情 | 作品 ID | 流量/互动指标、观众画像、评论与热词 |
-| `/api/insights/fans` | GET | 粉丝分析 V2.0 | `trend=7d|30d|month|custom`、日期范围 | 总量、增长、画像对比、吸粉作品、周报 |
+| `/api/insights/fans` | GET | 粉丝分析 V2.0 | `trend=7d|30d|month|custom`、日期范围 | 真实快照、周期增长、画像明细、吸粉作品和周报；缺失维度返回不可用状态 |
 | `/api/ai-analysis` | GET | 规则型内容分析 | 日期范围 | 作品五维评分、平台建议、选题、日报/周报 |
 | `/api/comment-insights` | GET | 查询评论洞察 | 日期范围 | 情绪、关键词、需求、建议 |
 | `/api/comment-insights` | POST | 执行并回写评论规则分析 | 日期范围 | 刷新后的洞察结果 |
 
-现状差异：`/api/insights/fans` 响应中存在 `collectionApi: "/api/v1/social/fans/collect"` 的提示字段，但代码树中没有对应 Route Handler。它应视为未来采集入口说明，不是当前可调用 API。
+`/api/insights/fans` 返回的 `collectionApi` 指向 `/api/collections/fans-v2`。增长图只读取 `period_type=daily` 的真实时间点，7 天、30 天和自然月汇总记录仅参与对应周期指标，不会伪造成每日趋势。
 
 ## 5. AI 内容策划 API
 
@@ -176,5 +180,5 @@ Excel 作品字段经过映射和校验后入库；图片当前只上传 R2 并�
 - 为所有核心路由补充 OpenAPI/JSON Schema，并把标准字段定义抽成可版本化契约。
 - 将旧版 `/api/collections*`、兼容 `/api/hot-topic/import` 与统一 V2 主链标注生命周期。
 - 为写接口统一鉴权、幂等键、请求 ID、错误码和审计字段。
-- 修正或实现粉丝接口提示中的 `/api/v1/social/fans/collect`，避免前端暴露不存在的路径。
+- 为粉丝 V2 接口补充正式 JSON Schema，并在形成连续历史快照后增加跨批次画像对比合同测试。
 - 增加 API 合同测试，覆盖日期时区、同日重复、跨平台关联和批次回滚。

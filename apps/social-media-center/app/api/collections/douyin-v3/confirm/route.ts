@@ -100,25 +100,37 @@ export async function POST(request: Request) {
     ),
     ...payload.fans.growth.map((growth) => d1.prepare(`
       INSERT INTO fan_growth_records
-        (account_id, platform, record_date, fans_count, net_growth, new_fans, lost_fans,
-         source_type, source_record_id, raw_payload, collection_log_id)
-      VALUES (?, 'douyin', ?, ?, ?, ?, ?, 'api', ?, ?, ?)
-      ON CONFLICT(account_id, record_date) DO UPDATE SET
+        (account_id, platform, record_date, snapshot_date, period_type, period_start, period_end,
+         fans_count, net_growth, new_fans, lost_fans, new_followers, lost_followers,
+         returning_followers, collection_time, source_type, source_record_id, raw_payload, collection_log_id)
+      VALUES (?, 'douyin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'api', ?, ?, ?)
+      ON CONFLICT(platform, source_record_id) WHERE source_record_id IS NOT NULL DO UPDATE SET
         fans_count = excluded.fans_count,
         net_growth = excluded.net_growth,
         new_fans = excluded.new_fans,
         lost_fans = excluded.lost_fans,
-        source_record_id = excluded.source_record_id,
+        new_followers = excluded.new_followers,
+        lost_followers = excluded.lost_followers,
+        returning_followers = excluded.returning_followers,
+        collection_time = excluded.collection_time,
         raw_payload = excluded.raw_payload,
         collection_log_id = excluded.collection_log_id,
         updated_at = CURRENT_TIMESTAMP
     `).bind(
       account.id,
       growth.recordDate.slice(0, 10),
+      payload.collectedAt.slice(0, 10),
+      growth.granularity === "period_summary" ? "custom" : "daily",
+      growth.granularity === "period_summary" ? payload.collectionRange.start.slice(0, 10) : growth.recordDate.slice(0, 10),
+      growth.recordDate.slice(0, 10),
       growth.fansCount,
       growth.netGrowth,
       growth.newFans,
       growth.lostFans,
+      growth.newFans,
+      growth.lostFans,
+      growth.returningFans ?? null,
+      collectedAt,
       `${sourcePrefix}:growth:${growth.recordDate.slice(0, 10)}`,
       JSON.stringify(growth),
       logId,
