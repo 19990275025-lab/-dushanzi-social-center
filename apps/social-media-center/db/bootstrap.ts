@@ -226,6 +226,8 @@ const schemaStatements = [
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
     snapshot_time TEXT NOT NULL,
     collection_time TEXT NOT NULL,
+    snapshot_date TEXT,
+    collection_batch TEXT,
     play_count INTEGER CHECK (play_count IS NULL OR play_count >= 0),
     like_count INTEGER CHECK (like_count IS NULL OR like_count >= 0),
     comment_overview_count INTEGER CHECK (comment_overview_count IS NULL OR comment_overview_count >= 0),
@@ -256,6 +258,28 @@ const schemaStatements = [
     ON social_post_snapshots(post_id, snapshot_time)`,
   `CREATE INDEX IF NOT EXISTS idx_social_post_snapshots_platform_time
     ON social_post_snapshots(platform, snapshot_time DESC)`,
+  `CREATE TABLE IF NOT EXISTS social_post_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    evaluation_date TEXT NOT NULL,
+    snapshot_id INTEGER NOT NULL REFERENCES social_post_snapshots(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    total_score REAL,
+    grade TEXT,
+    propagation_score REAL,
+    interaction_score REAL,
+    attraction_score REAL,
+    efficiency_score REAL,
+    confidence TEXT NOT NULL,
+    douyin_paid_status TEXT NOT NULL DEFAULT 'none',
+    data_completeness REAL,
+    raw_evaluation TEXT NOT NULL,
+    collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_evaluations_snapshot
+    ON social_post_evaluations(post_id, evaluation_date, snapshot_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_social_post_evaluations_post_date
+    ON social_post_evaluations(post_id, evaluation_date DESC)`,
   `CREATE TABLE IF NOT EXISTS content_collection_files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     file_name TEXT NOT NULL,
@@ -304,6 +328,9 @@ const schemaStatements = [
     ON social_post_metric_series(snapshot_id, metric_type, series_name, point_index)`,
   `CREATE INDEX IF NOT EXISTS idx_social_post_metric_series_post_type_time
     ON social_post_metric_series(post_id, metric_type, point_time)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_metric_series_time
+    ON social_post_metric_series(post_id, metric_type, series_name, point_time)
+    WHERE point_time IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS social_post_paid_traffic (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -846,6 +873,17 @@ async function initialize() {
   if (!snapshotColumnNames.has("source_failure_reason")) {
     await d1.prepare("ALTER TABLE social_post_snapshots ADD COLUMN source_failure_reason TEXT").run();
   }
+  if (!snapshotColumnNames.has("snapshot_date")) {
+    await d1.prepare("ALTER TABLE social_post_snapshots ADD COLUMN snapshot_date TEXT").run();
+  }
+  if (!snapshotColumnNames.has("collection_batch")) {
+    await d1.prepare("ALTER TABLE social_post_snapshots ADD COLUMN collection_batch TEXT").run();
+  }
+  await d1.batch([
+    d1.prepare("UPDATE social_post_snapshots SET snapshot_date = substr(snapshot_time, 1, 10) WHERE snapshot_date IS NULL"),
+    d1.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_snapshots_post_date_batch
+      ON social_post_snapshots(post_id, snapshot_date, collection_batch) WHERE collection_batch IS NOT NULL`),
+  ]);
 
   const collectionColumns = await d1
     .prepare("PRAGMA table_info(collection_logs)")

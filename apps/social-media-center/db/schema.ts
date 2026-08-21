@@ -312,6 +312,8 @@ export const socialPostSnapshots = sqliteTable(
     platform: text("platform").notNull(),
     snapshotTime: text("snapshot_time").notNull(),
     collectionTime: text("collection_time").notNull(),
+    snapshotDate: text("snapshot_date"),
+    collectionBatch: text("collection_batch"),
     playCount: integer("play_count"),
     likeCount: integer("like_count"),
     commentOverviewCount: integer("comment_overview_count"),
@@ -340,7 +342,34 @@ export const socialPostSnapshots = sqliteTable(
   },
   (table) => [
     uniqueIndex("uq_social_post_snapshots_post_time").on(table.postId, table.snapshotTime),
+    uniqueIndex("uq_social_post_snapshots_post_date_batch").on(table.postId, table.snapshotDate, table.collectionBatch),
     index("idx_social_post_snapshots_platform_time").on(table.platform, table.snapshotTime),
+  ],
+);
+
+export const socialPostEvaluations = sqliteTable(
+  "social_post_evaluations",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    postId: integer("post_id").notNull().references(() => socialPosts.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    evaluationDate: text("evaluation_date").notNull(),
+    snapshotId: integer("snapshot_id").notNull().references(() => socialPostSnapshots.id, { onDelete: "cascade", onUpdate: "cascade" }),
+    totalScore: real("total_score"),
+    grade: text("grade"),
+    propagationScore: real("propagation_score"),
+    interactionScore: real("interaction_score"),
+    attractionScore: real("attraction_score"),
+    efficiencyScore: real("efficiency_score"),
+    confidence: text("confidence").notNull(),
+    douyinPaidStatus: text("douyin_paid_status").notNull().default("none"),
+    dataCompleteness: real("data_completeness"),
+    rawEvaluation: text("raw_evaluation", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+    collectionLogId: integer("collection_log_id").references(() => collectionLogs.id, { onDelete: "set null" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("uq_social_post_evaluations_snapshot").on(table.postId, table.evaluationDate, table.snapshotId),
+    index("idx_social_post_evaluations_post_date").on(table.postId, table.evaluationDate),
   ],
 );
 
@@ -395,6 +424,7 @@ export const socialPostMetricSeries = sqliteTable(
   },
   (table) => [
     uniqueIndex("uq_social_post_metric_series_point").on(table.snapshotId, table.metricType, table.seriesName, table.pointIndex),
+    uniqueIndex("uq_social_post_metric_series_time").on(table.postId, table.metricType, table.seriesName, table.pointTime),
     index("idx_social_post_metric_series_post_type_time").on(table.postId, table.metricType, table.pointTime),
   ],
 );

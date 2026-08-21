@@ -6,6 +6,8 @@ import {
   validateWorkBuddyDeepPosts,
   type DeepPost,
 } from "@/lib/workbuddy-posts-deep-v2-1";
+import { normalizeWorkBuddyDailyPosts } from "@/lib/workbuddy-posts-daily-v2-2";
+import { loadContentEffectEvaluations } from "@/lib/content-effect-evaluation-server";
 
 type ExistingPost = { id: number; platform_post_id: string | null; title: string; publish_time: string };
 
@@ -50,11 +52,12 @@ export async function POST(request: Request) {
   const calculatedChecksum = await checksum(rawText);
   const suppliedChecksum = request.headers.get("x-source-checksum");
   if (suppliedChecksum && suppliedChecksum !== calculatedChecksum) return Response.json({ error: "checksum 复核失败，未写入" }, { status: 422 });
-  const payload = normalizeWorkBuddyDeepPosts(rawPayload, {
+  const fileMeta = {
     fileName: sourceFile, fullPath, checksum: calculatedChecksum,
     fileSize: new TextEncoder().encode(rawText).byteLength,
-  });
-  if (!payload) return Response.json({ error: "WorkBuddy V2.1 深度作品结构无效" }, { status: 400 });
+  };
+  const payload = normalizeWorkBuddyDailyPosts(rawPayload, fileMeta) ?? normalizeWorkBuddyDeepPosts(rawPayload, fileMeta);
+  if (!payload) return Response.json({ error: "WorkBuddy V2.1/V2.2 作品结构无效" }, { status: 400 });
   const errors = validateWorkBuddyDeepPosts(payload);
   if (errors.length) return Response.json({ error: "确认前完整性复核失败，未写入业务表", errors }, { status: 422 });
 
@@ -91,9 +94,11 @@ export async function POST(request: Request) {
   const logResult = await d1.prepare(`INSERT INTO collection_logs
     (platform, source_type, source_name, entity_type, status, total_count, success_count,
      error_count, comment_count, source_file, batch_key, unavailable_count, raw_payload, collected_at)
-    VALUES ('douyin', 'api', 'WorkBuddy抖音作品深度采集V2.1', 'workbuddy_posts_deep_v2_1',
+    VALUES ('douyin', 'api', ?, ?,
       'pending', ?, 0, 0, ?, ?, ?, ?, ?, ?)`)
-    .bind(payload.posts.length, summary.actualComments, payload.sourceFile,
+    .bind(payload.schemaVersion === "2.2" ? "WorkBuddy抖音作品每日监测V2.2" : "WorkBuddy抖音作品深度采集V2.1",
+      payload.schemaVersion === "2.2" ? "workbuddy_posts_daily_v2_2" : "workbuddy_posts_deep_v2_1",
+      payload.posts.length, summary.actualComments, payload.sourceFile,
       `workbuddy:douyin-posts-deep:${payload.checksum}`, payload.unavailableValueCount,
       JSON.stringify({ checksum: payload.checksum, fullPath: payload.sourcePath, collectionBatch: payload.collectionBatch,
         completenessScore: payload.completenessScore, schemaFieldCount: payload.schemaFieldCount,
@@ -134,17 +139,17 @@ export async function POST(request: Request) {
     }
 
     statements.push(d1.prepare(`INSERT INTO social_post_snapshots
-      (post_id, platform, snapshot_time, collection_time, play_count, like_count,
+      (post_id, platform, snapshot_time, collection_time, snapshot_date, collection_batch, play_count, like_count,
        comment_overview_count, actual_loaded_count, comment_rows_count, favorite_count,
        share_count, danmaku_count, follower_gain, follower_loss, follower_play_ratio,
        page_entry_rate, data_availability_status, traffic_availability_status,
        traffic_sources_availability_status, audience_availability_status,
        comment_keywords_availability_status, comments_availability_status, post_age_days,
        source_file, raw_payload, collection_log_id, source_record_status, source_failure_reason)
-      SELECT p.id, 'douyin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      SELECT p.id, 'douyin', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       FROM social_posts p WHERE p.platform = 'douyin' AND ${matchSql} LIMIT 1
       ON CONFLICT(post_id, snapshot_time) DO NOTHING`).bind(
-      post.snapshot.snapshotTime, post.snapshot.collectionTime, post.snapshot.playCount,
+      post.snapshot.snapshotTime, post.snapshot.collectionTime, payload.collectionDate, payload.collectionBatch, post.snapshot.playCount,
       post.snapshot.likeCount, post.snapshot.commentOverviewCount, post.snapshot.actualLoadedCount,
       post.snapshot.commentRowsCount, post.snapshot.favoriteCount, post.snapshot.shareCount,
       post.snapshot.danmakuCount, post.snapshot.followerGain, post.snapshot.followerLoss,
@@ -183,7 +188,7 @@ export async function POST(request: Request) {
         SELECT p.id, s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', ?
         FROM social_posts p JOIN social_post_snapshots s ON s.post_id = p.id AND s.snapshot_time = ?
         WHERE p.platform = 'douyin' AND ${matchSql} LIMIT 1
-        ON CONFLICT(snapshot_id, metric_type, series_name, point_index) DO NOTHING`).bind(
+        ON CONFLICT DO NOTHING`).bind(
         post.snapshot.snapshotTime, point.metricType, point.seriesName, point.pointIndex,
         point.pointTime, point.pointLabel, point.metricValue, point.unit, point.sourcePath,
         JSON.stringify(point.rawValue), logId, post.snapshot.snapshotTime, ...matchBinds(post),
@@ -283,18 +288,47 @@ export async function POST(request: Request) {
     }
   }
 
-  statements.push(d1.prepare(`UPDATE collection_logs SET status = 'completed', success_count = ?,
-    comment_count = ?, error_count = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
-    .bind(payload.posts.length, summary.actualComments, logId));
-  statements.push(d1.prepare(`UPDATE content_collection_files SET status = 'completed', processed_at = CURRENT_TIMESTAMP,
-    collection_log_id = ?, error_message = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND checksum = ?`)
-    .bind(logId, fileRecord.id, payload.checksum));
-
   try { await d1.batch(statements); }
   catch (error) {
     const message = error instanceof Error ? error.message : "深度作品 V2.1 数据库事务失败";
     await markFailed(fileRecord.id, logId, message);
     return Response.json({ error: "深度作品 V2.1 数据写入失败，业务数据事务已回滚", detail: message }, { status: 500 });
+  }
+
+  let evaluationCount = 0;
+  try {
+    const evaluations = await loadContentEffectEvaluations(d1, { platform: "douyin" });
+    for (const evaluation of evaluations.evaluations.filter((item) => item.grade !== null)) {
+      const snapshotRow = await d1.prepare(`SELECT id FROM social_post_snapshots
+        WHERE post_id = ? AND collection_log_id = ? ORDER BY snapshot_time DESC, id DESC LIMIT 1`)
+        .bind(evaluation.postId, logId).first<{ id: number }>();
+      if (!snapshotRow) continue;
+      const result = await d1.prepare(`INSERT INTO social_post_evaluations
+        (post_id, evaluation_date, snapshot_id, total_score, grade, propagation_score,
+         interaction_score, attraction_score, efficiency_score, confidence, douyin_paid_status,
+         data_completeness, raw_evaluation, collection_log_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(post_id, evaluation_date, snapshot_id) DO NOTHING`).bind(
+        evaluation.postId, payload.collectionDate, snapshotRow.id, evaluation.overallScore, evaluation.grade,
+        evaluation.dimensions.propagation.score, evaluation.dimensions.interaction.score,
+        evaluation.dimensions.attraction.score, evaluation.dimensions.efficiency.score,
+        evaluation.dataConfidence, evaluation.labels.includes("含付费流量") ? "paid" : "none",
+        evaluation.dataCompleteness, JSON.stringify(evaluation), logId,
+      ).run();
+      evaluationCount += Number(result.meta.changes ?? 0);
+    }
+    await d1.batch([
+      d1.prepare(`UPDATE collection_logs SET status = 'completed', success_count = ?,
+        comment_count = ?, error_count = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?`)
+        .bind(payload.posts.length, summary.actualComments, logId),
+      d1.prepare(`UPDATE content_collection_files SET status = 'completed', processed_at = CURRENT_TIMESTAMP,
+        collection_log_id = ?, error_message = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND checksum = ?`)
+        .bind(logId, fileRecord.id, payload.checksum),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "内容效果评分历史保存失败";
+    await markFailed(fileRecord.id, logId, message);
+    return Response.json({ error: "作品已写入但评分历史保存失败，批次未标记完成", detail: message }, { status: 500 });
   }
 
   const [snapshotCount, seriesCount, sourceCount, paidCount, audienceCount, keywordCount, commentCount, replyCount] = await Promise.all([
@@ -315,8 +349,8 @@ export async function POST(request: Request) {
       snapshots: Number(snapshotCount?.count ?? 0), metricSeriesPoints: Number(seriesCount?.count ?? 0),
       trafficSources: Number(sourceCount?.count ?? 0), paidTraffic: Number(paidCount?.count ?? 0),
       audienceRecords: Number(audienceCount?.count ?? 0), commentKeywords: Number(keywordCount?.count ?? 0),
-      comments: Number(commentCount?.count ?? 0), commentReplies: Number(replyCount?.count ?? 0),
+      comments: Number(commentCount?.count ?? 0), commentReplies: Number(replyCount?.count ?? 0), evaluations: evaluationCount,
     },
-    message: `WorkBuddy 深度作品 V2.1 已完成：${payload.posts.length} 条作品、${Number(seriesCount?.count ?? 0)} 个真实趋势点、${Number(commentCount?.count ?? 0)} 条真实评论。`,
+    message: `WorkBuddy 抖音作品 V${payload.schemaVersion} 已完成：${payload.posts.length} 条作品、${Number(seriesCount?.count ?? 0)} 个真实趋势点、${Number(commentCount?.count ?? 0)} 条真实评论、${evaluationCount} 条评分历史。`,
   });
 }

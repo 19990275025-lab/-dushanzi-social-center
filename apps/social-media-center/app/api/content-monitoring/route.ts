@@ -21,6 +21,11 @@ type PostRow = MonitorPost & {
   has_paid_traffic: number;
   data_availability_status: string;
   source_record_status: string;
+  play_delta: number | null;
+  like_delta: number | null;
+  comment_delta: number | null;
+  favorite_delta: number | null;
+  share_delta: number | null;
 };
 
 type CommentRow = {
@@ -86,6 +91,11 @@ export async function GET(request: Request) {
         COALESCE(s.comment_overview_count, p.comments) AS comments,
         COALESCE(s.favorite_count, p.favorites) AS favorites,
         COALESCE(s.share_count, p.shares) AS shares,
+        CASE WHEN s.play_count IS NULL OR ps.play_count IS NULL THEN NULL ELSE s.play_count - ps.play_count END AS play_delta,
+        CASE WHEN s.like_count IS NULL OR ps.like_count IS NULL THEN NULL ELSE s.like_count - ps.like_count END AS like_delta,
+        CASE WHEN s.comment_overview_count IS NULL OR ps.comment_overview_count IS NULL THEN NULL ELSE s.comment_overview_count - ps.comment_overview_count END AS comment_delta,
+        CASE WHEN s.favorite_count IS NULL OR ps.favorite_count IS NULL THEN NULL ELSE s.favorite_count - ps.favorite_count END AS favorite_delta,
+        CASE WHEN s.share_count IS NULL OR ps.share_count IS NULL THEN NULL ELSE s.share_count - ps.share_count END AS share_delta,
         COALESCE(s.follower_gain, p.fans_growth) AS fans_growth,
         p.hashtags, COALESCE(p.duration_seconds, p.duration) AS duration,
         COALESCE(t.completion_rate, p.completion_rate) AS completion_rate,
@@ -109,6 +119,7 @@ export async function GET(request: Request) {
       FROM social_posts p
       INNER JOIN social_accounts a ON a.id = p.account_id
       LEFT JOIN ranked_snapshots s ON s.post_id = p.id AND s.snapshot_rank = 1
+      LEFT JOIN ranked_snapshots ps ON ps.post_id = p.id AND ps.snapshot_rank = 2
       LEFT JOIN social_post_traffic t ON t.snapshot_id = s.id
       WHERE p.platform = ? AND a.account_id NOT LIKE 'test_%'
         AND date(p.publish_time) BETWEEN date(?) AND date(?)

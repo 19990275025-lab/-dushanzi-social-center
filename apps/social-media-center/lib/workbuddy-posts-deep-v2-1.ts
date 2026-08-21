@@ -136,7 +136,7 @@ export type DeepPost = {
 };
 
 export type WorkBuddyDeepPayload = {
-  schemaVersion: "2.1";
+  schemaVersion: "2.1" | "2.2";
   platform: "douyin";
   source: "WorkBuddy";
   sourceFile: string;
@@ -174,6 +174,7 @@ function numberValue(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (unavailable(value)) return null;
   const raw = text(value).replaceAll(",", "");
+  if (/精确值\s*unavailable/i.test(raw)) return null;
   const match = raw.match(/[+-]?\d+(?:\.\d+)?/);
   if (!match) return null;
   let result = Number(match[0]);
@@ -251,15 +252,28 @@ function addSeries(target: DeepSeriesPoint[], metricType: string, seriesName: st
   });
 }
 
+function hourlyTimeAxis(value: unknown, count: number) {
+  if (!count) return null;
+  const match = text(value).match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})\s*~\s*(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/);
+  if (!match) return null;
+  const start = Date.parse(`${match[1].replace(" ", "T")}:00+08:00`);
+  const end = Date.parse(`${match[2].replace(" ", "T")}:00+08:00`);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || end - start !== (count - 1) * 3_600_000) return null;
+  return Array.from({ length: count }, (_, index) => new Date(start + index * 3_600_000).toISOString());
+}
+
 function normalizeSeries(row: JsonObject) {
   const records: DeepSeriesPoint[] = [];
   const overview = object(row.overview);
   const chart = object(overview.traffic_chart);
-  if (Array.isArray(chart.hourly_new)) addSeries(records, "play", "hourly_new", chart.hourly_new, null, null, "overview.traffic_chart.hourly_new", "count");
-  if (Array.isArray(chart.hourly_cumulative)) addSeries(records, "play", "hourly_cumulative", chart.hourly_cumulative, null, null, "overview.traffic_chart.hourly_cumulative", "count");
+  const hourlyTimes = hourlyTimeAxis(chart.time_range, Array.isArray(chart.hourly_new) ? chart.hourly_new.length : 0);
+  if (Array.isArray(chart.hourly_new)) addSeries(records, "play", "hourly_new", chart.hourly_new, hourlyTimes, null, "overview.traffic_chart.hourly_new", "count");
+  if (Array.isArray(chart.hourly_cumulative)) addSeries(records, "play", "hourly_cumulative", chart.hourly_cumulative, hourlyTimeAxis(chart.time_range, chart.hourly_cumulative.length), null, "overview.traffic_chart.hourly_cumulative", "count");
   if (Array.isArray(chart.daily_new)) addSeries(records, "play", "daily_new", chart.daily_new, null, null, "overview.traffic_chart.daily_new", "count");
   const fanChart = object(overview.fan_chart);
-  if (Array.isArray(fanChart.hourly)) addSeries(records, "follower_gain", "hourly_new", fanChart.hourly, null, null, "overview.fan_chart.hourly", "count");
+  if (Array.isArray(fanChart.hourly_new)) addSeries(records, "follower_gain", "hourly_new", fanChart.hourly_new, hourlyTimeAxis(fanChart.time_range, fanChart.hourly_new.length), null, "overview.fan_chart.hourly_new", "count");
+  if (Array.isArray(fanChart.hourly_cumulative)) addSeries(records, "follower_gain", "hourly_cumulative", fanChart.hourly_cumulative, hourlyTimeAxis(fanChart.time_range, fanChart.hourly_cumulative.length), null, "overview.fan_chart.hourly_cumulative", "count");
+  if (Array.isArray(fanChart.hourly)) addSeries(records, "follower_gain", "hourly_new", fanChart.hourly, hourlyTimeAxis(fanChart.time_range, fanChart.hourly.length), null, "overview.fan_chart.hourly", "count");
 
   if (Array.isArray(chart.data)) {
     addSeries(records, "play", "hourly_new", chart.data.map((item) => object(item).value), chart.data.map((item) => object(item).time), null, "overview.traffic_chart.data", "count");
@@ -387,9 +401,11 @@ function normalizeTrafficSources(value: unknown) {
   const records: DeepTrafficSource[] = [];
   const push = (name: string, raw: unknown) => {
     const row = object(raw);
-    const percentage = percent(row["占比"] ?? row.share ?? row.percentage);
-    if (!name || percentage === null) return;
-    records.push({ sourceType: "platform_page", sourceName: name, trafficValue: null, percentage, changePercentage: percent(row["对比7日"] ?? row.change), trafficNature: name === "其他" ? "other" : "organic", rawValue: raw });
+    const percentage = percent(isObject(raw) ? row["占比"] ?? row.share ?? row.percentage : raw);
+    const trafficValue = numberValue(row["播放量"] ?? row.traffic_value ?? row.value);
+    if (!name || (percentage === null && trafficValue === null)) return;
+    const changeMatch = text(raw).match(/对比7日\s*([+-]?\d+(?:\.\d+)?)%/);
+    records.push({ sourceType: "platform_page", sourceName: name, trafficValue, percentage, changePercentage: changeMatch ? Number(changeMatch[1]) : percent(row["对比7日"] ?? row.change), trafficNature: name === "其他" || /平台扶持/.test(name) ? "other" : "organic", rawValue: raw });
   };
   if (Array.isArray(value)) value.forEach((item) => push(text(object(item)["来源"] ?? object(item).source), item));
   else if (isObject(value)) Object.entries(value).forEach(([name, raw]) => push(name, raw));
@@ -431,7 +447,7 @@ function normalizePost(value: unknown, fileCollectionTime: string): DeepPost {
   const keywordValues = Array.isArray(keywordRaw.keywords) ? keywordRaw.keywords : [];
   const paidRaw = object(row.paid_traffic);
   const paidType = text(paidRaw.type);
-  const hasPaid = /DOU\s*\+|付费|投放/i.test(paidType);
+  const hasPaid = !/非DOU\s*\+|平台扶持/i.test(paidType) && /DOU\s*\+|付费|投放/i.test(paidType);
   const metadata = object(row.content_metadata);
 
   return {
@@ -462,7 +478,7 @@ function normalizePost(value: unknown, fileCollectionTime: string): DeepPost {
     trafficSources: normalizeTrafficSources(trafficRaw.traffic_sources),
     paidTraffic: hasPaid ? {
       campaignType: paidType, playCount: integer(paidRaw["播放量"]),
-      relationshipToOverview: ("extra_traffic_paid" in trafficRaw || /额外流量/.test(text(paidRaw.note) + text(object(trafficRaw.extra_traffic_paid).note))) ? "additional" : "unknown",
+      relationshipToOverview: ("extra_traffic_paid" in trafficRaw || /额外流量/.test(text(paidRaw.note) + text(paidRaw.detail_entry) + text(object(trafficRaw.extra_traffic_paid).note))) ? "additional" : "unknown",
       detailAvailable: text(paidRaw.detail_entry).includes("无") || text(paidRaw.note).includes("无二级") ? false : null,
       dataAvailabilityStatus: "available", rawPayload: paidRaw,
     } : null,

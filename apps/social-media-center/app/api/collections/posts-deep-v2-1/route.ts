@@ -5,6 +5,7 @@ import {
   summarizeWorkBuddyDeepPosts,
   validateWorkBuddyDeepPosts,
 } from "@/lib/workbuddy-posts-deep-v2-1";
+import { normalizeWorkBuddyDailyPosts } from "@/lib/workbuddy-posts-daily-v2-2";
 
 async function checksum(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -30,13 +31,14 @@ export async function POST(request: Request) {
   if (suppliedChecksum && suppliedChecksum !== calculatedChecksum) {
     return Response.json({ error: "文件 checksum 与请求声明不一致，未建立处理记录" }, { status: 422 });
   }
-  const payload = normalizeWorkBuddyDeepPosts(rawPayload, {
+  const fileMeta = {
     fileName: sourceFile,
     fullPath,
     checksum: calculatedChecksum,
     fileSize: new TextEncoder().encode(rawText).byteLength,
-  });
-  if (!payload) return Response.json({ error: "WorkBuddy V2.1 深度作品结构无效" }, { status: 400 });
+  };
+  const payload = normalizeWorkBuddyDailyPosts(rawPayload, fileMeta) ?? normalizeWorkBuddyDeepPosts(rawPayload, fileMeta);
+  if (!payload) return Response.json({ error: "WorkBuddy V2.1/V2.2 作品结构无效" }, { status: 400 });
   const errors = validateWorkBuddyDeepPosts(payload);
 
   await ensureDatabase();
@@ -102,11 +104,17 @@ export async function POST(request: Request) {
       completenessScore: payload.completenessScore,
     },
     summary,
-    fieldChecks: {
-      collection_info: true,
-      collection_summary: false,
-      summary: true,
-      posts: true,
+    fieldChecks: payload.schemaVersion === "2.2" ? {
+      collection_date: payload.collectionDate === "2026-08-21",
+      new_posts: Array.isArray((rawPayload as Record<string, unknown>).new_posts),
+      monitored_posts: Array.isArray((rawPayload as Record<string, unknown>).monitored_posts),
+      private_posts: Array.isArray((rawPayload as Record<string, unknown>).private_posts),
+      expired_posts: Array.isArray((rawPayload as Record<string, unknown>).expired_posts),
+      failed_posts: Array.isArray((rawPayload as Record<string, unknown>).failed_posts),
+      snapshot_time: payload.posts.every((post) => Boolean(post.snapshot.snapshotTime)),
+      collection_time: payload.posts.every((post) => Boolean(post.snapshot.collectionTime)),
+    } : {
+      collection_info: true, collection_summary: false, summary: true, posts: true,
       missingTopLevelExpectedFields: ["collection_summary", "collection_info.collection_date", "collection_info.collection_batch"],
     },
     postPreview: payload.posts.map((post) => ({
@@ -134,6 +142,6 @@ export async function POST(request: Request) {
       },
     })),
     qualityWarnings: payload.qualityWarnings,
-    message: "WorkBuddy 抖音深度作品 V2.1 无业务落库预览已生成，可执行确认入库。",
+    message: `WorkBuddy 抖音作品 V${payload.schemaVersion} 无业务落库预览已生成，可执行确认入库。`,
   });
 }

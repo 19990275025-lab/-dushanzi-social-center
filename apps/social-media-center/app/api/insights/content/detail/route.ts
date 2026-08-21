@@ -81,6 +81,8 @@ type KeywordRow = { keyword: string; ranking: number | null; occurrence_count: n
 type CommentRow = { id: number; username: string; comment_text: string | null; comment_type: string; comment_time: string | null; comment_time_raw: string | null; likes: number | null; likes_availability_status: string; reply_count: number; is_author: number; author_replied: number | null; sentiment: string; keyword: string | null; user_need: string | null };
 type PaidTrafficRow = { campaign_type: string; play_count: number | null; relationship_to_overview: "unknown" | "included" | "additional"; detail_available: number | null; data_availability_status: string };
 type SeriesRow = { metric_type: string; series_name: string; point_index: number; point_time: string | null; point_label: string | null; metric_value: number; unit: string | null };
+type SnapshotHistoryRow = { id: number; snapshot_date: string | null; snapshot_time: string; play_count: number | null; like_count: number | null; comment_overview_count: number | null; favorite_count: number | null; share_count: number | null; source_record_status: string };
+type EvaluationHistoryRow = { evaluation_date: string; snapshot_id: number; total_score: number | null; grade: string | null; propagation_score: number | null; interaction_score: number | null; attraction_score: number | null; efficiency_score: number | null; confidence: string; douyin_paid_status: string; data_completeness: number | null };
 
 function percent(value: number, total: number) {
   return total > 0 ? Number(((value / total) * 100).toFixed(2)) : null;
@@ -115,7 +117,7 @@ export async function GET(request: Request) {
   if (!Number.isInteger(id) || id <= 0) return Response.json({ error: "作品编号无效" }, { status: 400 });
 
   const d1 = getD1();
-  const [post, snapshot, traffic, sourceResult, paidTraffic, seriesResult, commentResult, audienceResult, legacyAudience, keywordResult] = await Promise.all([
+  const [post, snapshot, traffic, sourceResult, paidTraffic, seriesResult, commentResult, audienceResult, legacyAudience, keywordResult, snapshotHistoryResult, evaluationHistoryResult] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, platform_post_id, title, content_type, post_type, post_status, publish_time,
         post_url, video_url, cover_url, views, likes, comments, favorites, shares,
@@ -176,6 +178,12 @@ export async function GET(request: Request) {
         SELECT id FROM social_post_snapshots WHERE post_id = ? ORDER BY snapshot_time DESC, id DESC LIMIT 1
       ) ORDER BY COALESCE(ranking, 999), id`
     ).bind(id).all<KeywordRow>(),
+    d1.prepare(`SELECT id, snapshot_date, snapshot_time, play_count, like_count,
+      comment_overview_count, favorite_count, share_count, source_record_status
+      FROM social_post_snapshots WHERE post_id = ? ORDER BY snapshot_time, id`).bind(id).all<SnapshotHistoryRow>(),
+    d1.prepare(`SELECT evaluation_date, snapshot_id, total_score, grade, propagation_score,
+      interaction_score, attraction_score, efficiency_score, confidence, douyin_paid_status, data_completeness
+      FROM social_post_evaluations WHERE post_id = ? ORDER BY evaluation_date, id`).bind(id).all<EvaluationHistoryRow>(),
   ]);
 
   if (!post) return Response.json({ error: "未找到该作品" }, { status: 404 });
@@ -210,6 +218,14 @@ export async function GET(request: Request) {
     activity: group("activity"),
     attentionKeyword: group("attention_keyword"),
     other: group("other"),
+  };
+  const previousSnapshot = snapshotHistoryResult.results.length > 1 ? snapshotHistoryResult.results.at(-2)! : null;
+  const deltas = {
+    play: snapshot?.play_count === null || snapshot?.play_count === undefined || previousSnapshot?.play_count === null || previousSnapshot?.play_count === undefined ? null : snapshot.play_count - previousSnapshot.play_count,
+    like: snapshot?.like_count === null || snapshot?.like_count === undefined || previousSnapshot?.like_count === null || previousSnapshot?.like_count === undefined ? null : snapshot.like_count - previousSnapshot.like_count,
+    comment: snapshot?.comment_overview_count === null || snapshot?.comment_overview_count === undefined || previousSnapshot?.comment_overview_count === null || previousSnapshot?.comment_overview_count === undefined ? null : snapshot.comment_overview_count - previousSnapshot.comment_overview_count,
+    favorite: snapshot?.favorite_count === null || snapshot?.favorite_count === undefined || previousSnapshot?.favorite_count === null || previousSnapshot?.favorite_count === undefined ? null : snapshot.favorite_count - previousSnapshot.favorite_count,
+    share: snapshot?.share_count === null || snapshot?.share_count === undefined || previousSnapshot?.share_count === null || previousSnapshot?.share_count === undefined ? null : snapshot.share_count - previousSnapshot.share_count,
   };
 
   return Response.json({
@@ -251,6 +267,9 @@ export async function GET(request: Request) {
     trafficSources: sourceResult.results.map((item: SourceRow) => ({ name: item.source_name, value: item.traffic_value, rate: item.percentage, change: item.change_percentage, nature: item.traffic_nature })),
     audience,
     metricSeries: seriesResult.results,
+    snapshotHistory: snapshotHistoryResult.results,
+    evaluationHistory: evaluationHistoryResult.results,
+    deltas,
     effectEvaluation,
     paidTraffic: paidTraffic.results,
     dataAvailability: {
@@ -268,7 +287,7 @@ export async function GET(request: Request) {
         commentKeywords: availabilityNote(snapshot?.comment_keywords_availability_status, "评论热词", snapshot?.source_record_status),
       },
     },
-    sources: ["social_posts", "social_post_snapshots", "social_post_metric_series", "social_post_traffic", "social_post_traffic_sources", "social_post_paid_traffic", "social_post_audience", "social_post_comment_keywords", "social_comments", "social_comment_replies"],
+    sources: ["social_posts", "social_post_snapshots", "social_post_metric_series", "social_post_traffic", "social_post_traffic_sources", "social_post_paid_traffic", "social_post_audience", "social_post_comment_keywords", "social_comments", "social_comment_replies", "social_post_evaluations"],
     updatedAt: snapshot?.snapshot_time ?? post.updated_at,
   });
 }

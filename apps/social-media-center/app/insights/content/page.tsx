@@ -20,6 +20,11 @@ type TopPost = {
   has_paid_traffic: number;
   data_availability_status: string;
   effectEvaluation: ContentEffectEvaluation | null;
+  play_delta: number | null;
+  like_delta: number | null;
+  comment_delta: number | null;
+  favorite_delta: number | null;
+  share_delta: number | null;
 };
 
 type BreakoutItem = {
@@ -118,6 +123,11 @@ const metricCards = [
   { key: "favorites", label: "收藏", note: "筛选周期累计" },
   { key: "shares", label: "分享", note: "筛选周期累计" },
 ] as const;
+
+function Delta({ value }: { value: number | null }) {
+  if (value === null) return <span>暂无上次快照</span>;
+  return <b className={value < 0 ? "snapshot-delta negative" : value > 0 ? "snapshot-delta positive" : "snapshot-delta"}>{value > 0 ? "+" : ""}{formatCompact(value)}</b>;
+}
 
 export default function ContentMonitoringPage() {
   const range = useGlobalDateRange();
@@ -224,7 +234,7 @@ export default function ContentMonitoringPage() {
           <tbody>
             {rankedPosts.map((post, index) => <tr key={post.id}>
               <td><span className={`rank-chip rank-${index + 1}`}>TOP {index + 1}</span></td>
-              <td><strong>{post.title}</strong><div className="effect-label-row">{post.effectEvaluation?.labels.map((label) => <span className={`effect-label label-${label === "含付费流量" ? "paid" : label === "数据不足" ? "insufficient" : "result"}`} key={label}>{label}</span>)}</div><small className="table-subline">{formatDate(post.publish_time)} · 自然证据 {post.effectEvaluation?.naturalEvidenceViews === null ? "口径待确认" : formatCompact(post.effectEvaluation?.naturalEvidenceViews ?? 0)}</small></td>
+              <td><strong>{post.title}</strong><div className="effect-label-row">{post.effectEvaluation?.labels.map((label) => <span className={`effect-label label-${label === "含付费流量" ? "paid" : label === "数据不足" ? "insufficient" : "result"}`} key={label}>{label}</span>)}</div><small className="table-subline">{formatDate(post.publish_time)} · 自然证据 {post.effectEvaluation?.naturalEvidenceViews === null ? "口径待确认" : formatCompact(post.effectEvaluation?.naturalEvidenceViews ?? 0)}</small><small className="table-subline snapshot-delta-line">较上次采集：播放 <Delta value={post.play_delta} /> · 点赞 <Delta value={post.like_delta} /> · 评论 <Delta value={post.comment_delta} /> · 收藏 <Delta value={post.favorite_delta} /> · 分享 <Delta value={post.share_delta} /></small></td>
               <td><span className={`effect-grade grade-${post.effectEvaluation?.grade ?? "none"}`}>{post.effectEvaluation?.grade ?? "—"}</span><strong className="effect-score">{post.effectEvaluation?.overallScore ?? "—"}分</strong><small className="table-subline">{post.effectEvaluation?.gradeLabel ?? "待评价"}</small></td>
               <td>{post.effectEvaluation?.dimensions.propagation.score ?? "—"}<small className="table-subline">/30</small></td>
               <td>{post.effectEvaluation?.dimensions.interaction.score ?? "—"}<small className="table-subline">/25</small></td>

@@ -252,6 +252,41 @@ test("WorkBuddy deep content V2.1 preserves source files, real series and paid t
   assert.match(monitor, /social_post_paid_traffic/);
 });
 
+test("WorkBuddy daily monitor V2.2 appends deduplicated snapshots, deltas and evaluation history", async () => {
+  const [parser, preview, confirm, importer, schema, bootstrap, migration, monitorApi, monitorPage, detailApi, detailPage] = await Promise.all([
+    readFile(new URL("lib/workbuddy-posts-daily-v2-2.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/posts-daily-v2-2/route.ts", root), "utf8"),
+    readFile(new URL("app/api/collections/posts-deep-v2-1/confirm/route.ts", root), "utf8"),
+    readFile(new URL("scripts/import-workbuddy-douyin-daily.mjs", root), "utf8"),
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0029_workbuddy_daily_monitor_v2_2.sql", root), "utf8"),
+    readFile(new URL("app/api/content-monitoring/route.ts", root), "utf8"),
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/api/insights/content/detail/route.ts", root), "utf8"),
+    readFile(new URL("app/insights/content/detail/page.tsx", root), "utf8"),
+  ]);
+  assert.match(parser, /douyin_daily_monitor_v2\.2/);
+  assert.match(parser, /new_posts/);
+  assert.match(parser, /monitored_posts/);
+  assert.match(parser, /private_posts/);
+  assert.match(preview, /posts-deep-v2-1/);
+  assert.match(importer, /douyin_daily_monitor_20260821\.json/);
+  assert.doesNotMatch(importer, /writeFile|unlink|rename/);
+  for (const source of [schema, bootstrap, migration]) assert.match(source, /social_post_evaluations/);
+  assert.match(migration, /collection_batch/);
+  assert.match(migration, /uq_social_post_metric_series_time/);
+  assert.match(confirm, /INSERT INTO social_post_evaluations/);
+  assert.match(confirm, /ON CONFLICT\(post_id, evaluation_date, snapshot_id\) DO NOTHING/);
+  assert.match(confirm, /payload\.collectionBatch/);
+  assert.match(monitorApi, /s\.like_count - ps\.like_count/);
+  assert.match(monitorPage, /较上次采集/);
+  assert.match(detailApi, /snapshotHistory/);
+  assert.match(detailApi, /evaluationHistory/);
+  assert.match(detailPage, /系统每日快照趋势/);
+  assert.match(detailPage, /抖音平台趋势/);
+});
+
 test("Douyin content effect V1.0 uses four weighted dimensions, dynamic baselines and paid-traffic protection", async () => {
   const [model, loader, monitorApi, detailApi, monitorPage, detailPage, styles] = await Promise.all([
     readFile(new URL("lib/content-effect-evaluation.ts", root), "utf8"),
