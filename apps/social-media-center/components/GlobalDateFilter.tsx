@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { chinaToday, datePresetLabels, dateRangeQuery, isoDate, rangeForMonth, rangeForPreset, resolveDateRange, type DatePreset, type DateRange } from "@/lib/date-range";
 
 const baseStorageKey = "social-center-date-range-v1";
@@ -9,6 +9,7 @@ const baseRangeEvent = "social-center-date-range-change";
 type DateFilterOptions = {
   defaultPreset?: Exclude<DatePreset, "custom">;
   scope?: string;
+  showToday?: boolean;
 };
 
 function channelFor(scope: string) {
@@ -51,27 +52,22 @@ function publishRange(range: DateRange, scope: string) {
 
 export function useGlobalDateRange({ defaultPreset = "yesterday", scope = "global" }: DateFilterOptions = {}) {
   const { rangeEvent } = channelFor(scope);
-  const [range, setRange] = useState<DateRange>(() => readRange(defaultPreset, scope));
-
-  useEffect(() => {
-    const sync = (event: Event) => {
-      const detail = event instanceof CustomEvent ? event.detail as DateRange : null;
-      setRange(detail ?? readRange(defaultPreset, scope));
-    };
-    window.addEventListener(rangeEvent, sync);
-    window.addEventListener("popstate", sync);
+  const query = useSyncExternalStore((callback) => {
+    window.addEventListener(rangeEvent, callback);
+    window.addEventListener("popstate", callback);
     return () => {
-      window.removeEventListener(rangeEvent, sync);
-      window.removeEventListener("popstate", sync);
+      window.removeEventListener(rangeEvent, callback);
+      window.removeEventListener("popstate", callback);
     };
-  }, [defaultPreset, rangeEvent, scope]);
+  }, () => dateRangeQuery(readRange(defaultPreset, scope)), () => dateRangeQuery(rangeForPreset(defaultPreset)));
 
-  return range;
+  return resolveDateRange(new URLSearchParams(query));
 }
 
-export function GlobalDateFilter({ defaultPreset = "yesterday", scope = "global" }: DateFilterOptions = {}) {
+export function GlobalDateFilter({ defaultPreset = "yesterday", scope = "global", showToday = true }: DateFilterOptions = {}) {
   const range = useGlobalDateRange({ defaultPreset, scope });
   const [openPicker, setOpenPicker] = useState<"month" | "custom" | null>(null);
+  const presets = (Object.keys(datePresetLabels) as DatePreset[]).filter((preset) => showToday || preset !== "today");
 
   useEffect(() => {
     if (!openPicker) return;
@@ -95,7 +91,7 @@ export function GlobalDateFilter({ defaultPreset = "yesterday", scope = "global"
     <section className="global-date-filter" aria-label="全局数据周期筛选器">
       <div className="date-filter-title"><span>DATA PERIOD</span><strong>数据周期</strong><small>{range.from} — {range.to}</small></div>
       <div className="date-preset-group" role="group" aria-label="选择数据周期">
-        {(Object.keys(datePresetLabels) as DatePreset[]).map((preset) => (
+        {presets.map((preset) => (
           <button aria-expanded={preset === "month" || preset === "custom" ? openPicker === preset : undefined} className={range.preset === preset || openPicker === preset ? "active" : ""} key={preset} onClick={() => selectPreset(preset)}>{datePresetLabels[preset]}</button>
         ))}
       </div>

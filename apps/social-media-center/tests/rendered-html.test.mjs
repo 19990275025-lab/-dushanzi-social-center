@@ -39,36 +39,65 @@ for (const [path, heading] of [
   });
 }
 
-test("active system surfaces only support Douyin, Kuaishou and Weibo", async () => {
+test("frozen data surfaces still only query Douyin, Kuaishou and Weibo", async () => {
   const sourceFiles = [];
-  for (const directory of ["app", "components", "lib", "db"]) {
+  for (const directory of ["app/api", "db"]) {
     const names = await readdir(join(rootPath, directory), { recursive: true });
     sourceFiles.push(...names.filter((name) => /\.(?:ts|tsx|css)$/.test(name)).map((name) => join(rootPath, directory, name)));
   }
-  sourceFiles.push(join(rootPath, "README.md"));
   const sources = await Promise.all(sourceFiles.map((path) => readFile(path, "utf8")));
   for (const source of sources) assert.doesNotMatch(source, /wechat_channels|视频号|微信视频号/);
 });
 
-test("content monitoring and fan analysis are independent navigation modules", async () => {
-  const [source, shell] = await Promise.all([
-    readFile(new URL("app/insights/page.tsx", root), "utf8"),
+test("V2 primary navigation exposes eight isolated centers and keeps legacy pages", async () => {
+  const [shell, overview, platformPage, aiPlanning, taskCenter, reports] = await Promise.all([
     readFile(new URL("components/AppShell.tsx", root), "utf8"),
+    readFile(new URL("app/overview/page.tsx", root), "utf8"),
+    readFile(new URL("app/platform/[platform]/[[...section]]/page.tsx", root), "utf8"),
+    readFile(new URL("app/ai-planning/page.tsx", root), "utf8"),
+    readFile(new URL("app/task-center/page.tsx", root), "utf8"),
+    readFile(new URL("app/reports/page.tsx", root), "utf8"),
   ]);
-  assert.match(source, /内容与用户洞察中心/);
-  assert.match(source, /href="\/insights\/content"/);
-  assert.match(source, /href="\/insights\/fans"/);
-  assert.match(shell, /href: "\/insights\/content", label: "内容监测中心", code: "03"/);
-  assert.match(shell, /href: "\/insights\/fans", label: "粉丝分析中心", code: "04"/);
-  assert.match(shell, /href: "\/tasks", label: "任务管理中心", code: "11"/);
-  assert.match(shell, /platformNavPaths.*\/insights\/content.*\/hot-topics/);
-  assert.match(shell, /platformSubnav/);
-  assert.match(shell, /collapsedPlatformMenu/);
-  assert.match(shell, /setCollapsedPlatformMenu/);
-  assert.match(shell, /aria-expanded/);
-  assert.match(shell, /nav-expand-icon/);
-  for (const platform of ["抖音", "快手", "微博"]) assert.match(shell, new RegExp(`label: "${platform}"`));
-  assert.doesNotMatch(shell, /label: "内容与用户洞察"/);
+  for (const [code, label, href] of [
+    ["01", "总览", "/overview"],
+    ["02", "抖音运营中心", "/platform/douyin"],
+    ["03", "快手运营中心", "/platform/kuaishou"],
+    ["04", "微博运营中心", "/platform/weibo"],
+    ["05", "视频号运营中心", "/platform/video-account"],
+    ["06", "AI内容策划中心", "/ai-planning"],
+    ["07", "任务中心", "/task-center"],
+    ["08", "报表中心", "/reports"],
+  ]) assert.match(shell, new RegExp(`href: "${href}", label: "${label}", code: "${code}"`));
+  assert.match(overview, /\/api\/dashboard/);
+  assert.match(overview, /\/api\/posts/);
+  assert.match(platformPage, /platformLegacyHref/);
+  assert.match(aiPlanning, /content_plans/);
+  assert.match(taskCenter, /content_tasks/);
+  assert.match(reports, /不重新设计报表计算逻辑/);
+  for (const legacyPage of ["app/page.tsx", "app/insights/content/page.tsx", "app/insights/fans/page.tsx", "app/hot-topics/page.tsx", "app/content-planning/page.tsx", "app/tasks/page.tsx"]) await access(new URL(legacyPage, root));
+});
+
+test("V2 platform containers share layouts, tabs, date selector and honest empty states", async () => {
+  const [navigation, layout, selector, metric, empty, status, styles] = await Promise.all([
+    readFile(new URL("lib/v2-navigation.ts", root), "utf8"),
+    readFile(new URL("components/v2/PlatformLayout.tsx", root), "utf8"),
+    readFile(new URL("components/v2/DateRangeSelector.tsx", root), "utf8"),
+    readFile(new URL("components/v2/MetricCard.tsx", root), "utf8"),
+    readFile(new URL("components/v2/EmptyState.tsx", root), "utf8"),
+    readFile(new URL("components/v2/DataStatusBadge.tsx", root), "utf8"),
+    readFile(new URL("app/globals.css", root), "utf8"),
+  ]);
+  for (const platform of ["douyin", "kuaishou", "weibo", "video_account"]) assert.match(navigation, new RegExp(platform));
+  for (const section of ["粉丝分析", "内容监测及诊断", "热点监测", "AI生成话题"]) assert.match(navigation, new RegExp(section));
+  assert.match(navigation, /video_account:[\s\S]+sections: \["fans", "content"\]/);
+  assert.match(layout, /PlatformHeader/);
+  assert.match(layout, /PlatformTabs/);
+  assert.match(selector, /showToday=\{false\}/);
+  assert.match(metric, /v2-metric-card/);
+  assert.match(empty, /暂无真实数据/);
+  assert.match(status, /数据接入中/);
+  assert.match(styles, /v2-platform-tabs/);
+  assert.match(styles, /v2-platform-contribution-grid/);
 });
 
 test("content monitoring and fan insights retain platform themes", async () => {
@@ -340,7 +369,7 @@ test("data collection center combines automatic collection and imports without r
   assert.match(collector, /DataImportPanel/);
   assert.match(imports, /export function DataImportPanel/);
   assert.match(imports, /export default function ImportsPage/);
-  assert.match(shell, /label: "数据采集中心"/);
+  assert.doesNotMatch(shell, /label: "数据采集中心"/);
   assert.doesNotMatch(shell, /label: "数据导入中心"/);
   assert.doesNotMatch(shell, /label: "智能采集中心"/);
 });
@@ -513,7 +542,7 @@ test("external agents can import hot topics as JSON or Excel without collection 
   assert.doesNotMatch(localService, /playwright|douyin\.com|weibo\.com|kuaishou\.com/);
 });
 
-test("hot topic center uses the sidebar as its only platform selector", async () => {
+test("legacy hot topic center remains query-driven while V2 platform pages own navigation", async () => {
   const [page, shell, filter, api, agentApi, analysisApi, schema, migration] = await Promise.all([
     readFile(new URL("app/hot-topics/page.tsx", root), "utf8"),
     readFile(new URL("components/AppShell.tsx", root), "utf8"),
@@ -537,6 +566,7 @@ test("hot topic center uses the sidebar as its only platform selector", async ()
   assert.match(page, /topic\.url.*target="_blank"/);
   assert.match(page, /不展示模拟结果/);
   assert.match(shell, /isHotTopicsPage && <GlobalDateFilter defaultPreset="today" scope="hot-topics"/);
+  assert.doesNotMatch(shell, /platformSubnav|collapsedPlatformMenu/);
   assert.match(page, /useGlobalDateRange\(\{ defaultPreset: "today", scope: "hot-topics" \}\)/);
   assert.match(page, /topic\.collection_date/);
   assert.match(page, /from: range\.from, to: range\.to/);
@@ -1135,7 +1165,7 @@ test("hot topic archive V4.0 snapshots daily assets and exports Excel without al
   assert.match(download, /application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet/);
   assert.match(download, /content-disposition/);
   for (const label of ["热点历史查询", "生成当日报告", "下载Excel", "日期", "平台", "热点类型"]) assert.match(page, new RegExp(label));
-  assert.match(shell, /href: "\/hot-topic-archive", label: "热点档案库", code: "07"/);
+  assert.doesNotMatch(shell, /href: "\/hot-topic-archive", label: "热点档案库"/);
   assert.match(worker, /async scheduled/);
   assert.match(worker, /generateAndStoreDailyArchive/);
   assert.match(vite, /30 0 \* \* \*/);
@@ -1177,7 +1207,7 @@ test("AI content planning V1.0 closes hotspot to plan, task, post and seven-day 
   assert.match(api, /related_post_id = \?/);
   assert.match(api, /platform = 'douyin'/);
   for (const label of ["今日推荐选题 TOP5", "查看方案", "生成任务", "短视频标题（5个）", "视频脚本", "拍摄分镜", "封面文案", "推荐发布时间", "推荐标签", "推荐话题", "推荐背景音乐", "直播主题", "预计播放量", "预计互动率", "涨粉预估", "内容任务", "发布效果", "AI复盘"]) assert.match(page, new RegExp(label));
-  assert.match(shell, /href: "\/content-planning", label: "AI内容策划中心", code: "08"/);
+  assert.match(shell, /href: "\/ai-planning", label: "AI内容策划中心", code: "06"/);
   assert.match(worker, /refreshContentPlanFeedback/);
   assert.match(styles, /planning-topic-grid/);
   assert.match(styles, /planning-workspace/);
@@ -1255,7 +1285,7 @@ test("marketing operations V1.0 is a read-only daily hub backed by existing modu
   assert.match(api, /recommendationLevel/);
   assert.match(page, /shiftMonth/);
   assert.match(page, /未设目标/);
-  assert.match(shell, /href: "\/marketing-operations", label: "营销运营中心", code: "01"/);
+  assert.match(shell, /href: "\/overview", label: "总览", code: "01"/);
   assert.match(styles, /operations-todo-grid/);
   assert.match(styles, /operations-calendar-grid/);
   assert.match(styles, /marketing-goals-grid/);
