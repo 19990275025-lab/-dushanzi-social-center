@@ -996,10 +996,11 @@ test("WorkBuddy automatic relay validates, deduplicates, analyzes and archives a
 });
 
 test("V2.0 stable baseline formally declares evaluation history and maintenance runs", async () => {
-  const [schema, bootstrap, migration] = await Promise.all([
+  const [schema, bootstrap, migration, indexParityMigration] = await Promise.all([
     readFile(new URL("db/schema.ts", root), "utf8"),
     readFile(new URL("db/bootstrap.ts", root), "utf8"),
     readFile(new URL("drizzle/0030_v2_stable_baseline.sql", root), "utf8"),
+    readFile(new URL("drizzle/0031_schema_index_parity.sql", root), "utf8"),
   ]);
   for (const source of [schema, bootstrap]) {
     assert.match(source, /social_post_evaluations/);
@@ -1007,6 +1008,9 @@ test("V2.0 stable baseline formally declares evaluation history and maintenance 
   }
   assert.match(schema, /export const dataMaintenanceRuns/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS data_maintenance_runs/);
+  for (const indexName of ["uq_social_fans_source_record", "uq_fan_growth_source_record", "uq_content_audience_source_record", "uq_competitor_posts_source_record"]) {
+    assert.match(indexParityMigration, new RegExp(indexName));
+  }
 });
 
 test("hot topic V2.5 adds action levels, TOP5, conversion scoring and topic generation without schema changes", async () => {

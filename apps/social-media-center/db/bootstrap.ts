@@ -129,7 +129,7 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_social_fans_platform_collected_at
     ON social_fans(platform, collected_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_fans_source_record
-    ON social_fans(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+    ON social_fans(platform, source_record_id)`,
   `CREATE TABLE IF NOT EXISTS fan_profile_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     batch_id INTEGER NOT NULL REFERENCES fan_collection_batches(batch_id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -179,7 +179,7 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_fan_growth_platform_date
     ON fan_growth_records(platform, record_date DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_fan_growth_source_record
-    ON fan_growth_records(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+    ON fan_growth_records(platform, source_record_id)`,
   `CREATE TABLE IF NOT EXISTS social_posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     account_id INTEGER NOT NULL REFERENCES social_accounts(id) ON UPDATE CASCADE ON DELETE RESTRICT,
@@ -454,7 +454,7 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_content_audience_platform_collected_at
     ON content_audience_analysis(platform, collected_at DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_content_audience_source_record
-    ON content_audience_analysis(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+    ON content_audience_analysis(platform, source_record_id)`,
   `CREATE TABLE IF NOT EXISTS social_post_comment_keywords (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     post_id INTEGER NOT NULL REFERENCES social_posts(id) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -697,7 +697,7 @@ const schemaStatements = [
   `CREATE INDEX IF NOT EXISTS idx_competitor_posts_account_publish_time
     ON competitor_posts(account_name, publish_time DESC)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS uq_competitor_posts_source_record
-    ON competitor_posts(platform, source_record_id) WHERE source_record_id IS NOT NULL`,
+    ON competitor_posts(platform, source_record_id)`,
   `CREATE TABLE IF NOT EXISTS viral_videos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
