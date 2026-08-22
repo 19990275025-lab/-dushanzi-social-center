@@ -43,6 +43,12 @@ export const dataImportLogs = sqliteTable(
   ],
 );
 
+export const dataMaintenanceRuns = sqliteTable("data_maintenance_runs", {
+  operation: text("operation").primaryKey(),
+  resultJson: text("result_json", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const collectionLogs = sqliteTable(
   "collection_logs",
   {
@@ -259,8 +265,6 @@ export const socialPosts = sqliteTable(
     coverUrl: text("cover_url"),
     views: integer("views").notNull().default(0),
     likes: integer("likes").notNull().default(0),
-    likesAvailabilityStatus: text("likes_availability_status").notNull().default("available"),
-    likesRawValue: text("likes_raw_value"),
     comments: integer("comments").notNull().default(0),
     favorites: integer("favorites").notNull().default(0),
     shares: integer("shares").notNull().default(0),
@@ -621,6 +625,8 @@ export const socialComments = sqliteTable(
     commentTime: text("comment_time"),
     commentTimeRaw: text("comment_time_raw"),
     likes: integer("likes").notNull().default(0),
+    likesAvailabilityStatus: text("likes_availability_status").notNull().default("available"),
+    likesRawValue: text("likes_raw_value", { mode: "json" }).$type<unknown>(),
     replyCount: integer("reply_count").notNull().default(0),
     isAuthor: integer("is_author", { mode: "boolean" }).notNull().default(false),
     authorReplied: integer("author_replied", { mode: "boolean" }),

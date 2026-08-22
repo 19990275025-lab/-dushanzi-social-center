@@ -88,6 +88,17 @@ export function workBuddyFileDate(fileName: string) {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day ? date : null;
 }
 
+export function workBuddyCollectionDate(value: unknown) {
+  const parsed = new Date(String(value ?? ""));
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+}
+
 export async function startWorkBuddyRelay(
   d1: D1Database,
   input: { fileName: string; fileDate: string; originalCount: number; standardizedCount: number },
@@ -250,7 +261,7 @@ export async function preflightWorkBuddyRelay(
   const incomingKeys = new Set<string>();
   for (const row of staged.results) {
     const record = safeJson<Record<string, unknown> | null>(row.normalized_payload, null);
-    const collectDate = String(record?.collect_time ?? "").slice(0, 10);
+    const collectDate = workBuddyCollectionDate(record?.collect_time);
     const key = `${collectDate}|${record?.platform}|${record?.topic_type}|${record?.topic_name}|${record?.ranking}`;
     if (collectDate !== input.fileDate || incomingKeys.has(key)) throw new Error("暂存数据日期异常或批次内存在重复热点");
     incomingKeys.add(key);

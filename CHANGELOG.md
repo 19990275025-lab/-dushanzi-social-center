@@ -8,6 +8,7 @@
 
 ### 新增
 
+- 建立 V2.0 信息架构重组前稳定生产基线、正式 API 清单、冻结区、唯一业务主链和跨平台指标口径。
 - 新增抖音内容效果评价模型 V1.0：传播力 30、互动质量 25、用户吸引力 25、内容效率 20，并按视频/图文采用不同效率指标。
 - 内容监测新增综合/自然传播/互动/完播/涨粉/DOU+ 分类排行，作品详情新增动态基准、四维证据和八项原因诊断。
 - 新增 WorkBuddy 抖音深度作品 V2.1 接力：只读扫描固定目录，按真实采集时间、完整度和 checksum 选择尚未处理的最新批次，并完成预览、确认和重复拦截。
@@ -43,11 +44,13 @@
 
 ### 修复
 
+- 修复 WorkBuddy 热点自动接力把带 `+08:00` 的采集时间按 UTC 日期预检、导致北京时间当日文件退出码为 1 的问题。
 - 文档层面标注粉丝分析响应中存在但尚无实际 Route Handler 的预留采集路径。
 - 文档层面区分热点标准主表 `hot_topics` 与兼容表 `HOT_TOPIC_DATA`。
 
 ### 数据库调整
 
+- 正式声明 `social_post_evaluations` 评价历史表；保留并补入生产已有的 `data_maintenance_runs` 兼容定义，迁移只增不删。
 - 新增 `content_collection_files`、`social_post_metric_series`、`social_post_paid_traffic`、`social_post_audience`、`social_comment_replies`；作品快照与评论补充源记录状态和点赞可用性字段。
 - 新增 `social_post_snapshots`、`social_post_traffic`、`social_post_traffic_sources`、`social_post_comment_keywords`；扩展作品、作品观众、评论和采集日志结构。
 - 新增 `fan_collection_batches`、`fan_profile_records`；扩展 `social_fans` 与 `fan_growth_records` 支持历史快照、周期类型、回访粉丝和批次防重复。

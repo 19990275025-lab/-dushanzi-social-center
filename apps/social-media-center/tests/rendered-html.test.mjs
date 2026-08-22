@@ -979,6 +979,9 @@ test("WorkBuddy automatic relay validates, deduplicates, analyzes and archives a
   assert.match(relayModule, /generateAndStoreDailyArchive/);
   assert.match(relayModule, /planningRecommendation/);
   assert.match(relayModule, /status = 'success'/);
+  assert.match(relayModule, /workBuddyCollectionDate/);
+  assert.match(relayModule, /timeZone: "Asia\/Shanghai"/);
+  assert.doesNotMatch(relayModule, /String\(record\?\.collect_time \?\? ""\)\.slice\(0, 10\)/);
   assert.match(script, /hot_topic_\\d\{8\}\\\.\(json\|xlsx\|xls\)/);
   assert.match(script, /\/api\/data-collection\/v2\/receive/);
   assert.match(script, /\/api\/data-collection\/v2\/preview/);
@@ -990,6 +993,20 @@ test("WorkBuddy automatic relay validates, deduplicates, analyzes and archives a
   assert.match(collector, /今日归档/);
   for (const source of [schema, bootstrap, migration]) assert.match(source, /uq_hot_topics_relay_identity/);
   assert.match(planning, /h\.collection_date = \?/);
+});
+
+test("V2.0 stable baseline formally declares evaluation history and maintenance runs", async () => {
+  const [schema, bootstrap, migration] = await Promise.all([
+    readFile(new URL("db/schema.ts", root), "utf8"),
+    readFile(new URL("db/bootstrap.ts", root), "utf8"),
+    readFile(new URL("drizzle/0030_v2_stable_baseline.sql", root), "utf8"),
+  ]);
+  for (const source of [schema, bootstrap]) {
+    assert.match(source, /social_post_evaluations/);
+    assert.match(source, /data_maintenance_runs/);
+  }
+  assert.match(schema, /export const dataMaintenanceRuns/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS data_maintenance_runs/);
 });
 
 test("hot topic V2.5 adds action levels, TOP5, conversion scoring and topic generation without schema changes", async () => {

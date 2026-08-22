@@ -107,6 +107,8 @@ pnpm test
 | [模块状态](docs/module-status.md) | 版本、完成度、数据来源、问题和计划 |
 | [数据库设计](docs/database-design.md) | 全部核心表、字段、关系与数据质量 |
 | [API 设计](docs/api-design.md) | 现有路由、输入、输出和安全约定 |
+| [正式 API 基线 V1](docs/api-baseline-v1.md) | V2.0 重组期间保留的正式与兼容接口清单 |
+| [V2.0 重组前稳定基线](docs/v2-stable-baseline.md) | 生产备份、Schema 对账、冻结区、唯一主链与指标口径 |
 | [抖音内容效果评价 V1.0](docs/content-effect-evaluation-v1.md) | 四维评分、账号动态基准、缺失值保护、DOU+ 隔离和真实数据验证 |
 | [数据流](docs/data-flow.md) | WorkBuddy、抖音及规划工具到复盘的 Mermaid 流程 |
 | [版本路线](docs/version-roadmap.md) | `social-v0.9.0` 至 `social-v3.0.0` 目标和验收 |

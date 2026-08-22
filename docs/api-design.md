@@ -1,6 +1,6 @@
 # 新媒体运营中心 API 设计与现状
 
-> 核对范围：`apps/social-media-center/app/api/**/route.ts`，2026-08-20。
+> 核对范围：`apps/social-media-center/app/api/**/route.ts`，2026-08-22。冻结清单见 [正式 API 基线 V1](api-baseline-v1.md)。
 > 本文记录现有接口，不在本次文档工作中新增或修改 API。
 
 ## 1. 通用约定

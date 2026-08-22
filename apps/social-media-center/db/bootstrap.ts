@@ -34,6 +34,11 @@ const schemaStatements = [
     ON data_import_logs(created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_data_import_logs_status
     ON data_import_logs(status)`,
+  `CREATE TABLE IF NOT EXISTS data_maintenance_runs (
+    operation TEXT PRIMARY KEY,
+    result_json TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
   `CREATE TABLE IF NOT EXISTS collection_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform TEXT NOT NULL CHECK (platform IN ('douyin','kuaishou','weibo')),
