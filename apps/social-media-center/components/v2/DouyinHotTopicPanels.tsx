@@ -52,11 +52,12 @@ function planningHref(topic: HotTopic) {
 
 export function DouyinHotTopicsPanel() {
   const range = useV2DateRange();
+  const rangeQuery = dateRangeQuery(range);
   const [data, setData] = useState<TopicResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/hot-topic-data?platform=douyin&${dateRangeQuery(range)}`)
+    fetch(`/api/hot-topic-data?platform=douyin&${rangeQuery}`)
       .then(async (response) => {
         const body = await response.json() as TopicResponse & { error?: string };
         if (!response.ok) throw new Error(body.error ?? "抖音热点读取失败");
@@ -64,7 +65,7 @@ export function DouyinHotTopicsPanel() {
         setError("");
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : "抖音热点读取失败"));
-  }, [range]);
+  }, [rangeQuery]);
 
   const topics = (data?.topics ?? []).filter((topic) => topic.platform === "douyin").slice(0, 20);
   if (error) return <div className="error-panel">{error}</div>;
@@ -98,11 +99,12 @@ export function DouyinHotTopicsPanel() {
 
 export function DouyinAiTopicsPanel() {
   const range = useV2DateRange();
+  const rangeQuery = dateRangeQuery(range);
   const [data, setData] = useState<TopicResponse | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`/api/hot-topic-data?platform=douyin&${dateRangeQuery(range)}`)
+    fetch(`/api/hot-topic-data?platform=douyin&${rangeQuery}`)
       .then(async (response) => {
         const body = await response.json() as TopicResponse & { error?: string };
         if (!response.ok) throw new Error(body.error ?? "AI选题读取失败");
@@ -110,7 +112,7 @@ export function DouyinAiTopicsPanel() {
         setError("");
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : "AI选题读取失败"));
-  }, [range]);
+  }, [rangeQuery]);
 
   const recommendations = useMemo(() => (data?.topics ?? [])
     .filter((topic) => topic.platform === "douyin" && topic.analysis_id !== null && topic.ai_relevance_score !== null
