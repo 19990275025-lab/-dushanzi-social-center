@@ -125,10 +125,15 @@ function aggregatePlatforms(items: FanPlatform[]): FanPlatform {
     trend, trendSource: trend.length ? "已入库平台每日增长记录汇总" : "unavailable", strategy: { positioning: "分平台制定运营策略", actions: ["选择具体平台查看定位建议"] }, profile: null, previousProfile: null, profileHistory: [], profileComparison: null };
 }
 
-export default function FanAnalysisCenterPage() {
-  const range = useGlobalDateRange();
+type FanAnalysisCenterPageProps = {
+  embedded?: boolean;
+  forcedPlatform?: "douyin" | "kuaishou" | "weibo";
+};
+
+export default function FanAnalysisCenterPage({ embedded = false, forcedPlatform }: FanAnalysisCenterPageProps = {}) {
+  const range = useGlobalDateRange({ defaultPreset: "yesterday", scope: embedded ? "v2" : "global" });
   const [data, setData] = useState<FanData | null>(null);
-  const [selected, setSelected] = useState("douyin");
+  const [selected, setSelected] = useState(forcedPlatform ?? "douyin");
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>("7d");
   const [trendRange, setTrendRange] = useState<DateRange | null>(null);
   const [openTrendPicker, setOpenTrendPicker] = useState<"month" | "custom" | null>(null);
@@ -198,20 +203,20 @@ export default function FanAnalysisCenterPage() {
     window.setTimeout(cleanup, 1500);
   }
 
-  return <div className={`page-stack fan-analysis-center-page fan-insights-page platform-themed-page theme-${selected}`}>
-    <header className="page-heading compact-heading fan-v2-heading">
+  return <div className={`page-stack fan-analysis-center-page fan-insights-page platform-themed-page theme-${selected} ${embedded ? "v2-embedded-business-page" : ""}`}>
+    {!embedded && <header className="page-heading compact-heading fan-v2-heading">
       <div><p className="eyebrow">FAN ANALYSIS CENTER · V2.1</p><h1>{selected === "all" ? "粉丝分析中心" : `${currentPlatformLabel}粉丝分析`}</h1><p>监测真实粉丝批次、画像变化与期间作品表现，形成可验证的增长分析。</p></div>
       <div className="fan-v2-heading-actions"><span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span>{isDouyin && <div className="fan-export-actions"><button onClick={exportPdf} disabled={!current.metricsAvailable} title="在打印窗口中选择另存为PDF">导出PDF</button><button onClick={() => void exportPng()} disabled={exporting || !current.metricsAvailable}>{exporting ? "生成中…" : "导出PNG"}</button></div>}</div>
-    </header>
+    </header>}
 
-    <section className="fan-platform-grid">
+    {!embedded && <section className="fan-platform-grid">
       {platformData.map((item) => <button aria-pressed={selected === item.platform} className={`fan-platform-card platform-${item.platform} ${selected === item.platform ? "active" : ""}`} key={item.platform} onClick={() => setSelected(item.platform)}><div><span>{item.platform === "all" ? "全部平台" : platformLabel(item.platform)}</span><small>{selected === item.platform ? "当前平台" : item.profile ? "真实快照" : "平台暂未提供数据"}</small></div><strong>{item.fansCount === null ? "—" : formatCompact(item.fansCount)}<em>粉丝</em></strong><p className={item.netGrowth === null ? "" : item.netGrowth >= 0 ? "growth-up" : "growth-down"}>{item.netGrowth === null ? "平台暂未提供该周期数据" : `${item.netGrowth >= 0 ? "+" : ""}${formatCompact(item.netGrowth)} 净增长`}</p></button>)}
-    </section>
+    </section>}
 
-    <nav className="insight-platform-tabs fan-tabs" aria-label="粉丝分析平台筛选">{platforms.map((item) => <button aria-pressed={selected === item} className={`${selected === item ? "active" : ""} platform-tab-${item}`} key={item} onClick={() => setSelected(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}</nav>
+    {!embedded && <nav className="insight-platform-tabs fan-tabs" aria-label="粉丝分析平台筛选">{platforms.map((item) => <button aria-pressed={selected === item} className={`${selected === item ? "active" : ""} platform-tab-${item}`} key={item} onClick={() => setSelected(item)}>{item === "all" ? "全部平台" : platformLabel(item)}</button>)}</nav>}
 
     {isDouyin && <>
-      {!batchComparison.canCompare && <section className="panel batch-waiting-banner"><div><span>REAL BATCH STATUS</span><h2>{batchComparison.message}</h2><p>当前已完成真实采集批次：{batchComparison.batchCount}。系统不会使用旧版无批次快照或模拟数据补足上期。</p></div></section>}
+      {!batchComparison.canCompare && <section className="panel batch-waiting-banner"><div><span>REAL BATCH STATUS</span><h2>{embedded ? "真实历史批次不足，暂无法形成趋势。" : batchComparison.message}</h2><p>当前已完成真实采集批次：{batchComparison.batchCount}。系统不会使用旧版无批次快照或模拟数据补足上期。</p></div></section>}
 
       <section className="panel batch-current-overview">
         <div className="panel-heading"><div><span className="section-kicker">CURRENT REAL BATCH</span><h2>本期概览</h2></div><span className="section-note">{batchComparison.current ? `${batchComparison.current.collection_date} · 批次 #${batchComparison.current.batch_id}` : "暂无真实采集批次"}</span></div>

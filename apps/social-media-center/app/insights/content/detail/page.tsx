@@ -85,7 +85,9 @@ function SeriesChart({ title, points, color = "#168661" }: { title: string; poin
   return <article className="audience-dimension-block deep-series-card"><div className="deep-series-heading"><h3>{title}</h3><span>{points.length} 个真实数据点</span></div><svg aria-label={title} preserveAspectRatio="none" viewBox={`0 0 ${width} ${height}`}><polyline fill="none" points={polyline} stroke={color} strokeLinejoin="round" strokeWidth="4" /></svg><div className="deep-series-meta"><span>最小 {formatCompact(min)}</span><strong>最新 {formatCompact(values.at(-1) ?? 0)}</strong><span>最大 {formatCompact(max)}</span></div></article>;
 }
 
-export default function ContentDetailPage() {
+type ContentDetailPageProps = { embedded?: boolean };
+
+export default function ContentDetailPage({ embedded = false }: ContentDetailPageProps = {}) {
   const [activeTab, setActiveTab] = useState<Tab>("effect");
   const [data, setData] = useState<DetailData | null>(null);
   const [error, setError] = useState("");
@@ -120,11 +122,11 @@ export default function ContentDetailPage() {
     .map((item, point_index) => ({ metric_type: key, series_name: "system_daily_snapshot", point_index,
       point_time: item.snapshot_time, point_label: item.snapshot_date, metric_value: item[key] as number, unit: "count" }));
 
-  return <div className={`page-stack content-detail-page platform-themed-page theme-${post.platform}`}>
+  return <div className={`page-stack content-detail-page platform-themed-page theme-${post.platform} ${embedded ? "v2-embedded-business-page" : ""}`}>
     <header className="detail-work-hero">
       <div className={`detail-work-cover ${post.cover_url ? "has-cover" : ""}`} style={post.cover_url ? { backgroundImage: `url(${post.cover_url})` } : undefined}><span>{post.cover_url ? "" : "作品"}</span></div>
       <div className="detail-work-copy"><div className="detail-work-tags"><span className={`platform-tag tag-${post.platform}`}>{platformLabel(post.platform)}</span>{post.hasPaidTraffic && <span className="paid-traffic-badge">含付费流量</span>}{data.snapshot?.source_record_status === "private" && <span className="private-work-badge">私密作品</span>}</div><h1>{post.title}</h1><p>{formatDate(post.publish_time)} · {post.post_type || (post.content_type === "video" ? "短视频" : post.content_type)}{data.snapshot ? ` · 快照 ${formatDate(data.snapshot.snapshot_time)}` : ""}</p><strong className={`work-status ${data.snapshot?.source_record_status === "private" ? "private" : ""}`}><i />{data.snapshot?.source_record_status === "private" ? "作品状态：私密" : `作品状态：${post.post_status || "正常"}`}</strong></div>
-      <a className="back-to-insights" href={`/insights/content?platform=${post.platform}`}>← 返回内容分析</a>
+      <a className="back-to-insights" href={embedded ? "/platform/douyin/content" : `/insights/content?platform=${post.platform}`}>← 返回内容分析</a>
     </header>
 
     <nav className="detail-analysis-tabs" aria-label="作品数据分析">

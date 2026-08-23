@@ -1345,3 +1345,56 @@ input:focus, select:focus { border-color: #57cba0; box-shadow: 0 0 0 3px rgba(64
   .v2-platform-tabs a { padding-left: 13px; padding-right: 13px; }
   .v2-page-header h1 { font-size: 34px; }
 }
+
+/* V2.0 阶段2：总览与抖音真实业务挂接 */
+.v2-embedded-business-page { min-width: 0; }
+.v2-embedded-business-page > :first-child { margin-top: 0; }
+.v2-platform-not-connected { display: grid!important; gap: 8px; margin-top: 28px; }
+.v2-platform-not-connected b { color: #7e8985!important; font-size: 14px!important; margin: 0!important; }
+.v2-platform-not-connected small { line-height: 1.55; }
+
+.v2-douyin-post-list-panel { margin-bottom: 16px; }
+.v2-douyin-post-table { min-width: 1480px; }
+.v2-douyin-post-table td { vertical-align: middle; }
+.v2-douyin-post-table td:first-child { min-width: 380px; }
+.v2-work-title-cell { align-items: center; display: flex; gap: 12px; }
+.v2-work-title-cell > div { min-width: 0; }
+.v2-work-title-cell strong { display: -webkit-box; font-size: 10px; line-height: 1.55; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.v2-work-title-cell small { align-items: center; color: #83908b; display: flex; flex-wrap: wrap; font-size: 7px; gap: 4px; margin-top: 7px; }
+.v2-work-cover-fallback { align-items: center; background: #171c20; border-radius: 9px; color: #33d3e4; display: flex; flex: 0 0 52px; font-size: 8px; font-weight: 800; height: 66px; justify-content: center; }
+.v2-no-paid-badge { background: #edf2f0; border-radius: 99px; color: #77847e; display: inline-flex; font-size: 8px; padding: 6px 9px; }
+
+.v2-douyin-hot-panel { margin-bottom: 16px; }
+.v2-hot-topic-table { min-width: 1280px; }
+.v2-hot-topic-table td:nth-child(2) { min-width: 330px; }
+.v2-hot-topic-table td:nth-child(8) { min-width: 260px; }
+.v2-topic-trend-unavailable { background: #f0f3f2; border-radius: 99px; color: #7b8782; display: inline-flex; font-size: 8px; padding: 6px 9px; }
+
+.v2-ai-topic-stack { display: grid; gap: 16px; }
+.v2-ai-topic-intro { align-items: center; display: flex; justify-content: space-between; }
+.v2-ai-topic-intro h2 { color: #1b342c; font-size: 22px; margin: 8px 0; }
+.v2-ai-topic-intro p { color: #74817c; font-size: 10px; margin: 0; }
+.v2-ai-topic-intro > strong { color: #6f7d77; font-size: 10px; white-space: nowrap; }
+.v2-ai-topic-grid { display: grid; gap: 13px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v2-ai-topic-grid > article { border-top: 3px solid #222a2f; display: flex; flex-direction: column; min-height: 430px; }
+.v2-ai-topic-card-head { align-items: center; display: flex; justify-content: space-between; }
+.v2-ai-topic-card-head > strong { color: #173b30; font-size: 25px; text-align: right; }
+.v2-ai-topic-card-head > strong small { color: #84908b; display: block; font-size: 7px; font-weight: 500; }
+.v2-ai-topic-grid h3 { color: #192f28; font-size: 16px; line-height: 1.55; margin: 18px 0; }
+.v2-ai-topic-grid dl { display: grid; gap: 10px; margin: 0 0 20px; }
+.v2-ai-topic-grid dl > div { border-top: 1px solid #e5ebe8; display: grid; gap: 12px; grid-template-columns: 84px 1fr; padding-top: 10px; }
+.v2-ai-topic-grid dt { color: #708079; font-size: 8px; font-weight: 800; }
+.v2-ai-topic-grid dd { color: #52635c; font-size: 9px; line-height: 1.65; margin: 0; }
+.v2-ai-topic-grid .v2-primary-link { align-self: flex-start; margin-top: auto; }
+.v2-platform-selector-shell.has-topic-context { border-color: #9ed5bf; box-shadow: 0 8px 24px rgba(23, 138, 100, .08); }
+.v2-platform-selector-shell button.active { background: #153f33; color: white; }
+
+@media (max-width: 960px) {
+  .v2-ai-topic-grid { grid-template-columns: 1fr; }
+  .v2-ai-topic-intro { align-items: flex-start; flex-direction: column; gap: 12px; }
+}
+
+@media (max-width: 560px) {
+  .v2-work-title-cell { align-items: flex-start; }
+  .v2-ai-topic-grid dl > div { grid-template-columns: 1fr; }
+}

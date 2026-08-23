@@ -1,6 +1,9 @@
 import { EmptyState } from "@/components/v2/EmptyState";
 import { DataStatusBadge } from "@/components/v2/DataStatusBadge";
+import { DouyinAiTopicsPanel, DouyinHotTopicsPanel } from "@/components/v2/DouyinHotTopicPanels";
 import { PlatformLayout } from "@/components/v2/PlatformLayout";
+import ContentMonitoringPage from "@/app/insights/content/page";
+import FanAnalysisCenterPage from "@/app/insights/fans/page";
 import { platformDefinitions, platformFromRoute, platformLegacyHref, platformSections, type PlatformSection } from "@/lib/v2-navigation";
 
 export default async function PlatformCenterPage({ params }: { params: Promise<{ platform: string; section?: string[] }> }) {
@@ -12,6 +15,15 @@ export default async function PlatformCenterPage({ params }: { params: Promise<{
   const requestedSection = routeParams.section?.[0] as PlatformSection | undefined;
   const activeSection: PlatformSection = requestedSection && definition.sections.includes(requestedSection as never) ? requestedSection : "home";
   const legacyHref = platformLegacyHref(platform, activeSection);
+
+  if (platform === "douyin" && activeSection !== "home") {
+    return <PlatformLayout platform={platform} activeSection={activeSection}>
+      {activeSection === "fans" && <FanAnalysisCenterPage embedded forcedPlatform="douyin" />}
+      {activeSection === "content" && <ContentMonitoringPage embedded forcedPlatform="douyin" />}
+      {activeSection === "hot-topics" && <DouyinHotTopicsPanel />}
+      {activeSection === "ai-topics" && <DouyinAiTopicsPanel />}
+    </PlatformLayout>;
+  }
 
   return <PlatformLayout platform={platform} activeSection={activeSection}>
     {activeSection === "home" ? <section className="v2-module-grid" aria-label={`${definition.label}运营模块`}>

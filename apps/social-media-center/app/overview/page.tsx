@@ -6,126 +6,145 @@ import { DateRangeSelector, useV2DateRange } from "@/components/v2/DateRangeSele
 import { MetricCard } from "@/components/v2/MetricCard";
 import { V2PageHeader } from "@/components/v2/V2PageHeader";
 import { dateRangeQuery } from "@/lib/date-range";
-import { formatCompact } from "@/lib/format";
+import { formatCompact, formatDate } from "@/lib/format";
 
-type DashboardData = {
-  overview: Array<{ platform: string; followers: number; todayPosts: number; views: number; interactions: number }>;
+type FanData = {
+  platforms: Array<{ platform: string; fansCount: number | null; profile: { collectedAt: string } | null }>;
   updatedAt: string;
 };
 
-type Post = {
-  id: number;
+type ContentData = {
   platform: string;
-  views: number;
-  likes: number;
-  comments: number;
-  favorites: number;
-  shares: number;
+  range: { from: string; to: string; label: string };
+  summary: {
+    periodPublished: number;
+    views: number;
+    likes: number;
+    comments: number;
+    favorites: number;
+    shares: number;
+    interactions: number;
+  };
+  updatedAt: string;
 };
 
 const platforms = [
-  { id: "douyin", label: "抖音", metric: "播放" },
-  { id: "kuaishou", label: "快手", metric: "播放" },
-  { id: "weibo", label: "微博", metric: "曝光 / 阅读" },
-  { id: "video_account", label: "视频号", metric: "播放" },
+  {
+    id: "douyin",
+    label: "抖音",
+    metric: "播放",
+    positioning: "短视频传播、热点内容、视觉冲击、项目体验",
+    connected: true,
+  },
+  {
+    id: "kuaishou",
+    label: "快手",
+    metric: "播放",
+    positioning: "短视频传播、下沉用户、本地及旅行兴趣人群",
+    connected: false,
+  },
+  {
+    id: "weibo",
+    label: "微博",
+    metric: "曝光 / 阅读",
+    positioning: "热点传播、事件传播、图文信息、公共话题",
+    connected: false,
+  },
+  {
+    id: "video_account",
+    label: "视频号",
+    metric: "播放",
+    positioning: "微信生态、品牌内容、私域传播",
+    connected: false,
+  },
 ] as const;
 
 export default function OverviewPage() {
   const range = useV2DateRange();
-  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [fans, setFans] = useState<FanData | null>(null);
+  const [content, setContent] = useState<ContentData | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const query = dateRangeQuery(range);
     Promise.all([
-      fetch(`/api/dashboard?${query}`).then((response) => response.ok ? response.json() as Promise<DashboardData> : Promise.reject(new Error("总览数据读取失败"))),
-      fetch(`/api/posts?platform=all&from=${range.from}&to=${range.to}`).then((response) => response.ok ? response.json() as Promise<{ posts: Post[] }> : Promise.reject(new Error("作品数据读取失败"))),
-    ]).then(([dashboardData, postData]) => {
-      setDashboard(dashboardData);
-      setPosts(postData.posts);
+      fetch(`/api/insights/fans?${query}&trend=7d`).then((response) => response.ok
+        ? response.json() as Promise<FanData>
+        : Promise.reject(new Error("粉丝数据读取失败"))),
+      fetch(`/api/content-monitoring?platform=douyin&${query}`).then((response) => response.ok
+        ? response.json() as Promise<ContentData>
+        : Promise.reject(new Error("作品数据读取失败"))),
+    ]).then(([fanData, contentData]) => {
+      setFans(fanData);
+      setContent(contentData);
       setError("");
     }).catch((reason: Error) => setError(reason.message));
   }, [range]);
 
-  const totals = useMemo(() => posts.reduce((sum, post) => ({
-    views: sum.views + Number(post.views ?? 0),
-    likes: sum.likes + Number(post.likes ?? 0),
-    comments: sum.comments + Number(post.comments ?? 0),
-    favorites: sum.favorites + Number(post.favorites ?? 0),
-    shares: sum.shares + Number(post.shares ?? 0),
-  }), { views: 0, likes: 0, comments: 0, favorites: 0, shares: 0 }), [posts]);
-
-  const totalFollowers = dashboard?.overview.reduce((sum, item) => sum + Number(item.followers ?? 0), 0) ?? null;
-  const platformRows = platforms.map((platform) => {
-    const account = dashboard?.overview.find((item) => item.platform === platform.id);
-    const platformPosts = posts.filter((post) => post.platform === platform.id);
-    const views = platformPosts.reduce((sum, post) => sum + Number(post.views ?? 0), 0);
-    return {
-      ...platform,
-      followers: account?.followers ?? null,
-      posts: platformPosts.length,
-      views,
-      hasData: Boolean(account?.followers || platformPosts.length),
-      hasTrafficData: platformPosts.length > 0,
-    };
-  });
-
-  const hasAnyData = posts.length > 0 || Boolean(totalFollowers);
+  const douyinFans = fans?.platforms.find((item) => item.platform === "douyin") ?? null;
+  const summary = content?.summary ?? null;
+  const hasPeriodContent = Boolean(summary?.periodPublished);
+  const hasRealData = douyinFans?.fansCount !== null && douyinFans?.fansCount !== undefined || hasPeriodContent;
+  const platformRows = useMemo(() => platforms.map((platform) => ({
+    ...platform,
+    followers: platform.id === "douyin" ? douyinFans?.fansCount ?? null : null,
+    posts: platform.id === "douyin" && summary ? summary.periodPublished : null,
+    views: platform.id === "douyin" && summary ? summary.views : null,
+    interactions: platform.id === "douyin" && summary ? summary.interactions : null,
+  })), [douyinFans?.fansCount, summary]);
 
   return <div className="page-stack v2-page v2-overview-page">
     <DateRangeSelector />
     <V2PageHeader
       eyebrow="MANAGEMENT OVERVIEW"
       title="总览"
-      description="管理层跨平台观察入口；统一展示、保留各平台原始指标口径。"
-      aside={<DataStatusBadge status={hasAnyData ? "ready" : "unavailable"} />}
+      description="管理层跨平台观察入口；指标来自真实业务数据，并保留各平台原始口径。"
+      aside={<DataStatusBadge status={hasRealData ? "ready" : "unavailable"} />}
     />
 
     {error && <div className="error-panel">{error}</div>}
 
     <section className="v2-metric-grid" aria-label="跨平台核心指标">
-      <MetricCard label="总粉丝数量" value={totalFollowers ? formatCompact(totalFollowers) : "暂无数据"} note="账号最新真实记录" state={totalFollowers ? "available" : "empty"} />
-      <MetricCard label="发布作品数量" value={posts.length || "暂无数据"} note={range.label} state={posts.length ? "available" : "empty"} />
-      <MetricCard label="总流量 / 总播放" value={posts.length ? formatCompact(totals.views) : "暂无数据"} note="按平台原始播放或曝光口径展示" state={posts.length ? "available" : "empty"} />
-      <MetricCard label="总点赞" value={posts.length ? formatCompact(totals.likes) : "暂无数据"} note={range.label} state={posts.length ? "available" : "empty"} />
-      <MetricCard label="总评论" value={posts.length ? formatCompact(totals.comments) : "暂无数据"} note={range.label} state={posts.length ? "available" : "empty"} />
-      <MetricCard label="总收藏" value={posts.length ? formatCompact(totals.favorites) : "暂无数据"} note={range.label} state={posts.length ? "available" : "empty"} />
-      <MetricCard label="总转发 / 分享" value={posts.length ? formatCompact(totals.shares) : "暂无数据"} note={range.label} state={posts.length ? "available" : "empty"} />
+      <MetricCard label="总粉丝数量" value={douyinFans?.fansCount === null || douyinFans?.fansCount === undefined ? "暂无数据" : formatCompact(douyinFans.fansCount)} note="抖音最新真实账号快照" state={douyinFans?.fansCount === null || douyinFans?.fansCount === undefined ? "empty" : "available"} />
+      <MetricCard label="发布作品数量" value={hasPeriodContent ? summary?.periodPublished ?? "暂无数据" : "暂无数据"} note={range.label} state={hasPeriodContent ? "available" : "empty"} />
+      <MetricCard label="总播放 / 总流量" value={hasPeriodContent ? formatCompact(summary?.views ?? 0) : "暂无数据"} note="当前阶段为抖音播放口径" state={hasPeriodContent ? "available" : "empty"} />
+      <MetricCard label="总点赞" value={hasPeriodContent ? formatCompact(summary?.likes ?? 0) : "暂无数据"} note={range.label} state={hasPeriodContent ? "available" : "empty"} />
+      <MetricCard label="总评论" value={hasPeriodContent ? formatCompact(summary?.comments ?? 0) : "暂无数据"} note={range.label} state={hasPeriodContent ? "available" : "empty"} />
+      <MetricCard label="总收藏" value={hasPeriodContent ? formatCompact(summary?.favorites ?? 0) : "暂无数据"} note={range.label} state={hasPeriodContent ? "available" : "empty"} />
+      <MetricCard label="总分享" value={hasPeriodContent ? formatCompact(summary?.shares ?? 0) : "暂无数据"} note={range.label} state={hasPeriodContent ? "available" : "empty"} />
     </section>
 
     <section className="panel v2-contribution-panel">
       <div className="panel-heading">
-        <div><span className="section-kicker">PLATFORM CONTRIBUTION</span><h2>平台流量贡献</h2></div>
-        <span className="section-note">DOU+不得计入自然传播占比；当前仅展示业务表原始口径</span>
+        <div><span className="section-kicker">PLATFORM CONTRIBUTION</span><h2>各平台内容贡献</h2></div>
+        <span className="section-note">当前仅接入抖音真实数据；不同平台原始口径不强行合并</span>
       </div>
       <div className="v2-platform-contribution-grid">
-        {platformRows.map((platform) => {
-          const share = totals.views > 0 && platform.hasTrafficData ? platform.views / totals.views * 100 : null;
-          return <article key={platform.id}>
-            <div><strong>{platform.label}</strong><span>{platform.metric}</span></div>
-            {platform.hasTrafficData ? <>
-              <b>{formatCompact(platform.views)}</b>
-              <div className="v2-contribution-track"><i style={{ width: `${share ?? 0}%` }} /></div>
-              <small>周期贡献 {share?.toFixed(1)}% · {platform.posts} 条作品</small>
-            </> : <p>暂无数据</p>}
-          </article>;
-        })}
+        {platformRows.map((platform) => <article key={platform.id}>
+          <div><strong>{platform.label}</strong><span>{platform.metric}</span></div>
+          {platform.connected && hasPeriodContent ? <>
+            <b>{formatCompact(platform.views ?? 0)}</b>
+            <div className="v2-contribution-track"><i style={{ width: "100%" }} /></div>
+            <small>作品 {platform.posts} 条 · 互动 {formatCompact(platform.interactions ?? 0)} · 当前已接入平台贡献 100%</small>
+          </> : <div className="v2-platform-not-connected"><b>{platform.connected ? "暂无数据" : "未接入"}</b><small>{platform.connected ? "当前筛选周期没有真实作品" : "不使用抖音数据填充"}</small></div>}
+        </article>)}
       </div>
     </section>
 
     <section className="panel v2-positioning-panel">
       <div className="panel-heading">
-        <div><span className="section-kicker">PLATFORM POSITIONING</span><h2>平台内容定位</h2></div>
-        <span className="section-note">本阶段仅建立分析容器，不生成模拟结论</span>
+        <div><span className="section-kicker">PLATFORM POSITIONING</span><h2>平台运营定位</h2></div>
+        <span className="section-note">运营说明，不参与指标计算</span>
       </div>
       <div className="v2-positioning-grid">
         {platformRows.map((platform) => <article key={platform.id}>
           <span>{platform.label}</span>
-          <h3>{platform.hasData ? "等待后续阶段接入定位分析" : "暂无真实数据"}</h3>
-          <p>{platform.hasData ? "将复用内容、粉丝与效果评价结果形成平台定位。" : "完成该平台数据接入后启用分析。"}</p>
+          <h3>{platform.positioning}</h3>
+          <p>{platform.connected ? "已接入真实业务数据" : "平台容器已保留，等待真实数据接入"}</p>
         </article>)}
       </div>
     </section>
+
+    <p className="analysis-disclaimer">数据来源：social_fans、fan_growth_records、social_posts、social_post_snapshots、social_post_evaluations · 粉丝快照：{douyinFans?.profile?.collectedAt ? formatDate(douyinFans.profile.collectedAt) : "暂无"} · 页面更新时间：{content?.updatedAt ? formatDate(content.updatedAt) : "读取中"} · 未知值不转换为0。</p>
   </div>;
 }

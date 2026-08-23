@@ -36,7 +36,7 @@ export const platformSections = {
   fans: { label: "粉丝分析", summary: "查看粉丝规模、增长与平台实际提供的画像。" },
   content: { label: "内容监测及诊断", summary: "查看作品表现、内容评分与改进方向。" },
   "hot-topics": { label: "热点监测", summary: "从平台热点中识别可跟进的内容机会。" },
-  "ai-topics": { label: "AI生成话题", summary: "将平台和热点上下文传递至统一AI内容策划中心。" },
+  "ai-topics": { label: "AI选题推荐", summary: "将平台和热点上下文传递至统一AI内容策划中心。" },
 } as const;
 
 export function platformFromRoute(route: string): V2Platform | null {

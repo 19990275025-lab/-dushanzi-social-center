@@ -68,8 +68,8 @@ test("V2 primary navigation exposes eight isolated centers and keeps legacy page
     ["07", "任务中心", "/task-center"],
     ["08", "报表中心", "/reports"],
   ]) assert.match(shell, new RegExp(`href: "${href}", label: "${label}", code: "${code}"`));
-  assert.match(overview, /\/api\/dashboard/);
-  assert.match(overview, /\/api\/posts/);
+  assert.match(overview, /\/api\/insights\/fans/);
+  assert.match(overview, /\/api\/content-monitoring/);
   assert.match(platformPage, /platformLegacyHref/);
   assert.match(aiPlanning, /content_plans/);
   assert.match(taskCenter, /content_tasks/);
@@ -88,7 +88,7 @@ test("V2 platform containers share layouts, tabs, date selector and honest empty
     readFile(new URL("app/globals.css", root), "utf8"),
   ]);
   for (const platform of ["douyin", "kuaishou", "weibo", "video_account"]) assert.match(navigation, new RegExp(platform));
-  for (const section of ["粉丝分析", "内容监测及诊断", "热点监测", "AI生成话题"]) assert.match(navigation, new RegExp(section));
+  for (const section of ["粉丝分析", "内容监测及诊断", "热点监测", "AI选题推荐"]) assert.match(navigation, new RegExp(section));
   assert.match(navigation, /video_account:[\s\S]+sections: \["fans", "content"\]/);
   assert.match(layout, /PlatformHeader/);
   assert.match(layout, /PlatformTabs/);
@@ -98,6 +98,41 @@ test("V2 platform containers share layouts, tabs, date selector and honest empty
   assert.match(status, /数据接入中/);
   assert.match(styles, /v2-platform-tabs/);
   assert.match(styles, /v2-platform-contribution-grid/);
+});
+
+test("V2 stage 2 reuses real Douyin APIs and mature pages without duplicating data models", async () => {
+  const [overview, platformPage, hotPanels, fans, content, detail, detailRoute, planning] = await Promise.all([
+    readFile(new URL("app/overview/page.tsx", root), "utf8"),
+    readFile(new URL("app/platform/[platform]/[[...section]]/page.tsx", root), "utf8"),
+    readFile(new URL("components/v2/DouyinHotTopicPanels.tsx", root), "utf8"),
+    readFile(new URL("app/insights/fans/page.tsx", root), "utf8"),
+    readFile(new URL("app/insights/content/page.tsx", root), "utf8"),
+    readFile(new URL("app/insights/content/detail/page.tsx", root), "utf8"),
+    readFile(new URL("app/platform/douyin/content/detail/page.tsx", root), "utf8"),
+    readFile(new URL("app/ai-planning/page.tsx", root), "utf8"),
+  ]);
+  for (const label of ["总粉丝数量", "发布作品数量", "总播放 / 总流量", "总点赞", "总评论", "总收藏", "总分享", "各平台内容贡献", "平台运营定位"]) assert.match(overview, new RegExp(label));
+  assert.match(overview, /未接入/);
+  assert.match(overview, /不使用抖音数据填充/);
+  assert.match(platformPage, /FanAnalysisCenterPage embedded forcedPlatform="douyin"/);
+  assert.match(platformPage, /ContentMonitoringPage embedded forcedPlatform="douyin"/);
+  assert.match(platformPage, /DouyinHotTopicsPanel/);
+  assert.match(platformPage, /DouyinAiTopicsPanel/);
+  assert.match(fans, /scope: embedded \? "v2" : "global"/);
+  assert.match(fans, /真实历史批次不足，暂无法形成趋势/);
+  assert.match(content, /作品监测列表/);
+  assert.match(content, /较上次/);
+  assert.match(content, /含付费流量/);
+  assert.match(detail, /系统每日快照趋势/);
+  assert.match(detail, /抖音平台趋势/);
+  assert.match(detailRoute, /ContentDetailPage embedded/);
+  assert.match(hotPanels, /platform=douyin/);
+  assert.match(hotPanels, /hot_topic_analysis_id/);
+  assert.match(hotPanels, /进入AI内容策划中心/);
+  assert.match(planning, /已接收抖音热点/);
+  for (const forbidden of ["CREATE TABLE", "ALTER TABLE", "INSERT INTO social_posts", "UPDATE social_posts"]) {
+    assert.doesNotMatch(overview + platformPage + hotPanels, new RegExp(forbidden));
+  }
 });
 
 test("content monitoring and fan insights retain platform themes", async () => {

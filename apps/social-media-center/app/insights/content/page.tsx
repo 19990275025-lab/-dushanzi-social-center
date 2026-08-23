@@ -10,8 +10,13 @@ type TopPost = {
   id: number;
   title: string;
   platform: string;
+  content_type: string;
   publish_time: string;
   views: number;
+  likes: number;
+  comments: number;
+  favorites: number;
+  shares: number;
   interactions: number;
   interactionRate: number;
   aiScore: number;
@@ -129,9 +134,15 @@ function Delta({ value }: { value: number | null }) {
   return <b className={value < 0 ? "snapshot-delta negative" : value > 0 ? "snapshot-delta positive" : "snapshot-delta"}>{value > 0 ? "+" : ""}{formatCompact(value)}</b>;
 }
 
-export default function ContentMonitoringPage() {
-  const range = useGlobalDateRange();
-  const platform = useSyncExternalStore(subscribePlatform, platformSnapshot, () => "douyin");
+type ContentMonitoringPageProps = {
+  embedded?: boolean;
+  forcedPlatform?: MonitoringPlatform;
+};
+
+export default function ContentMonitoringPage({ embedded = false, forcedPlatform }: ContentMonitoringPageProps = {}) {
+  const range = useGlobalDateRange({ defaultPreset: "yesterday", scope: embedded ? "v2" : "global" });
+  const routePlatform = useSyncExternalStore(subscribePlatform, platformSnapshot, () => "douyin");
+  const platform = forcedPlatform ?? routePlatform;
   const currentPlatformLabel = platformLabel(platform);
   const [data, setData] = useState<ContentMonitoringData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -182,28 +193,28 @@ export default function ContentMonitoringPage() {
   const rankedPosts = data.topPosts.filter((post) => rankingMode !== "paid" || post.has_paid_traffic === 1)
     .sort((a, b) => rankingValue(b) - rankingValue(a) || (b.organic_views ?? -1) - (a.organic_views ?? -1));
 
-  return <div className={`page-stack content-monitor-v1 platform-themed-page theme-${platform}`}>
-    <header className="page-heading compact-heading">
+  return <div className={`page-stack content-monitor-v1 platform-themed-page theme-${platform} ${embedded ? "v2-embedded-business-page" : ""}`}>
+    {!embedded && <header className="page-heading compact-heading">
       <div>
         <p className="eyebrow">CONTENT MONITORING CENTER · V1.0</p>
         <h1>{currentPlatformLabel}内容监测中心</h1>
         <p>围绕作品表现、爆款结构、低效原因和热点转化，形成每日可执行的内容优化闭环。</p>
       </div>
       <span className="current-platform-badge" aria-live="polite"><i />当前平台：{currentPlatformLabel}</span>
-    </header>
+    </header>}
 
-    <section className="content-monitor-scope" aria-label="监测范围">
+    {!embedded && <section className="content-monitor-scope" aria-label="监测范围">
       <div><span>监测平台</span><strong>{currentPlatformLabel}</strong><small>左侧平台入口切换</small></div>
       <div><span>数据周期</span><strong>{data.range.label}</strong><small>{data.range.from} — {data.range.to}</small></div>
       <div><span>周期发布</span><strong>{data.summary.periodPublished} 条</strong><small>来源 social_posts</small></div>
       <div><span>评论样本</span><strong>{data.summary.capturedComments} 条</strong><small>来源 social_comments</small></div>
-    </section>
+    </section>}
 
     <section className="content-monitor-kpis" aria-label="作品监测驾驶舱">
       {metricCards.map((item) => <article key={item.key}>
-        <span>{item.label}</span>
-        <strong>{formatCompact(data.summary[item.key])}</strong>
-        <small>{item.note}</small>
+        <span>{embedded && item.key === "todayPublished" ? "发布作品数" : item.label}</span>
+        <strong>{formatCompact(embedded && item.key === "todayPublished" ? data.summary.periodPublished : data.summary[item.key])}</strong>
+        <small>{embedded && item.key === "todayPublished" ? data.range.label : item.note}</small>
       </article>)}
       <article className="interaction-kpi">
         <span>互动率</span>
@@ -211,6 +222,28 @@ export default function ContentMonitoringPage() {
         <small>（点赞+评论+收藏+分享）÷ 播放</small>
       </article>
     </section>
+
+    {embedded && <section className="panel v2-douyin-post-list-panel">
+      <div className="panel-heading">
+        <div><span className="section-kicker">REAL POST MONITORING</span><h2>作品监测列表</h2></div>
+        <span className="section-note">当前指标来自最新真实快照；负增长按平台原值保留</span>
+      </div>
+      <div className="table-wrap">
+        <table className="content-table v2-douyin-post-table">
+          <thead><tr><th>作品</th><th>发布时间</th><th>类型</th><th>播放</th><th>点赞</th><th>评论</th><th>收藏</th><th>分享</th><th>DOU+</th><th>评分</th><th>完整度</th><th>操作</th></tr></thead>
+          <tbody>{data.topPosts.map((post) => <tr key={post.id}>
+            <td><div className="v2-work-title-cell"><span className="v2-work-cover-fallback">作品</span><div><strong>{post.title}</strong><small>较上次：播放 <Delta value={post.play_delta} /> · 点赞 <Delta value={post.like_delta} /> · 评论 <Delta value={post.comment_delta} /></small></div></div></td>
+            <td className="date-cell">{formatDate(post.publish_time)}</td>
+            <td>{post.content_type === "video" ? "短视频" : post.content_type || "平台未提供"}</td>
+            <td>{formatCompact(post.views)}</td><td>{formatCompact(post.likes)}</td><td>{formatCompact(post.comments)}</td><td>{formatCompact(post.favorites)}</td><td>{formatCompact(post.shares)}</td>
+            <td>{post.has_paid_traffic === 1 ? <span className="paid-traffic-badge">含付费流量</span> : <span className="v2-no-paid-badge">未发现</span>}</td>
+            <td><span className={`effect-grade grade-${post.effectEvaluation?.grade ?? "none"}`}>{post.effectEvaluation?.grade ?? "—"}</span><small className="table-subline">{post.effectEvaluation?.overallScore ?? "—"}分</small></td>
+            <td>{post.effectEvaluation?.dataCompleteness ?? 0}%<small className="table-subline">{post.effectEvaluation?.dataConfidence ?? "low"}</small></td>
+            <td><a className="content-analysis-link" href={`/platform/douyin/content/detail?id=${post.id}`}>数据分析</a></td>
+          </tr>)}{!data.topPosts.length && <tr><td className="empty-cell" colSpan={12}>当前筛选周期暂无抖音真实作品。</td></tr>}</tbody>
+        </table>
+      </div>
+    </section>}
 
     <section className="panel content-ranking-panel">
       <div className="panel-heading">
@@ -241,7 +274,7 @@ export default function ContentMonitoringPage() {
               <td>{post.effectEvaluation?.dimensions.attraction.score ?? "—"}<small className="table-subline">/25</small></td>
               <td>{post.effectEvaluation?.dimensions.efficiency.score ?? "—"}<small className="table-subline">/20</small></td>
               <td><span className={`confidence-badge confidence-${post.effectEvaluation?.dataConfidence ?? "low"}`}>{post.effectEvaluation?.dataConfidence ?? "low"}</span><small className="table-subline">数据完整度 {post.effectEvaluation?.dataCompleteness ?? 0}%</small></td>
-              <td><a className="content-analysis-link" href={`/insights/content/detail?id=${post.id}`}>数据分析</a></td>
+              <td><a className="content-analysis-link" href={embedded ? `/platform/douyin/content/detail?id=${post.id}` : `/insights/content/detail?id=${post.id}`}>数据分析</a></td>
             </tr>)}
             {!rankedPosts.length && <tr><td className="empty-cell" colSpan={9}>{rankingMode === "paid" ? "筛选周期内没有DOU+作品" : `筛选周期内暂无${currentPlatformLabel}作品`}</td></tr>}
           </tbody>
