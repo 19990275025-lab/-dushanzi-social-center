@@ -197,13 +197,13 @@ export async function POST(request: Request) {
 
     for (const source of post.trafficSources) {
       statements.push(d1.prepare(`INSERT INTO social_post_traffic_sources
-        (post_id, snapshot_id, snapshot_time, source_type, source_name, traffic_value,
+        (post_id, snapshot_id, snapshot_time, source_type, metric_dimension, source_name, traffic_value,
          percentage, change_percentage, traffic_nature, raw_value, collection_log_id)
-        SELECT p.id, s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        SELECT p.id, s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         FROM social_posts p JOIN social_post_snapshots s ON s.post_id = p.id AND s.snapshot_time = ?
         WHERE p.platform = 'douyin' AND ${matchSql} LIMIT 1
-        ON CONFLICT(snapshot_id, source_name, traffic_nature) DO NOTHING`).bind(
-        post.snapshot.snapshotTime, source.sourceType, source.sourceName, source.trafficValue,
+        ON CONFLICT(snapshot_id, metric_dimension, source_name, traffic_nature) DO NOTHING`).bind(
+        post.snapshot.snapshotTime, source.sourceType, source.trafficValue !== null || source.percentage !== null ? "play" : "unknown", source.sourceName, source.trafficValue,
         source.percentage, source.changePercentage, source.trafficNature, JSON.stringify(source.rawValue),
         logId, post.snapshot.snapshotTime, ...matchBinds(post),
       ));
@@ -211,9 +211,9 @@ export async function POST(request: Request) {
 
     if (post.paidTraffic) {
       statements.push(d1.prepare(`INSERT INTO social_post_paid_traffic
-        (post_id, snapshot_id, snapshot_time, campaign_type, play_count, relationship_to_overview,
+        (post_id, snapshot_id, snapshot_time, campaign_type, promotion_type, promotion_source, promotion_present, play_count, relationship_to_overview,
          detail_available, data_availability_status, raw_payload, collection_log_id)
-        SELECT p.id, s.id, ?, ?, ?, ?, ?, ?, ?, ?
+        SELECT p.id, s.id, ?, ?, 'paid', 'dou_plus', 1, ?, ?, ?, ?, ?, ?
         FROM social_posts p JOIN social_post_snapshots s ON s.post_id = p.id AND s.snapshot_time = ?
         WHERE p.platform = 'douyin' AND ${matchSql} LIMIT 1
         ON CONFLICT(snapshot_id, campaign_type) DO NOTHING`).bind(
@@ -306,14 +306,15 @@ export async function POST(request: Request) {
       const result = await d1.prepare(`INSERT INTO social_post_evaluations
         (post_id, evaluation_date, snapshot_id, total_score, grade, propagation_score,
          interaction_score, attraction_score, efficiency_score, confidence, douyin_paid_status,
-         data_completeness, raw_evaluation, collection_log_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         data_completeness, raw_evaluation, collection_log_id, platform, model_version, promotion_status, promotion_type, natural_performance_confidence)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'douyin', 'douyin-content-effect-rules-v1', ?, ?, ?)
         ON CONFLICT(post_id, evaluation_date, snapshot_id) DO NOTHING`).bind(
         evaluation.postId, payload.collectionDate, snapshotRow.id, evaluation.overallScore, evaluation.grade,
         evaluation.dimensions.propagation.score, evaluation.dimensions.interaction.score,
         evaluation.dimensions.attraction.score, evaluation.dimensions.efficiency.score,
         evaluation.dataConfidence, evaluation.labels.includes("含付费流量") ? "paid" : "none",
         evaluation.dataCompleteness, JSON.stringify(evaluation), logId,
+        evaluation.labels.includes("含付费流量") ? "paid" : "none", evaluation.labels.includes("含付费流量") ? "paid" : "organic", evaluation.naturalPerformanceConfidence,
       ).run();
       evaluationCount += Number(result.meta.changes ?? 0);
     }

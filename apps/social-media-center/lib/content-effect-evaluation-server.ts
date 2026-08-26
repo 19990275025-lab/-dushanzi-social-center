@@ -1,4 +1,5 @@
 import { evaluateContentEffects, type ContentEffectEvaluation, type ContentEffectFact } from "@/lib/content-effect-evaluation";
+import { DouyinEvaluationStrategy } from "@/lib/platform-evaluation-strategies";
 
 type BaseRow = {
   id: number;
@@ -203,7 +204,11 @@ export async function loadContentEffectEvaluations(
   const byAccount = new Map<number, ContentEffectFact[]>();
   for (const post of facts) byAccount.set(post.accountId, [...(byAccount.get(post.accountId) ?? []), post]);
   for (const accountPosts of byAccount.values()) {
-    evaluations.push(...evaluateContentEffects(accountPosts, selectedIds));
+    // Kuaishou reads are dispatched before this legacy loader. Other old platform
+    // callers keep their existing contract; this change must not refactor Weibo.
+    evaluations.push(...(options.platform === "douyin"
+      ? DouyinEvaluationStrategy.evaluate(accountPosts, selectedIds)
+      : evaluateContentEffects(accountPosts, selectedIds)));
   }
   const rankable = evaluations.filter((item) => item.grade !== null);
   const gradeCounts = { S: 0, A: 0, B: 0, C: 0, D: 0 };

@@ -175,7 +175,7 @@ export async function POST(request: Request) {
           (account_id, platform, source, title, content_type, publish_time,
            views, likes, comments, favorites, shares, collection_log_id, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-        ON CONFLICT(account_id, title) DO UPDATE SET
+        ON CONFLICT(account_id, title) WHERE platform <> 'kuaishou' OR platform_post_id IS NULL DO UPDATE SET
           platform = excluded.platform, source = excluded.source,
           content_type = excluded.content_type, publish_time = excluded.publish_time,
           views = excluded.views, likes = excluded.likes, comments = excluded.comments,

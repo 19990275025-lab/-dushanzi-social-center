@@ -1,6 +1,7 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { loadContentEffectEvaluations } from "@/lib/content-effect-evaluation-server";
+import { readKuaishouDetail } from "@/lib/kuaishou-content-data";
 
 type PostRow = {
   id: number;
@@ -117,6 +118,10 @@ export async function GET(request: Request) {
   if (!Number.isInteger(id) || id <= 0) return Response.json({ error: "作品编号无效" }, { status: 400 });
 
   const d1 = getD1();
+  const identity = await d1.prepare("SELECT platform FROM social_posts WHERE id=?").bind(id).first<{ platform: string }>();
+  const requestedPlatform = new URL(request.url).searchParams.get("platform");
+  if (!identity || (requestedPlatform && requestedPlatform !== identity.platform)) return Response.json({ error: "作品不存在或平台不匹配" }, { status: 404 });
+  if (identity.platform === "kuaishou") return Response.json(await readKuaishouDetail(d1, id));
   const [post, snapshot, traffic, sourceResult, paidTraffic, seriesResult, commentResult, audienceResult, legacyAudience, keywordResult, snapshotHistoryResult, evaluationHistoryResult] = await Promise.all([
     d1.prepare(`
       SELECT id, platform, platform_post_id, title, content_type, post_type, post_status, publish_time,

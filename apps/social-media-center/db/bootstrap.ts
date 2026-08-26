@@ -1,4 +1,5 @@
 import { getD1 } from "./index";
+import { ensureKuaishouAdapterSchema } from "./kuaishou-adapter-schema";
 
 let initialization: Promise<void> | null = null;
 
@@ -217,8 +218,6 @@ const schemaStatements = [
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_posts_account_title
-    ON social_posts(account_id, title)`,
   `CREATE INDEX IF NOT EXISTS idx_social_posts_account_publish_time
     ON social_posts(account_id, publish_time DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_social_posts_platform_publish_time
@@ -420,8 +419,6 @@ const schemaStatements = [
     collection_log_id INTEGER REFERENCES collection_logs(id) ON DELETE SET NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS uq_social_post_traffic_source_snapshot
-    ON social_post_traffic_sources(snapshot_id, source_name, traffic_nature)`,
   `CREATE INDEX IF NOT EXISTS idx_social_post_traffic_source_nature
     ON social_post_traffic_sources(post_id, traffic_nature, snapshot_time DESC)`,
   `CREATE TABLE IF NOT EXISTS content_audience_analysis (
@@ -862,7 +859,6 @@ async function initialize() {
   }
   await d1.batch([
     d1.prepare("UPDATE social_posts SET post_url = COALESCE(post_url, video_url), duration_seconds = COALESCE(duration_seconds, duration)"),
-    d1.prepare("CREATE UNIQUE INDEX IF NOT EXISTS uq_social_posts_platform_post_id ON social_posts(platform, platform_post_id) WHERE platform_post_id IS NOT NULL"),
   ]);
   await d1
     .prepare(
@@ -1231,6 +1227,7 @@ async function initialize() {
     d1.prepare("CREATE INDEX IF NOT EXISTS idx_content_tasks_related_post ON content_tasks(related_post_id)"),
   ]);
 
+  await ensureKuaishouAdapterSchema(d1);
   await d1.prepare("PRAGMA optimize").run();
 }
 

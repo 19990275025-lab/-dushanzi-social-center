@@ -1,6 +1,7 @@
 import { ensureDatabase } from "@/db/bootstrap";
 import { getD1 } from "@/db";
 import { resolveDateRange } from "@/lib/date-range";
+import { readKuaishouContent } from "@/lib/kuaishou-content-data";
 import { ruleBasedContentEngine, type AnalysisPost, type AnalysisTopic } from "@/lib/content-analysis-engine";
 
 const platforms = ["douyin", "kuaishou", "weibo"] as const;
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
   const requested = searchParams.get("platform") ?? "all";
   const platform = platforms.includes(requested as (typeof platforms)[number]) ? requested : "all";
   const d1 = getD1();
+  if (platform === "kuaishou") return Response.json(await readKuaishouContent(d1, range));
 
   const [postResult, accountResult, topicResult, viralResult] = await Promise.all([
     d1.prepare(`

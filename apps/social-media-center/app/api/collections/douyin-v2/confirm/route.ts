@@ -101,7 +101,7 @@ export async function POST(request: Request) {
          favorites, shares, fans_growth, hashtags, completion_rate, average_play_duration,
          traffic_sources, collection_log_id)
       VALUES (?, 'douyin', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, ?, ?)
-      ON CONFLICT(account_id, title) DO UPDATE SET
+      ON CONFLICT(account_id, title) WHERE platform <> 'kuaishou' OR platform_post_id IS NULL DO UPDATE SET
         content_type = excluded.content_type,
         publish_time = excluded.publish_time,
         video_url = excluded.video_url,

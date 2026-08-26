@@ -3,6 +3,7 @@ import { getD1 } from "@/db";
 import { chinaToday, resolveDateRange } from "@/lib/date-range";
 import { ruleBasedContentEngine, type AnalysisTopic } from "@/lib/content-analysis-engine";
 import { loadContentEffectEvaluations } from "@/lib/content-effect-evaluation-server";
+import { readKuaishouContent } from "@/lib/kuaishou-content-data";
 import {
   buildBreakoutAnalysis,
   buildLowEfficiencyDiagnosis,
@@ -78,6 +79,7 @@ export async function GET(request: Request) {
   }
   const today = chinaToday().iso;
   const d1 = getD1();
+  if (platform === "kuaishou") return Response.json(await readKuaishouContent(d1, range));
 
   const [postResult, topicResult, commentResult, feedbackResult, todayResult, effectResult] = await Promise.all([
     d1.prepare(`

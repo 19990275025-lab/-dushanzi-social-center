@@ -206,14 +206,14 @@ export async function POST(request: Request) {
     for (const source of post.trafficSources) {
       statements.push(d1.prepare(`
         INSERT INTO social_post_traffic_sources
-          (post_id, snapshot_id, snapshot_time, source_type, source_name, traffic_value,
+          (post_id, snapshot_id, snapshot_time, source_type, metric_dimension, source_name, traffic_value,
            percentage, change_percentage, traffic_nature, raw_value, collection_log_id)
-        SELECT p.id, s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        SELECT p.id, s.id, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         FROM social_posts p JOIN social_post_snapshots s ON s.post_id = p.id AND s.snapshot_time = ?
         WHERE p.platform = 'douyin' AND p.platform_post_id = ? LIMIT 1
-        ON CONFLICT(snapshot_id, source_name, traffic_nature) DO NOTHING
+        ON CONFLICT(snapshot_id, metric_dimension, source_name, traffic_nature) DO NOTHING
       `).bind(
-        post.snapshot.snapshotTime, source.sourceType, source.sourceName, source.trafficValue,
+        post.snapshot.snapshotTime, source.sourceType, source.trafficValue !== null || source.percentage !== null ? "play" : "unknown", source.sourceName, source.trafficValue,
         source.percentage, source.changePercentage, source.trafficNature, JSON.stringify(source.rawValue),
         logId, post.snapshot.snapshotTime, post.platformPostId,
       ));

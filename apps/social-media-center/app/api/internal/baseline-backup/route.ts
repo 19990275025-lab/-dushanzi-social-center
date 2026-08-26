@@ -186,6 +186,7 @@ export async function GET(request: Request) {
     createdAt: string;
     schema: SchemaRow[];
     tables: Record<string, {
+      columns: string[];
       rowCount: number;
       complete: boolean;
       chunks: Array<{ offset: number; rowCount: number; key: string; checksum: string; sizeBytes: number }>;
@@ -220,6 +221,31 @@ export async function GET(request: Request) {
   const chunkOffset = Number(new URL(request.url).searchParams.get("chunk_offset") ?? 0);
   if (!Number.isInteger(chunkOffset) || chunkOffset < 0) return json({ error: "invalid_chunk_offset" }, { status: 400 });
   const selectedChunks = requested.chunks.slice(chunkOffset, chunkOffset + 40);
+  if (new URL(request.url).searchParams.get("verify_live") === "1") {
+    const failures: string[] = [];
+    let verifiedRows = 0;
+    if (!requested.columns.includes("id")) return json({ error: "id_required_for_row_audit" }, { status: 400 });
+    for (const chunk of selectedChunks) {
+      const chunkObject = await runtime().UPLOADS.get(chunk.key);
+      if (!chunkObject) return json({ error: "backup_chunk_missing" }, { status: 409 });
+      const chunkText = await chunkObject.text();
+      if (await sha256(chunkText) !== chunk.checksum) return json({ error: "backup_checksum_mismatch" }, { status: 409 });
+      const rows = (JSON.parse(chunkText) as { rows: Array<Record<string, unknown>> }).rows;
+      if (!rows.length) continue;
+      const current = await runtime().DB.prepare(`SELECT ${requested.columns.map(quoteIdentifier).join(",")} FROM ${quoteIdentifier(requestedTable)} WHERE id IN (${rows.map(() => "?").join(",")})`)
+        .bind(...rows.map(row => row.id)).all<Record<string, unknown>>();
+      const byId = new Map(current.results.map(row => [row.id, row]));
+      for (const row of rows) {
+        const found = byId.get(row.id);
+        if (!found) failures.push(`${requestedTable}:${row.id}:missing`);
+        else if (requested.columns.some(column => JSON.stringify(row[column]) !== JSON.stringify(found[column]))) failures.push(`${requestedTable}:${row.id}:changed`);
+        verifiedRows += 1;
+      }
+    }
+    const currentCount = await runtime().DB.prepare(`SELECT COUNT(*) AS n FROM ${quoteIdentifier(requestedTable)}`).first<{ n: number }>();
+    return json({ ok: failures.length === 0, table: requestedTable, verifiedRows, backupRows: requested.rowCount,
+      currentRows: currentCount?.n, failures, nextChunkOffset: chunkOffset + selectedChunks.length < requested.chunks.length ? chunkOffset + selectedChunks.length : null });
+  }
   const rowCounts: Record<string, number> = {};
   const failures: string[] = [];
   let totalSizeBytes = new TextEncoder().encode(payload).byteLength;
@@ -263,4 +289,3 @@ export async function GET(request: Request) {
     failures,
   });
 }
-
