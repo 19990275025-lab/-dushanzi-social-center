@@ -214,6 +214,39 @@ test("Stage3A real-file acceptance, migrations, import, isolation and deduplicat
       assert.equal(fans.trendStatus, "insufficient_history"); unchanged(db, before);
       assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
     });
+    await t.test("legacy content API scopes both posts and overview to the requested platform", async () => {
+      // Execute the actual route against the disposable copy of real records.
+      // Only infrastructure bindings are replaced; no fake business rows are introduced.
+      const dependencies = {
+        "@/db/bootstrap": { ensureDatabase: async () => {} },
+        "@/db": { getD1: () => d1 },
+        "@/lib/date-range": await load("lib/date-range.ts"),
+        "@/lib/kuaishou-content-data": await load("lib/kuaishou-content-data.ts"),
+        "@/lib/content-analysis-engine": await load("lib/content-analysis-engine.ts"),
+      };
+      const code = ts.transpileModule(await readFile(resolve(root, "app/api/insights/content/route.ts"), "utf8"), {
+        compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+      }).outputText;
+      const exports = {};
+      new Function("require", "exports", code)(name => {
+        assert.ok(dependencies[name], `unexpected route dependency: ${name}`);
+        return dependencies[name];
+      }, exports);
+      const query = "preset=custom&from=2026-08-01&to=2026-08-26";
+      const douyin = await (await exports.GET(new Request(`https://local.invalid/api/insights/content?platform=douyin&${query}`))).json();
+      assert.deepEqual(douyin.platformOverview.map(item => item.platform), ["douyin"]);
+      assert.ok(douyin.monitoredPosts.length > 0);
+      assert.ok(douyin.monitoredPosts.every(post => post.platform === "douyin"));
+      assert.ok(douyin.topPosts.every(post => post.platform === "douyin"));
+      const kuaishou = await (await exports.GET(new Request(`https://local.invalid/api/insights/content?platform=kuaishou&${query}`))).json();
+      assert.equal(kuaishou.posts.length, 2);
+      assert.ok(kuaishou.posts.every(post => post.platform === "kuaishou"));
+      const all = await (await exports.GET(new Request(`https://local.invalid/api/insights/content?platform=all&${query}`))).json();
+      assert.equal(all.platformOverview.length, 3);
+      assert.ok(all.monitoredPosts.some(post => post.platform === "douyin"));
+      assert.ok(all.monitoredPosts.some(post => post.platform === "kuaishou"));
+      unchanged(db, before);
+    });
     console.log(JSON.stringify({ realFile, sampleResult: result.changes, sourcePosts: selectedPostIds, frozenRowsUnchanged: true }));
   } finally { db.close(); }
 });

@@ -55,10 +55,11 @@ export async function GET(request: Request) {
         comments, favorites, shares, fans_growth, hashtags, duration
       FROM social_posts
       WHERE date(publish_time) BETWEEN date(?) AND date(?)
+        AND (? = 'all' OR platform = ?)
       ORDER BY publish_time DESC, id DESC
       LIMIT 500
-    `).bind(range.from, range.to).all<PostRow>(),
-    d1.prepare("SELECT platform, followers_count FROM social_accounts WHERE status = 'active'").all<AccountRow>(),
+    `).bind(range.from, range.to, platform, platform).all<PostRow>(),
+    d1.prepare("SELECT platform, followers_count FROM social_accounts WHERE status = 'active' AND (? = 'all' OR platform = ?)").bind(platform, platform).all<AccountRow>(),
     d1.prepare(`
       SELECT platform, topic_name, keyword, heat_value, trend, related_degree, ai_suggestion
       FROM hot_topics
@@ -81,7 +82,7 @@ export async function GET(request: Request) {
   const analyzed = ruleBasedContentEngine.analyzePosts(selectedPosts.map((post) => ({ ...post, hashtags: parseHashtags(post.hashtags) })), topicResult.results);
   const scoreById = new Map(analyzed.map((post) => [post.id, post]));
 
-  const platformOverview = platforms.map((item) => {
+  const platformOverview = platforms.filter((item) => platform === "all" || item === platform).map((item) => {
     const rows = allPosts.filter((post) => post.platform === item);
     return {
       platform: item,
